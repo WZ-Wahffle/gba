@@ -2,8 +2,12 @@
 #import "File_Utilities";
 #import "Process";
 
-#run,stallable build();
-#run run_command("./build/gba");
+#run build_and_run();
+
+build_and_run :: () {
+    #run build();
+    run_command("./build/gba");
+}
 
 build :: () {
     w := compiler_create_workspace();

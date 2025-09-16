@@ -1,3 +1,4 @@
 .zed/
 .build/
 build/
+gba_bios.bin

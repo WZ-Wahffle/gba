@@ -1,5 +1,14 @@
 #import "Basic";
+#import "File";
+
+cpu: Cpu;
 
 main :: () {
-    print("Test\n");
+    bios, success := read_entire_file("in/gba_bios.bin");
+    if !success || bios.count != cpu.memory.bios.count {
+        log_error("BIOS file not found\n");
+        exit(1);
+    }
+
+    memcpy(cpu.memory.bios.data, bios.data, cpu.memory.bios.count);
 }
