@@ -54,7 +54,7 @@ ui :: (t: *Thread) -> s64 {
         immediate_quad(0., 0., xx window_width, xx window_height, .{1, 1, 1, 1});
         immediate_flush();
 
-        set_default_theme(default_theme_procs[5]());
+        set_default_theme(theme_catppuccin());
 
         ui_per_frame_update(win, xx window_width, xx window_height, seconds_since_init());
         if !subwindows_initted {
