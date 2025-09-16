@@ -8,9 +8,10 @@
 
 SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;
-FONT_HEIGHT :: 36;
+FONT_HEIGHT :: 28;
 window_width := SCREEN_WIDTH * 4;
 window_height := SCREEN_HEIGHT * 4;
+font: *Dynamic_Font;
 
 subwindow_cpu: Subwindow_Info;
 
@@ -24,6 +25,8 @@ ui :: (t: *Thread) -> s64 {
     defer texture_destroy(*texture);
     quit := false;
     subwindows_initted := false;
+    font = get_font_at_size("/usr/share/fonts/TTF", "JetBrainsMono-Regular.ttf", FONT_HEIGHT);
+    assert(font != null);
     ui_init();
 
     while !quit {
@@ -75,8 +78,11 @@ cpu_window_scroll := 0.;
 cpu_window :: (state: *Subwindow_State, r: Rect, data: *void) {
     label_theme: Label_Theme;
     label_theme.alignment = .Left;
+    label_theme.font = font;
+    label_theme.text_color = .{1., 0.95, 0.8, 1.};
     cursor := r;
     cursor.h = FONT_HEIGHT;
+    cursor.y += 10;
     context.print_style.default_format_int.base = 16;
     context.print_style.default_format_int.minimum_digits = 8;
     defer context.print_style.default_format_int.base = 10;
