@@ -1,5 +1,6 @@
 #import "Basic";
 #import "File";
+#import "Thread";
 
 cpu: Cpu;
 
@@ -11,4 +12,9 @@ main :: () {
     }
 
     memcpy(cpu.memory.bios.data, bios.data, cpu.memory.bios.count);
+
+    ui_thread: Thread;
+    thread_init(*ui_thread, ui);
+    thread_start(*ui_thread);
+    while !thread_is_done(*ui_thread) {}
 }
