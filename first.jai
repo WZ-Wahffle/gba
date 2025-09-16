@@ -1,11 +1,17 @@
 #import "Compiler";
 #import "File_Utilities";
 #import "Process";
+#import "Basic";
 
 #run build_and_run();
 
 build_and_run :: () {
+    start_time := file_modtime_and_size("./build/gba");
     #run build();
+    while true {
+        modtime := file_modtime_and_size("./build/gba");
+        if compare_apollo_times(start_time, modtime) != 0 break;
+    }
     run_command("./build/gba");
 }
 
