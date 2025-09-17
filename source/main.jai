@@ -3,6 +3,7 @@
 #import "Thread";
 
 cpu: Cpu;
+ppu: Ppu;
 
 main :: () {
     bios, success := read_entire_file("in/gba_bios.bin");
@@ -13,8 +14,5 @@ main :: () {
 
     memcpy(cpu.memory.bios.data, bios.data, cpu.memory.bios.count);
 
-    ui_thread: Thread;
-    thread_init(*ui_thread, ui);
-    thread_start(*ui_thread);
-    while !thread_is_done(*ui_thread) {}
+    ui();
 }
