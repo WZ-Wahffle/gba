@@ -4,10 +4,13 @@ Cpu :: struct {
     sp: u32;
     lr: u32;
     pc: u32;
-    psr: u32;
-    spsr: [#run enum_highest_value(Cpu_Mode)]u32;
+    psr: u32 = 0xb3;
+    spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     state := Cpu_State.ARM;
-    mode := Cpu_Mode.USER;
+    mode := Cpu_Mode.SVC;
+
+    interrupt_master_enable := false;
+
     emu_state := Emulation_State.STOPPED;
     remaining_cycles := 0;
 
@@ -16,14 +19,14 @@ Cpu :: struct {
         ARM;
     }
 
-    Cpu_Mode :: enum {
-        USER;
-        SYSTEM;
-        IRQ;
-        FIQ;
-        SVC;
-        ABT;
-        UND;
+    Cpu_Mode :: enum s32 {
+        USER :: -2;
+        SYSTEM :: -1;
+        IRQ :: 0;
+        FIQ :: 1;
+        SVC :: 2;
+        ABT :: 3;
+        UND :: 4;
     }
 
     Emulation_State :: enum {

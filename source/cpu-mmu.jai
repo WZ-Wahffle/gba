@@ -17,6 +17,8 @@ mmu_read :: (addr: u32, execute := false) -> u8 {
 
     else if addr >= 0x04000000 && addr < 0x04000400 {
         if addr - 0x04000000 == {
+            case 0x300;
+            return 0;
             case;
             assert(false);
         }
@@ -56,6 +58,8 @@ mmu_write :: (addr: u32, val: u8) {
 
     else if addr >= 0x04000000 && addr < 0x04000400 {
         if addr - 0x04000000 == {
+            case 0x208;
+                cpu.interrupt_master_enable = (val & 1) != 0;
             case;
             assert(false);
         }

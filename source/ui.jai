@@ -14,6 +14,7 @@ window_height := SCREEN_HEIGHT * 4;
 font: *Dynamic_Font;
 
 subwindow_cpu: Subwindow_Info;
+subwindow_disasm: Subwindow_Info;
 
 step_ppu :: () {
     ppu.draw_x += 1;
@@ -91,14 +92,57 @@ ui :: () {
             subwindow_cpu.title_text = "cpu";
             subwindow_cpu.draw = cpu_window;
             subwindow_cpu.open = true;
+
+            subwindow_disasm.rect = get_rect(10+subwindow_cpu.rect.w, 10, xx window_width / 2., xx window_height / 2.);
+            subwindow_disasm.title_text = "disasm";
+            subwindow_disasm.draw = disasm_window;
+            subwindow_disasm.open = true;
             subwindows_initted = true;
         }
 
         add_subwindow(*subwindow_cpu);
+        add_subwindow(*subwindow_disasm);
         draw_popups();
 
         swap_buffers(win);
     }
+}
+
+#scope_file
+imm_button :: (cursor: *Rect, text: string, base_x: float, in_line: bool) -> (was_just_pressed: bool, state: *Button_State, was_just_released: bool) {
+    cursor.*.w = xx prepare_text(font, text);
+    ret1, ret2, ret3 := button(cursor.*, text, identifier=xx (cursor.*.x * cursor.*.y));
+    if in_line {
+        cursor.*.x += cursor.*.w + 5;
+    } else {
+        cursor.*.x = base_x;
+        cursor.*.y += cursor.*.h + 5;
+    }
+    return ret1, ret2, ret3;
+}
+
+#scope_file
+imm_label :: (cursor: *Rect, text: string, theme: *Label_Theme, base_x: float, in_line: bool) {
+    cursor.*.w = xx prepare_text(font, text);
+    label(cursor.*, text, theme);
+    if in_line {
+        cursor.*.x += cursor.*.w + 5;
+    } else {
+        cursor.*.x = base_x;
+        cursor.*.y += cursor.*.h + 5;
+    }
+}
+
+#scope_file
+imm_checkbox :: (cursor: *Rect, name: string, pressed: bool, base_x: float, in_line: bool) -> bool {
+    ret := base_checkbox(cursor.*, name, pressed);
+    if in_line {
+        cursor.*.x += cursor.*.w + 5;
+    } else {
+        cursor.*.x = base_x;
+        cursor.*.y += cursor.*.h + 5;
+    }
+    return ret;
 }
 
 cpu_window_scroll := 0.;
@@ -110,65 +154,53 @@ cpu_window :: (state: *Subwindow_State, r: Rect, data: *void) {
     cursor := r;
     cursor.h = FONT_HEIGHT;
     cursor.y += 10;
-    context.print_style.default_format_int.base = 16;
-    context.print_style.default_format_int.minimum_digits = 8;
-    defer context.print_style.default_format_int.base = 10;
-    defer context.print_style.default_format_int.minimum_digits = 1;
-
-    imm_button :: (cursor: *Rect, text: string, in_line: bool) -> (was_just_pressed: bool, state: *Button_State, was_just_released: bool) {
-        cursor.*.w = xx prepare_text(font, text);
-        ret1, ret2, ret3 := button(cursor.*, text, identifier=xx (cursor.*.x * cursor.*.y));
-        if in_line {
-            cursor.*.x += cursor.*.w + 5;
-        } else {
-            cursor.*.x = 0;
-            cursor.*.y += cursor.*.h + 5;
-        }
-        return ret1, ret2, ret3;
-    }
-
-    imm_label :: (cursor: *Rect, text: string, theme: *Label_Theme, in_line: bool) {
-        cursor.*.w = xx prepare_text(font, text);
-        label(cursor.*, text, theme);
-        if in_line {
-            cursor.*.x += cursor.*.w + 5;
-        } else {
-            cursor.*.x = 0;
-            cursor.*.y += cursor.*.h + 5;
-        }
-    }
 
     region, inside := begin_scrollable_region(r);
     cursor.y -= cpu_window_scroll;
-    cursor.x = 10;
-    if imm_button(*cursor, "Start", true) {
+    base_x := r.x + 10;
+    cursor.x = base_x;
+    if imm_button(*cursor, "Start", base_x, true) {
         cpu.emu_state = .RUNNING;
     }
-    if imm_button(*cursor, "Stop", true) {
+    if imm_button(*cursor, "Stop", base_x, true) {
         cpu.emu_state = .STOPPED;
     }
-    if imm_button(*cursor, "Step", false) {
+    if imm_button(*cursor, "Step", base_x, false) {
         cpu.emu_state = .STOPPED;
         cpu.remaining_cycles = 1;
         step_cpu();
     }
-    imm_label(*cursor, tprint("PC : 0x%", formatInt(cpu.pc, 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("LR : 0x%", formatInt(cpu.lr, 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("SP : 0x%", formatInt(cpu.sp, 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("PSR: 0x%", formatInt(cpu.psr, 16, 8)), *label_theme, false);
-    imm_label(*cursor, "", *label_theme, false);
-    imm_label(*cursor, tprint("R00: 0x% ", formatInt(cpu.gpr[0], 16, 8)), *label_theme, true);
-    imm_label(*cursor, tprint("R01: 0x%", formatInt(cpu.gpr[1], 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("R02: 0x% ", formatInt(cpu.gpr[2], 16, 8)), *label_theme, true);
-    imm_label(*cursor, tprint("R03: 0x%", formatInt(cpu.gpr[3], 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("R04: 0x% ", formatInt(cpu.gpr[4], 16, 8)), *label_theme, true);
-    imm_label(*cursor, tprint("R05: 0x%", formatInt(cpu.gpr[5], 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("R06: 0x% ", formatInt(cpu.gpr[6], 16, 8)), *label_theme, true);
-    imm_label(*cursor, tprint("R07: 0x%", formatInt(cpu.gpr[7], 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("R08: 0x% ", formatInt(cpu.gpr[8], 16, 8)), *label_theme, true);
-    imm_label(*cursor, tprint("R09: 0x%", formatInt(cpu.gpr[9], 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("R10: 0x% ", formatInt(cpu.gpr[10], 16, 8)), *label_theme, true);
-    imm_label(*cursor, tprint("R11: 0x%", formatInt(cpu.gpr[11], 16, 8)), *label_theme, false);
-    imm_label(*cursor, tprint("R12: 0x% ", formatInt(cpu.gpr[12], 16, 8)), *label_theme, true);
+
+    context.print_style.default_format_int.base = 16;
+    context.print_style.default_format_int.minimum_digits = 8;
+    defer context.print_style.default_format_int.base = 10;
+    defer context.print_style.default_format_int.minimum_digits = 1;
+    imm_label(*cursor, tprint("PC : 0x%", formatInt(cpu.pc, 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("LR : 0x%", formatInt(cpu.lr, 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("SP : 0x%", formatInt(cpu.sp, 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("PSR: 0x%", formatInt(cpu.psr, 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, "", *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R00: 0x% ", formatInt(cpu.gpr[0], 16, 8)), *label_theme, base_x, true);
+    imm_label(*cursor, tprint("R01: 0x%", formatInt(cpu.gpr[1], 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R02: 0x% ", formatInt(cpu.gpr[2], 16, 8)), *label_theme, base_x, true);
+    imm_label(*cursor, tprint("R03: 0x%", formatInt(cpu.gpr[3], 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R04: 0x% ", formatInt(cpu.gpr[4], 16, 8)), *label_theme, base_x, true);
+    imm_label(*cursor, tprint("R05: 0x%", formatInt(cpu.gpr[5], 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R06: 0x% ", formatInt(cpu.gpr[6], 16, 8)), *label_theme, base_x, true);
+    imm_label(*cursor, tprint("R07: 0x%", formatInt(cpu.gpr[7], 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R08: 0x% ", formatInt(cpu.gpr[8], 16, 8)), *label_theme, base_x, true);
+    imm_label(*cursor, tprint("R09: 0x%", formatInt(cpu.gpr[9], 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R10: 0x% ", formatInt(cpu.gpr[10], 16, 8)), *label_theme, base_x, true);
+    imm_label(*cursor, tprint("R11: 0x%", formatInt(cpu.gpr[11], 16, 8)), *label_theme, base_x, false);
+    imm_label(*cursor, tprint("R12: 0x% ", formatInt(cpu.gpr[12], 16, 8)), *label_theme, base_x, true);
     end_scrollable_region(region, r.w, cursor.y + cursor.h, *cpu_window_scroll);
+}
+
+disasm_window_scroll := 0.;
+disasm_window :: (state: *Subwindow_State, r: Rect, data: *void) {
+    cursor := r;
+    cursor.h = FONT_HEIGHT;
+    cursor.y += 10;
+    region, inside := begin_scrollable_region(r);
+    end_scrollable_region(region, r.w, cpu.memory.bios.count, *disasm_window_scroll);
 }

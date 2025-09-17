@@ -264,14 +264,14 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
     return 0, false, false;
 }
 
-immediate_operand :: (val: u16) -> (u32) {
+immediate_operand :: (val: u16) -> (u32, bool, bool) {
     imm : u32 = val & 0xff;
     rotate : u32 = (val >> 8) * 2;
     #asm {
         rotate === c;
         ror.32 imm, rotate;
     }
-    return imm;
+    return imm, rotate != 0, (imm & 0x80000000) != 0;
 }
 
 execute_next :: () {
@@ -309,17 +309,74 @@ execute_next :: () {
                     rd_idx := cast(u8)((ins >> 12) & 0xf);
                     // data processing and fsr
                     if (ins & 0xfb00000) == 0x3200000 {
-                        // msr
+                        // msr immediate
                         assert(false);
                     } else if (ins & 0xfb000f0) == 0x1200000 {
-                        // msr
-                        assert(false);
+                        // msr reg
+                        to_write := reg_src(xx (ins & 0xf));
+                        c := (ins & 0x10000) != 0;
+                        f := (ins & 0x80000) != 0;
+                        if (ins & 0x400000) != 0 {
+                            // spsr
+                            if f {
+                                cpu.spsr[cpu.mode] &= 0x00ffffff;
+                                cpu.spsr[cpu.mode] |= to_write & 0xff000000;
+                            }
+                            if c && cpu.mode != .USER && cpu.mode != .SYSTEM {
+                                cpu.spsr[cpu.mode] &= 0xffffff00;
+                                cpu.spsr[cpu.mode] |= to_write & 0x000000ff;
+                                if (to_write & 0x1f) == {
+                                    case 0b10000;
+                                        cpu.mode = .USER;
+                                    case 0b10001;
+                                        cpu.mode = .FIQ;
+                                    case 0b10010;
+                                        cpu.mode = .IRQ;
+                                    case 0b10011;
+                                        cpu.mode = .SVC;
+                                    case 0b10111;
+                                        cpu.mode = .ABT;
+                                    case 0b11011;
+                                        cpu.mode = .UND;
+                                    case 0b11111;
+                                        cpu.mode = .SYSTEM;
+                                }
+                            }
+                        } else {
+                            // cpsr
+                            if f {
+                                cpu.psr &= 0x00ffffff;
+                                cpu.psr |= to_write & 0xff000000;
+                            }
+                            if c && cpu.mode != .USER {
+                                cpu.psr &= 0xffffff00;
+                                cpu.psr |= to_write & 0x000000ff;
+                                if (to_write & 0x1f) == {
+                                    case 0b10000;
+                                        cpu.mode = .USER;
+                                    case 0b10001;
+                                        cpu.mode = .FIQ;
+                                    case 0b10010;
+                                        cpu.mode = .IRQ;
+                                    case 0b10011;
+                                        cpu.mode = .SVC;
+                                    case 0b10111;
+                                        cpu.mode = .ABT;
+                                    case 0b11011;
+                                        cpu.mode = .UND;
+                                    case 0b11111;
+                                        cpu.mode = .SYSTEM;
+                                }
+                            }
+                        }
                     } else {
                         operand: u32;
+                        should_carry: bool;
+                        carry_out: bool;
                         if (ins & 0x2000000) {
-                            operand = immediate_operand(xx (ins & 0xfff));
+                            operand, should_carry, carry_out = immediate_operand(xx (ins & 0xfff));
                         } else {
-                            operand = shifter_operand(xx (ins & 0xfff));
+                            operand, should_carry, carry_out = shifter_operand(xx (ins & 0xfff));
                         }
                         flags := (ins & 0x100000) != 0;
                         if ((ins >> 21) & 0xf) == {
@@ -358,8 +415,11 @@ execute_next :: () {
                             // tst
                             assert(false);
                             case 0b1001;
-                            // teq
-                            assert(false);
+                                // teq
+                                result := rn ^ operand;
+                                set_status_bit(.N, (result & 0x80000000) != 0);
+                                set_status_bit(.Z, result == 0);
+                                if should_carry set_status_bit(.C, carry_out);
                             case 0b1010;
                                 // cmp
                                 result := rn - operand;
@@ -384,6 +444,7 @@ execute_next :: () {
                                     } else {
                                         set_status_bit(.N, (operand & 0x80000000) != 0);
                                         set_status_bit(.Z, operand == 0);
+                                        if should_carry set_status_bit(.C, carry_out);
                                     }
                                 }
                             case 0b1110;
