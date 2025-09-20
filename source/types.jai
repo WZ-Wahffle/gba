@@ -32,6 +32,7 @@ Cpu :: struct {
     Emulation_State :: enum {
         RUNNING;
         STOPPED;
+        STEPPED;
     }
 }
 
@@ -49,6 +50,8 @@ Ppu :: struct {
 
     draw_x := 0;
     draw_y := 0;
+
+    remaining_cycles := 0;
 }
 
 Status_Bit :: enum {

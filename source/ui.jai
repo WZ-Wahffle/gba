@@ -1,206 +1,97 @@
-#import "Window_Creation";
-#import "Simp";
 #import "Thread";
 #import "Basic";
-#import "Input";
-#import "Gamepad";
-#import "GetRect_LeftHanded";
 
 SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;
-FONT_HEIGHT :: 24;
-window_width := SCREEN_WIDTH * 4;
-window_height := SCREEN_HEIGHT * 4;
-font: *Dynamic_Font;
-
-subwindow_cpu: Subwindow_Info;
-subwindow_disasm: Subwindow_Info;
+FONT_SIZE :: 26;
+window_width : s32 = SCREEN_WIDTH * 6;
+window_height : s32 = SCREEN_HEIGHT * 6;
 
 step_ppu :: () {
-    ppu.draw_x += 1;
-    if ppu.draw_x == 308 {
-        ppu.draw_x = 0;
-        ppu.draw_y += 1;
-        if ppu.draw_y == 228 {
-            ppu.draw_y = 0;
+    if ppu.remaining_cycles > 0 {
+        ppu.remaining_cycles -= 4;
+        ppu.draw_x += 1;
+        if ppu.draw_x == 308 {
+            ppu.draw_x = 0;
+            ppu.draw_y += 1;
+            if ppu.draw_y == 228 {
+                ppu.draw_y = 0;
+            }
         }
     }
 }
 
+font :: #run read_entire_file("in/ProggyClean.ttf");
+
 ui :: () {
-    win := create_window(window_width, window_height, "gba");
-    set_render_target(win, .LEFT_HANDED);
-    framebuffer: Bitmap;
-    bitmap_alloc(*framebuffer, SCREEN_WIDTH, SCREEN_HEIGHT, .RGBA8);
-    defer deinit(*framebuffer);
-    texture: Texture;
-    defer texture_destroy(*texture);
     quit := false;
-    subwindows_initted := false;
-    font = get_font_at_size("/usr/share/fonts/TTF", "JetBrainsMono-Thin.ttf", FONT_HEIGHT);
-    assert(font != null);
-    ui_init();
-    set_default_theme(theme_catppuccin());
+    SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
+    win := SDL_CreateWindow("gba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    gl_context := SDL_GL_CreateContext(win);
+    gl_load(*gl, SDL_GL_GetProcAddress);
+    renderer := SDL_CreateRenderer(win, -1, .ACCELERATED | .TARGETTEXTURE);
+    framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
+    surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
+    ImGui.CreateContext();
+    ImGui_ImplSdl_Init(win);
+    ImGui.StyleColorsDark();
+    ImGui.GetIO().Fonts.AddFontFromMemoryTTF(ImGui.GetIO().Fonts, font.data, font.count, FONT_SIZE);
+
     time := seconds_since_init();
     dt : float64;
     while !quit {
-        new_time := seconds_since_init();
-        dt = new_time - time;
-        time = new_time;
-        update_window_events();
-        for get_window_resizes() {
-            update_window(win);
-            if it.window == win {
-                window_width = it.width;
-                window_height = it.height;
+        event: SDL_Event;
+        while SDL_PollEvent(*event) {
+            ImGui_ImplSdl_ProcessEvent(*event);
+            if event.type == SDL_QUIT quit = true;
+            if event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(win) {
+                quit = true;
             }
-        }
-        for events_this_frame {
-            if it.type == .QUIT then quit = true;
-            if it.type == {
-                case .KEYBOARD;
-                if it.key_pressed && it.key_code == .ESCAPE {
-                    quit = true;
+            if event.type == SDL_KEYDOWN && event.key.keysym.sym == .SDLK_ESCAPE {
+                quit = true;
+            }
+            if event.type == SDL_MOUSEWHEEL {
+                if event.wheel.y < 0 {
+                    disasm_scroll_state += ifx cpu.state == .ARM then 4 else 2;
+                } else {
+                    disasm_scroll_state -= ifx cpu.state == .ARM then 4 else 2;
+                    disasm_scroll_state = max(disasm_scroll_state, 0);
                 }
             }
         }
+        new_time := seconds_since_init();
+        dt = new_time - time;
+        time = new_time;
 
         // processing
         if cpu.emu_state == {
             case .RUNNING;
             for 0..228*308 {
-                step_ppu();
                 cpu.remaining_cycles += 4;
+                ppu.remaining_cycles += 4;
+                step_ppu();
                 while cpu.remaining_cycles > 0 step_cpu();
             }
             case .STOPPED;
             // this page intentionally left blank
+            case .STEPPED;
+            cpu.emu_state = .STOPPED;
+            ppu.remaining_cycles += -cpu.remaining_cycles + 1;
+            cpu.remaining_cycles += -cpu.remaining_cycles + 1;
+            while ppu.remaining_cycles > 0 step_ppu();
+            while cpu.remaining_cycles > 0 step_cpu();
         }
-
-        // render
-        clear_render_target(0., 0., 0., 1.);
-        texture_load_from_bitmap(*texture, *framebuffer);
-        immediate_begin();
-        set_shader_for_images(*texture);
-        immediate_quad(0., 0., xx window_width, xx window_height, .{1, 1, 1, 1});
-        immediate_flush();
-
+        SDL_RenderClear(renderer);
+        tex := SDL_CreateTextureFromSurface(renderer, surface);
+        defer SDL_DestroyTexture(tex);
+        SDL_RenderCopy(renderer, tex, null, null);
         // GUI
-        ui_per_frame_update(win, xx window_width, xx window_height, seconds_since_init());
-        if !subwindows_initted {
-            subwindow_cpu.rect = get_rect(10, 10, xx window_width / 2., xx window_height / 2.);
-            subwindow_cpu.title_text = "cpu";
-            subwindow_cpu.draw = cpu_window;
-            subwindow_cpu.open = true;
-
-            subwindow_disasm.rect = get_rect(10+subwindow_cpu.rect.w, 10, xx window_width / 2., xx window_height / 2.);
-            subwindow_disasm.title_text = "disasm";
-            subwindow_disasm.draw = disasm_window;
-            subwindow_disasm.open = true;
-            subwindows_initted = true;
-        }
-
-        add_subwindow(*subwindow_cpu);
-        add_subwindow(*subwindow_disasm);
-        draw_popups();
-
-        swap_buffers(win);
+        SDL_GL_MakeCurrent(win, gl_context);
+        ImGui_ImplSdl_NewFrame(win);
+        ImGui.NewFrame();
+        draw_gui();
+        ImGui.Render();
+        ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
+        SDL_GL_SwapWindow(win);
     }
-}
-
-#scope_file
-imm_button :: (cursor: *Rect, text: string, base_x: float, in_line: bool) -> (was_just_pressed: bool, state: *Button_State, was_just_released: bool) {
-    cursor.*.w = xx prepare_text(font, text);
-    ret1, ret2, ret3 := button(cursor.*, text, identifier=xx (cursor.*.x * cursor.*.y));
-    if in_line {
-        cursor.*.x += cursor.*.w + 5;
-    } else {
-        cursor.*.x = base_x;
-        cursor.*.y += cursor.*.h + 5;
-    }
-    return ret1, ret2, ret3;
-}
-
-#scope_file
-imm_label :: (cursor: *Rect, text: string, theme: *Label_Theme, base_x: float, in_line: bool) {
-    cursor.*.w = xx prepare_text(font, text);
-    label(cursor.*, text, theme);
-    if in_line {
-        cursor.*.x += cursor.*.w + 5;
-    } else {
-        cursor.*.x = base_x;
-        cursor.*.y += cursor.*.h + 5;
-    }
-}
-
-#scope_file
-imm_checkbox :: (cursor: *Rect, name: string, pressed: bool, base_x: float, in_line: bool) -> bool {
-    ret := base_checkbox(cursor.*, name, pressed);
-    if in_line {
-        cursor.*.x += cursor.*.w + 5;
-    } else {
-        cursor.*.x = base_x;
-        cursor.*.y += cursor.*.h + 5;
-    }
-    return ret;
-}
-
-cpu_window_scroll := 0.;
-#scope_file
-cpu_window :: (state: *Subwindow_State, r: Rect, data: *void) {
-    label_theme: Label_Theme;
-    label_theme.alignment = .Left;
-    label_theme.font = font;
-    cursor := r;
-    cursor.h = FONT_HEIGHT;
-    cursor.y += 10;
-
-    region, inside := begin_scrollable_region(r);
-    cursor.y -= cpu_window_scroll;
-    base_x := r.x + 10;
-    cursor.x = base_x;
-    if imm_button(*cursor, "Start", base_x, true) {
-        cpu.emu_state = .RUNNING;
-    }
-    if imm_button(*cursor, "Stop", base_x, true) {
-        cpu.emu_state = .STOPPED;
-    }
-    if imm_button(*cursor, "Step", base_x, false) {
-        cpu.emu_state = .STOPPED;
-        cpu.remaining_cycles = 1;
-        step_cpu();
-    }
-
-    context.print_style.default_format_int.base = 16;
-    context.print_style.default_format_int.minimum_digits = 8;
-    defer context.print_style.default_format_int.base = 10;
-    defer context.print_style.default_format_int.minimum_digits = 1;
-    imm_label(*cursor, tprint("PC : 0x%", formatInt(cpu.pc, 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("LR : 0x%", formatInt(cpu.lr, 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("SP : 0x%", formatInt(cpu.sp, 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("PSR: 0x%", formatInt(cpu.psr, 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, "", *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R00: 0x% ", formatInt(cpu.gpr[0], 16, 8)), *label_theme, base_x, true);
-    imm_label(*cursor, tprint("R01: 0x%", formatInt(cpu.gpr[1], 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R02: 0x% ", formatInt(cpu.gpr[2], 16, 8)), *label_theme, base_x, true);
-    imm_label(*cursor, tprint("R03: 0x%", formatInt(cpu.gpr[3], 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R04: 0x% ", formatInt(cpu.gpr[4], 16, 8)), *label_theme, base_x, true);
-    imm_label(*cursor, tprint("R05: 0x%", formatInt(cpu.gpr[5], 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R06: 0x% ", formatInt(cpu.gpr[6], 16, 8)), *label_theme, base_x, true);
-    imm_label(*cursor, tprint("R07: 0x%", formatInt(cpu.gpr[7], 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R08: 0x% ", formatInt(cpu.gpr[8], 16, 8)), *label_theme, base_x, true);
-    imm_label(*cursor, tprint("R09: 0x%", formatInt(cpu.gpr[9], 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R10: 0x% ", formatInt(cpu.gpr[10], 16, 8)), *label_theme, base_x, true);
-    imm_label(*cursor, tprint("R11: 0x%", formatInt(cpu.gpr[11], 16, 8)), *label_theme, base_x, false);
-    imm_label(*cursor, tprint("R12: 0x% ", formatInt(cpu.gpr[12], 16, 8)), *label_theme, base_x, true);
-    end_scrollable_region(region, r.w, cursor.y + cursor.h, *cpu_window_scroll);
-}
-
-disasm_window_scroll := 0.;
-disasm_window :: (state: *Subwindow_State, r: Rect, data: *void) {
-    cursor := r;
-    cursor.h = FONT_HEIGHT;
-    cursor.y += 10;
-    region, inside := begin_scrollable_region(r);
-    end_scrollable_region(region, r.w, cpu.memory.bios.count, *disasm_window_scroll);
 }

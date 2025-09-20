@@ -88,6 +88,7 @@ set_status_bit :: (bit: Status_Bit, state: bool) {
 step_cpu :: () {
     if cpu.remaining_cycles > 0 {
         execute_next();
+        disasm_scroll_state = cpu.pc;
     }
 }
 
@@ -277,7 +278,7 @@ immediate_operand :: (val: u16) -> (u32, bool, bool) {
 execute_next :: () {
     if cpu.state == .ARM {
         ins := next_32(true);
-        print("%: %\n", formatInt(cpu.pc, 16, 8), formatInt(ins, 16, 8));
+        cpu.remaining_cycles -= 1;
         if !cond(xx (ins >> 28)) {
             return;
         }
@@ -308,7 +309,16 @@ execute_next :: () {
                     rn := reg_src(cast(u8)((ins >> 16) & 0xf));
                     rd_idx := cast(u8)((ins >> 12) & 0xf);
                     // data processing and fsr
-                    if (ins & 0xfb00000) == 0x3200000 {
+                    if (ins & 0xfb00000) == 0x1000000 {
+                        // mrs
+                        if (ins & 0x400000) != 0 {
+                            // spsr
+                            reg_dst(rd_idx, cpu.spsr[cpu.mode]);
+                        } else {
+                            // cpsr
+                            reg_dst(rd_idx, cpu.psr);
+                        }
+                    } else if (ins & 0xfb00000) == 0x3200000 {
                         // msr immediate
                         assert(false);
                     } else if (ins & 0xfb000f0) == 0x1200000 {
@@ -495,6 +505,7 @@ execute_next :: () {
 
                 if l {
                     // load
+                    cpu.remaining_cycles -= 2;
                     if b {
                         reg_dst(rd_idx, read_8(address));
                     } else {
@@ -502,6 +513,7 @@ execute_next :: () {
                     }
                 } else {
                     // store
+                    cpu.remaining_cycles -= 1;
                     if b {
                         write_8(address, xx (reg_src(rd_idx) & 0xff));
                     } else {
@@ -514,6 +526,7 @@ execute_next :: () {
                     assert(false);
                 } else {
                     // branch
+                    cpu.remaining_cycles -= 2;
                     if (ins & 0x1000000) == 0 {
                         // B
                         addr := (ins & 0x7fffff) << 2;
