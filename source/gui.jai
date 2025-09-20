@@ -172,20 +172,21 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                         // assert(false);
                         case 0b0010;
                             // sub
-                            // result := rn - operand;
-                            // reg_dst(rd_idx, result);
-                            if flags {
-                                // set_status_bit(.N, (result & 0x80000000) != 0);
-                                // set_status_bit(.Z, result == 0);
-                                // set_status_bit(.C, rn >= operand);
-                                // set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
-                            }
+                            opcode = ifx flags then "SUBS" else "SUB";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b0011;
                         // rsb
                         // assert(false);
                         case 0b0100;
-                        // add
-                        // assert(false);
+                            // add
+                            opcode = ifx flags then "ADDS" else "ADD";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b0101;
                         // adc
                         // assert(false);
@@ -221,13 +222,6 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             opcode = ifx flags then "MOVS" else "MOV";
                             append(*suffix, disassemble_register((inst >> 12) & 0xf));
                             append(*suffix, ", ");
-                            //     if rd_idx == 15 {
-                            //         cpu.psr = cpu.spsr[cpu.mode];
-                            //     } else {
-                            //         set_status_bit(.N, (operand & 0x80000000) != 0);
-                            //         set_status_bit(.Z, operand == 0);
-                            //         if should_carry set_status_bit(.C, carry_out);
-                            //     }
                         case 0b1110;
                         // bic
                         // assert(false);
@@ -244,8 +238,8 @@ disassemble_arm_instruction :: (inst: u32) -> string {
             }
         case 0b01;
             // LDR / STR / LDRB / STRB
-            rn_idx := cast(u8)((inst >> 12) & 0xf);
-            rd_idx := cast(u8)((inst >> 16) & 0xf);
+            rd_idx := cast(u8)((inst >> 12) & 0xf);
+            rn_idx := cast(u8)((inst >> 16) & 0xf);
             p := (inst & 0x1000000) != 0;
             u := (inst & 0x800000) != 0;
             b := (inst & 0x400000) != 0;
@@ -267,9 +261,9 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     opcode = "STR";
                 }
             }
-            append(*suffix, disassemble_register(rn_idx));
-            append(*suffix, ", [");
             append(*suffix, disassemble_register(rd_idx));
+            append(*suffix, ", [");
+            append(*suffix, disassemble_register(rn_idx));
             if !p {
                 // post indexed
                 append(*suffix, "], ");

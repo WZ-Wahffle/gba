@@ -3,7 +3,7 @@ mmu_read :: (addr: u32, execute := false) -> u8 {
         return cpu.memory.rom[addr % cpu.memory.rom.count];
     }
 
-    else if addr < 0x4000 && execute {
+    else if addr < 0x4000 {
         return cpu.memory.bios[addr];
     }
 

@@ -286,7 +286,11 @@ execute_next :: () {
             case 0b00;
                 if (ins & 0xffffff0) == 0x12fff10 {
                     // branch & exchange
-                    assert(false);
+                    post_inc := ifx cpu.state == .ARM then 4 else 2;
+                    rm := reg_src(cast(u8) ins & 0xf);
+                    cpu.state = ifx (rm & 1) != 0 then .THUMB else .ARM;
+                    cpu.pc = rm & 0xfffffffe;
+                    cpu.pc += post_inc;
                 } else if (ins & 0xfc000f0) == 0x0000090 {
                     // multiply
                     assert(false);
@@ -410,8 +414,15 @@ execute_next :: () {
                             // rsb
                             assert(false);
                             case 0b0100;
-                            // add
-                            assert(false);
+                                // add
+                                result := rn + operand;
+                                reg_dst(rd_idx, result);
+                                if flags {
+                                    set_status_bit(.N, (result & 0x80000000) != 0);
+                                    set_status_bit(.Z, result == 0);
+                                    set_status_bit(.C, cast(u64)rn + cast(u64)operand > 0xffffffff);
+                                    set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+                                }
                             case 0b0101;
                             // adc
                             assert(false);
@@ -468,9 +479,9 @@ execute_next :: () {
                 }
             case 0b01;
                 // immediate offset/index load/store
-                rn_idx := cast(u8)((ins >> 12) & 0xf);
+                rn_idx := cast(u8)((ins >> 16) & 0xf);
                 rn := reg_src(rn_idx);
-                rd_idx := cast(u8)((ins >> 16) & 0xf);
+                rd_idx := cast(u8)((ins >> 12) & 0xf);
                 p := (ins & 0x1000000) != 0;
                 u := (ins & 0x800000) != 0;
                 b := (ins & 0x400000) != 0;
