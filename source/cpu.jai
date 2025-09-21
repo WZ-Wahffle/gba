@@ -338,11 +338,11 @@ execute_next :: () {
                         f := (ins & 0x80000) != 0;
                         if (ins & 0x400000) != 0 {
                             // spsr
-                            if f {
+                            if f && cpu.mode != 0 {
                                 cpu.spsr[cpu.mode] &= 0x00ffffff;
                                 cpu.spsr[cpu.mode] |= to_write & 0xff000000;
                             }
-                            if c && cpu.mode != .USER && cpu.mode != .SYSTEM {
+                            if c && cpu.mode != 0 {
                                 cpu.spsr[cpu.mode] &= 0xffffff00;
                                 cpu.spsr[cpu.mode] |= to_write & 0x000000ff;
                                 if (to_write & 0x1f) == {
@@ -368,7 +368,7 @@ execute_next :: () {
                                 cpu.psr &= 0x00ffffff;
                                 cpu.psr |= to_write & 0xff000000;
                             }
-                            if c && cpu.mode != .USER {
+                            if c && cpu.privileged {
                                 cpu.psr &= 0xffffff00;
                                 cpu.psr |= to_write & 0x000000ff;
                                 if (to_write & 0x1f) == {
@@ -702,7 +702,7 @@ execute_next :: () {
                     case 0b11;
                     // bx / blx (2)
                     addr := reg_src(xx (ins >> 3) & 0xf);
-                    cpu.lr[cpu.mode] = (cpu.pc) | 1;
+                    if (ins & 0x80) != 0 then cpu.lr[cpu.mode] = (cpu.pc) | 1;
                     cpu.state = ifx (addr & 1) != 0 then .THUMB else .ARM;
                     cpu.psr &= ~cast(u32)0x10;
                     cpu.psr |= (addr & 1) << 4;
@@ -726,7 +726,30 @@ execute_next :: () {
             case 0b101;
             if (ins & 0x1000) != 0 {
                 // Miscellaneous
-                assert(false);
+                if (ins & 0x200) != 0 {
+                    // software breakpoint?
+                    assert(false);
+                } else if (ins & 0x400) != 0 {
+                    // push/pop register list
+                    if (ins & 0x100) != 0 {
+                        cpu.sp[cpu.mode] -= 4;
+                        write_32(cpu.sp[cpu.mode], cpu.lr[cpu.mode]);
+                    }
+                    for #v2 < 0..7 {
+                        if (ins & (1 << it)) != 0 {
+                            cpu.sp[cpu.mode] -= 4;
+                            write_32(cpu.sp[cpu.mode], cpu.gpr[it]);
+                        }
+                    }
+                } else {
+                    // add (7), sub (4)
+                    op := (ins & 0x80) != 0;
+                    if op {
+                        cpu.sp[cpu.mode] -= (ins & 0x7f) << 2;
+                    } else {
+                        cpu.sp[cpu.mode] += (ins & 0x7f) << 2;
+                    }
+                }
             } else {
                 // Add to SP or PC
                 assert(false);
@@ -744,8 +767,20 @@ execute_next :: () {
                 // Load/store multiple
                 assert(false);
             }
-            case;
-            assert(false);
+            case 0b111;
+            if ((ins >> 11) & 0b11) == {
+                case 0b00;
+                // B (2)
+                assert(false);
+                case 0b01;
+                // BL, BLX (1)
+                case 0b10;
+                // BL, BLX (1)
+                assert(false);
+                case 0b11;
+                // BL, BLX (1)
+                assert(false);
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ Cpu :: struct {
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     state := Cpu_State.ARM;
     mode := Cpu_Mode.SVC;
+    privileged := true;
 
     interrupt_master_enable := false;
 
@@ -23,12 +24,12 @@ Cpu :: struct {
 
     Cpu_Mode :: enum s32 {
         USER :: 0;
-        SYSTEM :: 1;
-        IRQ :: 2;
-        FIQ :: 3;
-        SVC :: 4;
-        ABT :: 5;
-        UND :: 6;
+        SYSTEM :: 0;
+        IRQ :: 1;
+        FIQ :: 2;
+        SVC :: 3;
+        ABT :: 4;
+        UND :: 5;
     }
 
     Emulation_State :: enum {

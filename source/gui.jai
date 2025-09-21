@@ -352,8 +352,185 @@ disassemble_arm_instruction :: (inst: u32) -> string {
     return tprint("%1%2 %", opcode, cond, builder_to_string(*suffix));
 }
 
-disassemble_thumb_instruction :: (inst: u16) -> string  {
-    return "NYI";
+cond_lut_lower := string.["eq", "ne", "cs/hs", "cc/lo", "mi", "pl", "vs", "vc", "hi", "ls", "ge", "lt", "gt", "le", ""];
+disassemble_thumb_instruction :: (ins: u16) -> string  {
+    opcode: string;
+    suffix: String_Builder;
+    if (ins >> 13) == {
+        case 0b000;
+        rm_idx : u8 = xx (ins >> 3) & 0b111;
+        rd_idx : u8 = xx ins & 0b111;
+        if (ins >> 9) == {
+            case 0b1100;
+            // add (3)
+            case 0b1101;
+            // sub (3)
+            case 0b1110;
+            // add (1)
+            // mov (2) if immediate is 0
+            operand := ((ins >> 6) & 0b111);
+            opcode = ifx operand == 0 then "mov" else "add";
+            append(*suffix, disassemble_register(rd_idx));
+            append(*suffix, ", ");
+            append(*suffix, disassemble_register(rm_idx));
+            if operand != 0 {
+                append(*suffix, ", #");
+                append(*suffix, tprint("%", formatInt(operand, 10, 1)));
+            }
+            case 0b1111;
+            // sub (1)
+            case;
+            // shift by immediate
+            if ((ins >> 11) & 0b11) == {
+                case 0b00;
+                // lsl (1)
+                case 0b01;
+                // lsr (1)
+                case 0b10;
+                // asr (1)
+                case 0b11;
+                // handled elsewhere
+            }
+        }
+        case 0b001;
+        // Add/subtract/compare/move immediate
+        immed := ins & 0xff;
+        reg_idx : u8 = xx (ins >> 8) & 0b111;
+        if ((ins >> 11) & 0b11) == {
+            case 0b00;
+            // mov (1)
+            opcode = "mov";
+            append(*suffix, disassemble_register(reg_idx));
+            append(*suffix, ", #0x");
+            append(*suffix, tprint("%", formatInt(immed, 16, 2)));
+            case 0b01;
+            // cmp (1)
+            case 0b10;
+            // add (2)
+            case 0b11;
+            // sub (2)
+        }
+        case 0b010;
+        if (ins & 0x2000) != 0 {
+            // Load/store word/byte immediate offset
+        } else if (ins & 0x1000) != 0 {
+            // Load/store register offset
+            rm_idx : u8 = xx (ins >> 6) & 0b111;
+            rn_idx : u8 = xx (ins >> 3) & 0b111;
+            rd_idx : u8 = xx ins & 0b111;
+            if ((ins >> 9) & 0b111) == {
+                case 0b000;
+                // str (2)
+                opcode = "str";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
+                case 0b001;
+                // strh (2)
+                case 0b010;
+                // strb (2)
+                case 0b011;
+                // ldrsb
+                case 0b100;
+                // ldr (2)
+                case 0b101;
+                // ldrh (2)
+                case 0b110;
+                // ldrb (2)
+                case 0b111;
+                // ldrsh
+            }
+        } else if (ins & 0x800) != 0 {
+            // ldr (3)
+            immed := ins & 0xff;
+            reg_idx : u8 = xx (ins >> 8) & 0b111;
+            opcode = "ldr";
+            append(*suffix, disassemble_register(reg_idx));
+            append(*suffix, ", [pc, #0x");
+            append(*suffix, tprint("%", formatInt(immed * 4, 16, 1)));
+            append(*suffix, "]");
+        } else if (ins & 0x400) != 0 {
+            // special data processing + bx
+            if ((ins >> 8) & 0b11) == {
+                case 0b00;
+                // add (4)
+                case 0b01;
+                // cmp (3)
+                case 0b10;
+                // mov (3)
+                case 0b11;
+                // bx / blx (2)
+                reg_idx : u8 = xx (ins >> 3) & 0xf;
+                opcode = ifx (ins & 0x80) != 0 then "blx" else "bx";
+                append(*suffix, disassemble_register(reg_idx));
+            }
+        } else {
+            // data processing register
+        }
+        case 0b011;
+        // Load/store word/byte immediate offset
+        case 0b100;
+        if (ins & 0x1000) != 0 {
+            // Load/store to/from stack
+        } else {
+            // Load/store halfword immediate offset
+        }
+        case 0b101;
+        if (ins & 0x1000) != 0 {
+            // Miscellaneous
+            if (ins & 0x200) != 0 {
+                // software breakpoint?
+            } else if (ins & 0x400) != 0 {
+                // push/pop register list
+                opcode = "push";
+                append(*suffix, "{");
+                any := false;
+                for 0..7 {
+                    if (ins & (1 << it)) != 0 {
+                        append(*suffix, ifx any then tprint(",R%", formatInt(it, 10, 1)) else tprint("R%", formatInt(it, 10, 1)));
+                        any = true;
+                    }
+                }
+                if (ins & 0x100) != 0 {
+                    append(*suffix, ifx any then ",LR" else "LR");
+                }
+                append(*suffix, "}");
+            } else {
+                // adjust stack pointer
+                opcode = ifx (ins & 0x80) != 0 then "sub" else "add";
+                append(*suffix, "SP, #0x");
+                append(*suffix, tprint("%", formatInt((ins & 0x7f) << 2, 16, 1)));
+            }
+        } else {
+            // Add to SP or PC
+        }
+        case 0b110;
+        if (ins & 0x1000) != 0 {
+            // B (1)
+            opcode = tprint("b%", cond_lut_lower[xx (ins >> 8) & 0xf]);
+            immed : s32 = xx (ins & 0xff) << 1;
+            if immed > 255 then immed -= 512;
+            append(*suffix, "0x");
+            append(*suffix, tprint("%", formatInt(immed, 16, 1)));
+        } else {
+            // Load/store multiple
+        }
+        case 0b111;
+        if ((ins >> 11) & 0b11) == {
+            case 0b00;
+            // B (2)
+            case 0b01;
+            // BL, BLX (1)
+            case 0b10;
+            // BL, BLX (1)
+            case 0b11;
+            // BL, BLX (1)
+        }
+    }
+    return tprint("% %", opcode, builder_to_string(*suffix));
 }
 
 disasm_window :: () {
