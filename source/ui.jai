@@ -70,7 +70,7 @@ ui :: () {
                 cpu.remaining_cycles += 4;
                 ppu.remaining_cycles += 4;
                 step_ppu();
-                while cpu.remaining_cycles > 0 step_cpu();
+                while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
             case .STOPPED;
             // this page intentionally left blank

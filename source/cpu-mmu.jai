@@ -41,7 +41,7 @@ mmu_read :: (addr: u32, execute := false) -> u8 {
     }
 
     else {
-        print("%\n", addr);
+        print("0x%: 0x%\n", formatInt(cpu.pc, 16), formatInt(addr, 16));
         assert(false);
     }
     return 0;
@@ -81,5 +81,8 @@ mmu_write :: (addr: u32, val: u8) {
         ppu.oam[addr % 0x400] = val;
     }
 
-    else assert(false);
+    else {
+        print("0x%: 0x%, %\n", formatInt(cpu.pc, 16), formatInt(addr, 16), val);
+        assert(false);
+    }
 }

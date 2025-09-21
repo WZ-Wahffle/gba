@@ -21,9 +21,31 @@ disasm_scroll_state := 0;
     if ImGui.Button("Step") {
         cpu.emu_state = .STEPPED;
     }
-    ImGui.Text("PC: 0x%", cpu.pc);
-    ImGui.Text("LR: 0x%", cpu.lr);
-    ImGui.Text("SP: 0x%", cpu.sp);
+    ImGui.Text("Mode: %, %", cpu.mode, cpu.state);
+    ImGui.Text("PC : 0x% ", cpu.pc);
+    ImGui.SameLine();
+    ImGui.Text("LR : 0x% ", cpu.lr[cpu.mode]);
+    ImGui.Text("SP : 0x% ", cpu.sp[cpu.mode]);
+    ImGui.SameLine();
+    ImGui.Text("R00: 0x% ", cpu.gpr[0]);
+    ImGui.Text("R01: 0x% ", cpu.gpr[1]);
+    ImGui.SameLine();
+    ImGui.Text("R02: 0x% ", cpu.gpr[2]);
+    ImGui.Text("R03: 0x% ", cpu.gpr[3]);
+    ImGui.SameLine();
+    ImGui.Text("R04: 0x% ", cpu.gpr[4]);
+    ImGui.Text("R05: 0x% ", cpu.gpr[5]);
+    ImGui.SameLine();
+    ImGui.Text("R06: 0x% ", cpu.gpr[6]);
+    ImGui.Text("R07: 0x% ", cpu.gpr[7]);
+    ImGui.SameLine();
+    ImGui.Text("R08: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[0] else cpu.gpr[8]);
+    ImGui.Text("R09: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[1] else cpu.gpr[9]);
+    ImGui.SameLine();
+    ImGui.Text("R10: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[2] else cpu.gpr[10]);
+    ImGui.Text("R11: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[3] else cpu.gpr[11]);
+    ImGui.SameLine();
+    ImGui.Text("R12: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[4] else cpu.gpr[12]);
     ImGui.End();
 }
 
@@ -338,22 +360,27 @@ disasm_window :: () {
     ImGui.Begin("disasm", null, .NoScrollbar);
     for 0..cast(u32)(ImGui.GetWindowSize().y / FONT_SIZE - 1) {
         addr : u32 = xx (disasm_scroll_state + xx it * ifx cpu.state == .ARM then 4 else 2);
+        to_print := ifx cpu.state == .ARM then
+            disassemble_arm_instruction(read_32(addr, true))
+        else disassemble_thumb_instruction(read_16(addr, true));
+        contains := array_find(cpu.breakpoints, addr);
+
         if addr == cpu.pc {
-            ImGui.TextColored(.{255, 255, 0, 255}, "%\t%", addr,
-                ifx cpu.state == .ARM then
-                    disassemble_arm_instruction(read_32(addr, true))
-                else disassemble_thumb_instruction(read_16(addr, true))
-            );
+            ImGui.TextColored(.{255, 255, 0, 255}, "%\t%", addr, to_print);
+        } else if contains {
+            ImGui.TextColored(.{255, 0, 0, 255}, "%\t%", addr, to_print);
         } else {
-            ImGui.Text("%\t%", addr,
-                ifx cpu.state == .ARM then
-                    disassemble_arm_instruction(read_32(addr, true))
-                else
-                    disassemble_thumb_instruction(read_16(addr, true))
-            );
+            ImGui.Text("%\t%", addr, to_print);
         }
         if ImGui.IsItemHovered() {
             ImGui.SetTooltip("0x%", read_32(addr, true));
+        }
+        if ImGui.IsItemClicked() {
+            if contains {
+                array_unordered_remove_by_value(*cpu.breakpoints, addr);
+            } else {
+                array_add(*cpu.breakpoints, addr);
+            }
         }
     }
     ImGui.End();
