@@ -610,10 +610,19 @@ execute_next :: () {
                 assert(false);
                 case;
                 // shift by immediate
+                rd_idx : u8 = xx ins & 0b111;
+                rm_idx : u8 = xx (ins >> 3) & 0b111;
+                immed := (ins >> 6) & 0x1f;
                 if ((ins >> 11) & 0b11) == {
                     case 0b00;
                     // lsl (1)
-                    assert(false);
+                    result := reg_src(rm_idx) << immed;
+                    if immed != 0 {
+                        set_status_bit(.C, (reg_src(rm_idx) & (1 << (32 - immed))) != 0);
+                    }
+                    reg_dst(rd_idx, result);
+                    set_status_bit(.N, (result & 0x80000000) != 0);
+                    set_status_bit(.Z, result == 0);
                     case 0b01;
                     // lsr (1)
                     assert(false);
@@ -686,7 +695,7 @@ execute_next :: () {
                 // ldr (3)
                 immed := ins & 0xff;
                 reg_idx : u8 = xx (ins >> 8) & 0b111;
-                reg_dst(reg_idx, read_32((cpu.pc & 0xfffffffc) + immed * 4));
+                reg_dst(reg_idx, read_32(((cpu.pc + 2) & 0xfffffffc) + immed * 4));
             } else if (ins & 0x400) != 0 {
                 // special data processing + bx
                 if ((ins >> 8) & 0b11) == {
@@ -710,7 +719,63 @@ execute_next :: () {
                 }
             } else {
                 // data processing register
-                assert(false);
+                rm : u8 = xx (ins >> 3) & 0b111;
+                rs : u8 = rm;
+                rd : u8 = xx ins & 0b111;
+                rn : u8 = rd;
+                if ((ins >> 6) & 0xf) == {
+                    case 0b0000;
+                    // and
+                    assert(false);
+                    case 0b0001;
+                    // eor
+                    assert(false);
+                    case 0b0010;
+                    // lsl (2)
+                    assert(false);
+                    case 0b0011;
+                    // lsr (2)
+                    assert(false);
+                    case 0b0100;
+                    // asr (2)
+                    assert(false);
+                    case 0b0101;
+                    // adc
+                    assert(false);
+                    case 0b0110;
+                    // sbc
+                    assert(false);
+                    case 0b0111;
+                    // ror
+                    assert(false);
+                    case 0b1000;
+                    // tst
+                    assert(false);
+                    case 0b1001;
+                    // neg
+                    assert(false);
+                    case 0b1010;
+                    // cmp (2)
+                    assert(false);
+                    case 0b1011;
+                    // cmn
+                    assert(false);
+                    case 0b1100;
+                    // orr
+                    assert(false);
+                    case 0b1101;
+                    // mul
+                    assert(false);
+                    case 0b1110;
+                    // bic
+                    assert(false);
+                    case 0b1111;
+                    // mvn
+                    result := ~reg_src(rm);
+                    reg_dst(rd, result);
+                    set_status_bit(.N, (result & 0x80000000) != 0);
+                    set_status_bit(.Z, result == 0);
+                }
             }
             case 0b011;
             // Load/store word/byte immediate offset
@@ -718,10 +783,28 @@ execute_next :: () {
             case 0b100;
             if (ins & 0x1000) != 0 {
                 // Load/store to/from stack
-                assert(false);
+                imm := ins & 0xff;
+                reg_idx : u8 = xx (ins >> 8) & 0b111;
+                addr := cpu.sp[cpu.mode] + 4 * imm;
+                if (ins & 0x800) != 0 {
+                    // ldr (4)
+                    reg_dst(reg_idx, read_32(addr));
+                } else {
+                    // str (3)
+                    write_32(addr, reg_src(reg_idx));
+                }
             } else {
                 // Load/store halfword immediate offset
-                assert(false);
+                rd_idx : u8 = xx ins & 0b111;
+                rn_idx : u8 = xx (ins >> 3) & 0b111;
+                immed := (ins >> 6) & 0x1f;
+                if (ins & 0x800) != 0 {
+                    // ldrh (1)
+                    reg_dst(rd_idx, read_16(reg_src(rn_idx) + immed * 2));
+                } else {
+                    // strh (1)
+                    write_16(reg_src(rn_idx) + immed * 2, xx reg_src(rd_idx));
+                }
             }
             case 0b101;
             if (ins & 0x1000) != 0 {
@@ -768,18 +851,27 @@ execute_next :: () {
                 assert(false);
             }
             case 0b111;
+            offset := ins & 0x7ff;
             if ((ins >> 11) & 0b11) == {
                 case 0b00;
                 // B (2)
                 assert(false);
                 case 0b01;
-                // BL, BLX (1)
+                // BL, BLX(1) blx suffix
+                assert(false);
                 case 0b10;
-                // BL, BLX (1)
-                assert(false);
+                // BL, BLX(1) prefix
+                offset_adj : u32 = xx offset;
+                if (offset_adj & 0x400) != 0 {
+                     cpu.lr[cpu.mode] = cpu.pc + ((offset_adj << 12) | 0xff800000) + 2;
+                } else {
+                     cpu.lr[cpu.mode] = cpu.pc + (offset_adj << 12) + 2;
+                }
                 case 0b11;
-                // BL, BLX (1)
-                assert(false);
+                // BL, BLX(1) bl suffix
+                next := cpu.pc;
+                cpu.pc = cpu.lr[cpu.mode] + (offset << 1);
+                cpu.lr[cpu.mode] = next | 1;
             }
         }
     }

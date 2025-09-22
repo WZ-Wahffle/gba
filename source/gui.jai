@@ -381,9 +381,18 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             // sub (1)
             case;
             // shift by immediate
+            rd_idx : u8 = xx ins & 0b111;
+            rm_idx : u8 = xx (ins >> 3) & 0b111;
+            immed := (ins >> 6) & 0x1f;
             if ((ins >> 11) & 0b11) == {
                 case 0b00;
                 // lsl (1)
+                opcode = "lsl";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, ", #");
+                append(*suffix, tprint("%", formatInt(immed, 10, 1)));
                 case 0b01;
                 // lsr (1)
                 case 0b10;
@@ -469,14 +478,86 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             }
         } else {
             // data processing register
+            rm : u8 = xx (ins >> 3) & 0b111;
+            rs : u8 = rm;
+            rd : u8 = xx ins & 0b111;
+            rn : u8 = rd;
+            if ((ins >> 6) & 0xf) == {
+                case 0b0000;
+                // and
+                case 0b0001;
+                // eor
+                case 0b0010;
+                // lsl (2)
+                case 0b0011;
+                // lsr (2)
+                case 0b0100;
+                // asr (2)
+                case 0b0101;
+                // adc
+                case 0b0110;
+                // sbc
+                case 0b0111;
+                // ror
+                case 0b1000;
+                // tst
+                case 0b1001;
+                // neg
+                case 0b1010;
+                // cmp (2)
+                case 0b1011;
+                // cmn
+                case 0b1100;
+                // orr
+                case 0b1101;
+                // mul
+                case 0b1110;
+                // bic
+                case 0b1111;
+                // mvn
+                opcode = "mvn";
+                append(*suffix, disassemble_register(rd));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm));
+            }
         }
         case 0b011;
         // Load/store word/byte immediate offset
         case 0b100;
         if (ins & 0x1000) != 0 {
             // Load/store to/from stack
+            imm := ins & 0xff;
+            reg_idx := (ins >> 8) & 0b111;
+            addr := cpu.sp[cpu.mode] + 4 * imm;
+            if (ins & 0x800) != 0 {
+                // ldr (4)
+                opcode = "ldr";
+            } else {
+                // str (3)
+                opcode = "str";
+            }
+            append(*suffix, disassemble_register(reg_idx));
+            append(*suffix, ", [SP, #");
+            append(*suffix, tprint("%", formatInt(imm * 4, 10, 1)));
+            append(*suffix, "]");
         } else {
             // Load/store halfword immediate offset
+            rd_idx : u8 = xx ins & 0b111;
+            rn_idx : u8 = xx (ins >> 3) & 0b111;
+            immed := (ins >> 6) & 0x1f;
+            if (ins & 0x800) != 0 {
+                // ldrh (1)
+                opcode = "ldrh";
+            } else {
+                // strh (1)
+                opcode = "strh";
+            }
+            append(*suffix, disassemble_register(rd_idx));
+            append(*suffix, ", [");
+            append(*suffix, disassemble_register(rn_idx));
+            append(*suffix, ", #");
+            append(*suffix, tprint("%", formatInt(immed * 2, 10, 1)));
+            append(*suffix, "]");
         }
         case 0b101;
         if (ins & 0x1000) != 0 {
@@ -519,15 +600,25 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             // Load/store multiple
         }
         case 0b111;
+        offset := ins & 0x7ff;
         if ((ins >> 11) & 0b11) == {
             case 0b00;
             // B (2)
             case 0b01;
-            // BL, BLX (1)
+            // BL, BLX(1) blx suffix
+            opcode = "blx_suf";
+            append(*suffix, "#0x");
+            append(*suffix, tprint("%", formatInt(offset, 16, 1)));
             case 0b10;
-            // BL, BLX (1)
+            // BL, BLX(1) prefix
+            opcode = "bl_pre";
+            append(*suffix, "#0x");
+            append(*suffix, tprint("%", formatInt(offset, 16, 1)));
             case 0b11;
-            // BL, BLX (1)
+            // BL, BLX(1) bl suffix
+            opcode = "bl_suf";
+            append(*suffix, "#0x");
+            append(*suffix, tprint("%", formatInt(offset, 16, 1)));
         }
     }
     return tprint("% %", opcode, builder_to_string(*suffix));

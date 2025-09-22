@@ -58,6 +58,24 @@ mmu_write :: (addr: u32, val: u8) {
 
     else if addr >= 0x04000000 && addr < 0x04000400 {
         if addr - 0x04000000 == {
+            case 0x000;
+                ppu.bg_mode = val & 0b111;
+                if (val & 0x8) != 0 {
+                    assert(false);
+                }
+                ppu.display_frame_select = (val & 0x10) != 0;
+                ppu.hblank_free = (val & 0x20) != 0;
+                ppu.obj_character_vram_mapping_one_dimensional = (val & 0x40) != 0;
+                ppu.forced_blank = (val & 0x80) != 0;
+            case 0x001;
+                ppu.bg[0].enable = (val & 0x1) != 0;
+                ppu.bg[1].enable = (val & 0x2) != 0;
+                ppu.bg[2].enable = (val & 0x4) != 0;
+                ppu.bg[3].enable = (val & 0x8) != 0;
+                ppu.obj_enable = (val & 0x10) != 0;
+                ppu.win[0].enable = (val & 0x20) != 0;
+                ppu.win[1].enable = (val & 0x40) != 0;
+                ppu.obj_win.enable = (val & 0x80) != 0;
             case 0x208;
                 cpu.interrupt_master_enable = (val & 1) != 0;
             case;

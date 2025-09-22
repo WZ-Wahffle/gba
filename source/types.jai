@@ -51,10 +51,28 @@ Ppu :: struct {
     vram: [0x18000]u8;
     oam: [0x400]u8;
 
+    // DISPCNT
+    bg_mode := 0;
+    display_frame_select := false;
+    hblank_free := false;
+    obj_character_vram_mapping_one_dimensional := false;
+    forced_blank := false;
+    bg: [4]Background_Config;
+    obj_enable := false;
+    win: [2]Window_Config;
+    obj_win: Window_Config;
+
     draw_x := 0;
     draw_y := 0;
-
     remaining_cycles := 0;
+
+    Background_Config :: struct {
+        enable := false;
+    }
+
+    Window_Config :: struct {
+        enable := false;
+    }
 }
 
 Status_Bit :: enum {
