@@ -11,9 +11,11 @@ step_ppu :: () {
     if ppu.remaining_cycles > 0 {
         ppu.remaining_cycles -= 4;
         ppu.draw_x += 1;
+        // 240 visible + 68 hblank
         if ppu.draw_x == 308 {
             ppu.draw_x = 0;
             ppu.draw_y += 1;
+            // 160 visible + 68 vblank
             if ppu.draw_y == 228 {
                 ppu.draw_y = 0;
             }
@@ -49,14 +51,6 @@ ui :: () {
             }
             if event.type == SDL_KEYDOWN && event.key.keysym.sym == .SDLK_ESCAPE {
                 quit = true;
-            }
-            if event.type == SDL_MOUSEWHEEL {
-                if event.wheel.y < 0 {
-                    disasm_scroll_state += ifx cpu.state == .ARM then 4 else 2;
-                } else {
-                    disasm_scroll_state -= ifx cpu.state == .ARM then 4 else 2;
-                    disasm_scroll_state = max(disasm_scroll_state, 0);
-                }
             }
         }
         new_time := seconds_since_init();

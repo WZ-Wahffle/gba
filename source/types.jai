@@ -5,38 +5,60 @@ Cpu :: struct {
     sp: [#run enum_highest_value(Cpu_Mode)+1]u32;
     lr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     pc: u32;
-    psr: u32 = 0xb3;
+    psr: u32 = 0x13;
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     state := Cpu_State.ARM;
     mode := Cpu_Mode.SVC;
     privileged := true;
 
+    // IME
     interrupt_master_enable := false;
+    // IE
+    ie: [#run enum_highest_value(Interrupt_Source)+1]bool;
+    // IF
+    ifl: [#run enum_highest_value(Interrupt_Source)+1]bool;
 
     emu_state := Emulation_State.STOPPED;
     remaining_cycles := 0;
     breakpoints: [..]u32;
 
-    Cpu_State :: enum {
-        THUMB;
-        ARM;
-    }
+}
+Cpu_State :: enum {
+    THUMB;
+    ARM;
+}
 
-    Cpu_Mode :: enum s32 {
-        USER :: 0;
-        SYSTEM :: 0;
-        IRQ :: 1;
-        FIQ :: 2;
-        SVC :: 3;
-        ABT :: 4;
-        UND :: 5;
-    }
+Cpu_Mode :: enum s32 {
+    USER :: 0;
+    SYSTEM :: 0;
+    IRQ :: 1;
+    FIQ :: 2;
+    SVC :: 3;
+    ABT :: 4;
+    UND :: 5;
+}
 
-    Emulation_State :: enum {
-        RUNNING;
-        STOPPED;
-        STEPPED;
-    }
+Emulation_State :: enum {
+    RUNNING;
+    STOPPED;
+    STEPPED;
+}
+
+Interrupt_Source :: enum {
+    LCD_VBLANK;
+    LCD_HBLANK;
+    LCD_VCOUNTER;
+    TIM0OVERFLOW;
+    TIM1OVERFLOW;
+    TIM2OVERFLOW;
+    TIM3OVERFLOW;
+    SERIAL;
+    DMA0;
+    DMA1;
+    DMA2;
+    DMA3;
+    KEYPAD;
+    GAMEPAK;
 }
 
 Cpu_Mmu :: struct {
@@ -61,6 +83,32 @@ Ppu :: struct {
     obj_enable := false;
     win: [2]Window_Config;
     obj_win: Window_Config;
+    outside_win_bg_enable: [4]bool;
+    outside_win_obj_enable := false;
+    outside_win_special_effect := false;
+    // DISPSTAT
+    vblank_irq_enable := false;
+    hblank_irq_enable := false;
+    vcounter_irq_enable := false;
+    vcounter := 0;
+    // MOSAIC
+    bg_mosaic_h := 0;
+    bg_mosaic_v := 0;
+    obj_mosaic_h := 0;
+    obj_mosaic_v := 0;
+    // BLDCNT
+    bg_first_target_pixel: [4]bool;
+    obj_first_target_pixel := false;
+    bd_first_target_pixel := false;
+    bg_second_target_pixel: [4]bool;
+    obj_second_target_pixel := false;
+    bd_second_target_pixel := false;
+    special_effect := 0;
+    // BLDALPHA
+    eva := 0;
+    evb := 0;
+    // BLDY
+    evy := 0;
 
     draw_x := 0;
     draw_y := 0;
@@ -68,10 +116,32 @@ Ppu :: struct {
 
     Background_Config :: struct {
         enable := false;
+        prio := 0;
+        char_base_block := 0;
+        mosaic := false;
+        more_colors := false;
+        screen_base_block := 0;
+        wraparound := false; // BG2/BG3 only
+        size := 0;
+        x_off := 0;
+        y_off := 0;
+        anchor_x := 0; // BG2/BG3 only
+        anchor_y := 0; // BG2/BG3 only
+        dx := 0; // BG2/BG3 only
+        dmx := 0; // BG2/BG3 only
+        dy := 0; // BG2/BG3 only
+        dmy := 0; // BG2/BG3 only
     }
 
     Window_Config :: struct {
         enable := false;
+        min_x := 0;
+        max_x := 0;
+        min_y := 0;
+        max_y := 0;
+        bg_enable: [4]bool;
+        obj_enable := false;
+        special_effect := false;
     }
 }
 
