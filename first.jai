@@ -2,22 +2,16 @@
 #import "File_Utilities";
 #import "Process";
 #import "Basic";
+#import "Metaprogram_Plugins";
 
-#run build_and_run();
-
-build_and_run :: () {
-    start_time := file_modtime_and_size("./build/gba");
-    #run build();
-    while true {
-        modtime := file_modtime_and_size("./build/gba");
-        if compare_apollo_times(start_time, modtime) != 0 break;
-    }
-    run_command("./build/gba");
-}
+#run,stallable build();
 
 build :: () {
     w := compiler_create_workspace();
     defer compiler_destroy_workspace(w);
+    plugins: [..]*Metaprogram_Plugin;
+    init_plugins(Plugin_To_Create.[.{name="Iprof"}, .{name="Autorun"}], *plugins, w);
+    for plugins if it.init then it.init(it, .{});
     options := get_build_options();
     options.output_executable_name = "gba";
     options.output_path = "build";
@@ -26,5 +20,8 @@ build :: () {
     for files {
         add_build_file(it, w);
     }
+    for plugins if it.add_source then it.add_source(it);
+    for plugins if it.finish then it.finish(it);
+    for plugins if it.shutdown then it.shutdown(it);
     set_build_options_dc(.{do_output=false});
 }
