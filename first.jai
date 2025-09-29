@@ -10,7 +10,7 @@ build :: () {
     w := compiler_create_workspace();
     defer compiler_destroy_workspace(w);
     plugins: [..]*Metaprogram_Plugin;
-    init_plugins(Plugin_To_Create.[.{name="Iprof"}, .{name="Autorun"}], *plugins, w);
+    init_plugins(Plugin_To_Create.[.{name="Iprof"}], *plugins, w);
     for plugins if it.init then it.init(it, .{});
     options := get_build_options();
     options.output_executable_name = "gba";
