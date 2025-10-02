@@ -24,6 +24,8 @@ step_ppu :: () {
 }
 
 font :: #run read_entire_file("in/ProggyClean.ttf");
+controller: *SDL_GameController;
+dt : float64;
 
 ui :: () {
     quit := false;
@@ -40,8 +42,10 @@ ui :: () {
     ImGui.GetIO().Fonts.AddFontFromMemoryTTF(ImGui.GetIO().Fonts, font.data, font.count, FONT_SIZE);
 
     time := seconds_since_init();
-    dt : float64;
     while !quit {
+        new_time := seconds_since_init();
+        dt = new_time - time;
+        time = new_time;
         event: SDL_Event;
         while SDL_PollEvent(*event) {
             ImGui_ImplSdl_ProcessEvent(*event);
@@ -52,10 +56,26 @@ ui :: () {
             if event.type == SDL_KEYDOWN && event.key.keysym.sym == .SDLK_ESCAPE {
                 quit = true;
             }
+            if event.type == SDL_CONTROLLERDEVICEADDED {
+                if controller == null
+                    controller = SDL_GameControllerOpen(event.cdevice.which);
+            }
+            if event.type == SDL_CONTROLLERDEVICEREMOVED {
+                if controller
+                    SDL_GameControllerClose(controller);
+            }
         }
-        new_time := seconds_since_init();
-        dt = new_time - time;
-        time = new_time;
+        ppu.keypad_state =
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A) << 0) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B) << 1) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK) << 2) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START) << 3) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) << 4) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) << 5) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP) << 6) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) << 7) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) << 8) |
+            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) << 9);
 
         // processing
         if cpu.emu_state == {
@@ -87,5 +107,9 @@ ui :: () {
         ImGui.Render();
         ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
         SDL_GL_SwapWindow(win);
+        __Iprof.update(true);
+        report = __Iprof.create_report();
+        // frame_time := seconds_since_init() - time;
+        // sleep_milliseconds(xx (16.6 - frame_time));
     }
 }

@@ -4,14 +4,17 @@ draw_gui :: () {
     cpu_window();
     disasm_window();
     iwram_window();
+    profiler_window();
     context.print_style.default_format_int.base = 10;
     context.print_style.default_format_int.minimum_digits = 1;
 }
 disasm_scroll_state := 0;
 iwram_scroll_state := 0;
+report: *__Iprof.Report;
 
 #scope_file cpu_window :: () {
     ImGui.Begin("cpu");
+    ImGui.Text("Frame time: %ms", dt * 1000);
     if ImGui.Button("Start") {
         cpu.emu_state = .RUNNING;
     }
@@ -814,5 +817,31 @@ iwram_window :: () {
         }
     }
     ImGui.EndTable();
+    ImGui.End();
+}
+
+profiler_window :: () {
+    ImGui.Begin("profiler");
+    if report {
+        if ImGui.BeginTable("##reports", 4, .Borders | .RowBg | .SizingFixedFit) {
+            ImGui.TableSetupColumn(report.header[0].data);
+            ImGui.TableSetupColumn(report.header[1].data);
+            ImGui.TableSetupColumn(report.header[2].data);
+            ImGui.TableSetupColumn(report.header[3].data);
+            ImGui.TableHeadersRow();
+            for report.*.records {
+                ImGui.TableNextColumn();
+                ImGui.Text("%", it.name);
+                ImGui.TableNextColumn();
+                ImGui.Text("%", it.self_time);
+                ImGui.TableNextColumn();
+                ImGui.Text("%", it.hier_time);
+                ImGui.TableNextColumn();
+                ImGui.Text("%", it.calls);
+                ImGui.TableNextRow();
+            }
+            ImGui.EndTable();
+        }
+    }
     ImGui.End();
 }

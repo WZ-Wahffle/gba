@@ -10,6 +10,8 @@ Cpu :: struct {
     state := Cpu_State.ARM;
     mode := Cpu_Mode.SVC;
     privileged := true;
+    dma: [4]Dma;
+    timer: [4]Timer;
 
     // IME
     interrupt_master_enable := false;
@@ -22,7 +24,53 @@ Cpu :: struct {
     remaining_cycles := 0;
     breakpoints: [..]u32;
 
+    Cpu_Mmu :: struct {
+        bios: [0x4000]u8;
+        ewram: [0x40000]u8;
+        iwram: [0x8000]u8;
+        rom: [..]u8;
+    }
+
+    Dma :: struct {
+        src: u32 = 0;
+        src_int: u32 = 0;
+        dst: u32 = 0;
+        dst_int: u32 = 0;
+        count: u16 = 0;
+        count_int : u16 = 0;
+        src_addr_control: Dma_Addr_Control;
+        dst_addr_control: Dma_Addr_Control;
+        repeat := false;
+        large_transfer := false;
+        game_pak := false;
+        start_timing: Dma_Start_Timing;
+        irq := false;
+        enable := false;
+    }
+
+    Timer :: struct {
+        reload : u16 = 0;
+        prescaler_selection := 0;
+        ignore_prescaler := false;
+        irq := false;
+        enable := false;
+    }
 }
+
+Dma_Start_Timing :: enum {
+    IMMED;
+    VBLANK;
+    HBLANK;
+    SPECIAL;
+}
+
+Dma_Addr_Control :: enum {
+    INC;
+    DEC;
+    FIXED;
+    INC_RELOAD;
+}
+
 Cpu_State :: enum {
     THUMB;
     ARM;
@@ -59,13 +107,6 @@ Interrupt_Source :: enum {
     DMA3;
     KEYPAD;
     GAMEPAK;
-}
-
-Cpu_Mmu :: struct {
-    bios: [0x4000]u8;
-    ewram: [0x40000]u8;
-    iwram: [0x8000]u8;
-    rom: [..]u8;
 }
 
 Ppu :: struct {
@@ -109,6 +150,12 @@ Ppu :: struct {
     evb := 0;
     // BLDY
     evy := 0;
+    // KEYINPUT
+    keypad_state : u16 = 0;
+    // KEYCNT
+    keypad_mask : u16 = 0;
+    keypad_irq := false;
+    keypad_require_all := false;
 
     draw_x := 0;
     draw_y := 0;

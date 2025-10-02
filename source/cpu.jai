@@ -46,7 +46,7 @@ next_32 :: (execute := false) -> u32 {
     return ret;
 }
 
-get_status_bit :: (bit: Status_Bit) -> bool {
+get_status_bit :: inline (bit: Status_Bit) -> bool {
     if #complete bit == {
         case .N;
         return (cpu.psr & 0x80000000) != 0;
@@ -59,7 +59,7 @@ get_status_bit :: (bit: Status_Bit) -> bool {
     }
 }
 
-set_status_bit :: (bit: Status_Bit, state: bool) {
+set_status_bit :: inline (bit: Status_Bit, state: bool) {
     if state {
         if #complete bit == {
             case .N;
@@ -399,6 +399,7 @@ execute_next :: () {
                             operand, should_carry, carry_out = immediate_operand(xx (ins & 0xfff));
                         } else {
                             operand, should_carry, carry_out = shifter_operand(xx (ins & 0xfff));
+                            cpu.remaining_cycles -= 1;
                         }
                         flags := (ins & 0x100000) != 0;
                         if ((ins >> 21) & 0xf) == {
@@ -568,8 +569,10 @@ execute_next :: () {
                     pointer := reg_src(rn_idx);
                     regs := ins & 0xffff;
                     if l {
+                        cpu.remaining_cycles -= 1;
                         for 0..15 {
                             if (regs & (1 << it)) != 0 {
+                                cpu.remaining_cycles -= 1;
                                 if p {
                                     if u then pointer += 4; else pointer -= 4;
                                 }
@@ -596,6 +599,7 @@ execute_next :: () {
                     } else {
                         for #v2 < 0..15 {
                             if (regs & (1 << it)) != 0 {
+                                cpu.remaining_cycles -= 1;
                                 if p {
                                     if u then pointer += 4; else pointer -= 4;
                                 }
@@ -746,7 +750,11 @@ execute_next :: () {
                 set_status_bit(.Z, immed == 0);
                 case 0b01;
                 // cmp (1)
-                assert(false);
+                result := reg - immed;
+                set_status_bit(.N, (result & 0x80000000) != 0);
+                set_status_bit(.Z, result == 0);
+                set_status_bit(.C, reg >= immed);
+                set_status_bit(.V, (reg & 0x80000000) != (immed & 0x80000000) && (result & 0x80000000) != (reg & 0x80000000));
                 case 0b10;
                 // add (2)
                 result := reg + immed;
@@ -800,6 +808,7 @@ execute_next :: () {
                 }
             } else if (ins & 0x800) != 0 {
                 // ldr (3)
+                cpu.remaining_cycles -= 2;
                 immed := ins & 0xff;
                 reg_idx : u8 = xx (ins >> 8) & 0b111;
                 reg_dst(reg_idx, read_32(((cpu.pc + 2) & 0xfffffffc) + immed * 4));
@@ -811,7 +820,13 @@ execute_next :: () {
                     assert(false);
                     case 0b01;
                     // cmp (3)
-                    assert(false);
+                    rn := reg_src(xx (ins & 0b111) | ((ins >> 4) & 0b1000));
+                    rm := reg_src(xx ((ins >> 3) & 0xf));
+                    result := rn - rm;
+                    set_status_bit(.N, (result & 0x80000000) != 0);
+                    set_status_bit(.Z, result == 0);
+                    set_status_bit(.C, rn >= rm);
+                    set_status_bit(.V, (rn & 0x80000000) != (rm & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
                     case 0b10;
                     // mov (3)
                     rd_idx : u8 = xx ((ins & 0b111) | ((ins >> 4) & 0b1000));
@@ -899,12 +914,14 @@ execute_next :: () {
             rn := reg_src(xx (ins >> 3) & 0b111);
             rd_idx : u8 = xx (ins & 0b111);
             if l {
+                cpu.remaining_cycles -= 2;
                 if s {
                     reg_dst(rd_idx, xx read_8(rn + imm));
                 } else {
                     reg_dst(rd_idx, read_32(rn + imm * 4));
                 }
             } else {
+                cpu.remaining_cycles -= 1;
                 if s {
                     write_8(rn + imm, xx (reg_src(rd_idx) & 0xff));
                 } else {
@@ -919,9 +936,11 @@ execute_next :: () {
                 addr := cpu.sp[cpu.mode] + 4 * imm;
                 if (ins & 0x800) != 0 {
                     // ldr (4)
+                    cpu.remaining_cycles -= 2;
                     reg_dst(reg_idx, read_32(addr));
                 } else {
                     // str (3)
+                    cpu.remaining_cycles -= 1;
                     write_32(addr, reg_src(reg_idx));
                 }
             } else {
@@ -931,9 +950,11 @@ execute_next :: () {
                 immed := (ins >> 6) & 0x1f;
                 if (ins & 0x800) != 0 {
                     // ldrh (1)
+                    cpu.remaining_cycles -= 2;
                     reg_dst(rd_idx, read_16(reg_src(rn_idx) + immed * 2));
                 } else {
                     // strh (1)
+                    cpu.remaining_cycles -= 1;
                     write_16(reg_src(rn_idx) + immed * 2, xx (reg_src(rd_idx) & 0xffff));
                 }
             }
@@ -945,14 +966,36 @@ execute_next :: () {
                     assert(false);
                 } else if (ins & 0x400) != 0 {
                     // push/pop register list
-                    if (ins & 0x100) != 0 {
-                        cpu.sp[cpu.mode] -= 4;
-                        write_32(cpu.sp[cpu.mode], cpu.lr[cpu.mode]);
-                    }
-                    for #v2 < 0..7 {
-                        if (ins & (1 << it)) != 0 {
+                    if (ins & 0x800) != 0 {
+                        // pop
+                        for 0..7 {
+                            if (ins & (1 << it)) != 0 {
+                                cpu.remaining_cycles -= 1;
+                                cpu.gpr[it] = read_32(cpu.sp[cpu.mode]);
+                                cpu.sp[cpu.mode] += 4;
+                            }
+                        }
+                        if (ins & 0x100) != 0 {
+                            cpu.remaining_cycles -= 1;
+                            cpu.pc = read_32(cpu.sp[cpu.mode]);
+                            cpu.state = ifx (cpu.pc & 1) != 0 then .THUMB else .ARM;
+                            cpu.psr &= ~cast(u32)0x10;
+                            cpu.psr |= (cpu.pc & 1) << 4;
+                            cpu.pc &= 0xfffffffe;
+                        }
+                    } else {
+                        // push
+                        if (ins & 0x100) != 0 {
+                            cpu.remaining_cycles -= 1;
                             cpu.sp[cpu.mode] -= 4;
-                            write_32(cpu.sp[cpu.mode], cpu.gpr[it]);
+                            write_32(cpu.sp[cpu.mode], cpu.lr[cpu.mode]);
+                        }
+                        for #v2 < 0..7 {
+                            if (ins & (1 << it)) != 0 {
+                                cpu.remaining_cycles -= 1;
+                                cpu.sp[cpu.mode] -= 4;
+                                write_32(cpu.sp[cpu.mode], cpu.gpr[it]);
+                            }
                         }
                     }
                 } else {
