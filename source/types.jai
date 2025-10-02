@@ -57,6 +57,13 @@ Cpu :: struct {
     }
 }
 
+Status_Bit :: enum {
+    N :: 0x80000000;
+    Z :: 0x40000000;
+    C :: 0x20000000;
+    V :: 0x10000000;
+}
+
 Dma_Start_Timing :: enum {
     IMMED;
     VBLANK;
@@ -190,11 +197,4 @@ Ppu :: struct {
         obj_enable := false;
         special_effect := false;
     }
-}
-
-Status_Bit :: enum {
-    N;
-    Z;
-    C;
-    V;
 }

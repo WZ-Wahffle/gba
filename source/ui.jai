@@ -1,5 +1,6 @@
 #import "Thread";
 #import "Basic";
+#import "String";
 
 SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;

@@ -760,8 +760,8 @@ disasm_window :: () {
     for 0..cast(int)ImGui.GetWindowSize().y {
         addr : u32 = xx ((disasm_scroll_state + xx it) * ifx cpu.state == .ARM then 4 else 2);
         to_print := ifx cpu.state == .ARM then
-            disassemble_arm_instruction(read_32(addr, true))
-        else disassemble_thumb_instruction(read_16(addr, true));
+            disassemble_arm_instruction(read_32(addr))
+        else disassemble_thumb_instruction(read_16(addr));
         contains := array_find(cpu.breakpoints, addr);
         if addr == cpu.pc {
             ImGui.TextColored(.{0, 255, 0, 255}, "%\t%", addr, to_print);
@@ -771,7 +771,7 @@ disasm_window :: () {
             ImGui.Text("%\t%", addr, to_print);
         }
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("0x%", read_32(addr, true));
+            ImGui.SetTooltip("0x%", read_32(addr));
         }
         if ImGui.IsItemClicked() {
             if contains {
@@ -820,16 +820,28 @@ iwram_window :: () {
     ImGui.End();
 }
 
+profiler_filter_selected : s32 = 0;
 profiler_window :: () {
     ImGui.Begin("profiler");
+    ImGui.RadioButton("Filter None".data, *profiler_filter_selected, 0);
+    ImGui.RadioButton("Filter ARM Instructions".data, *profiler_filter_selected, 1);
+    ImGui.RadioButton("Filter THUMB Instructions".data, *profiler_filter_selected, 2);
     if report {
-        if ImGui.BeginTable("##reports", 4, .Borders | .RowBg | .SizingFixedFit) {
+        if ImGui.BeginTable("##reports", 5, .Borders | .RowBg | .SizingFixedFit) {
             ImGui.TableSetupColumn(report.header[0].data);
             ImGui.TableSetupColumn(report.header[1].data);
             ImGui.TableSetupColumn(report.header[2].data);
             ImGui.TableSetupColumn(report.header[3].data);
+            ImGui.TableSetupColumn("per iteration");
             ImGui.TableHeadersRow();
             for report.*.records {
+                if profiler_filter_selected == 1 {
+                    if !starts_with(it.name, "arm_") continue;
+                }
+                if profiler_filter_selected == 2 {
+                    if !starts_with(it.name, "thumb_") continue;
+                }
+                if it.self_time < 0.00001 continue;
                 ImGui.TableNextColumn();
                 ImGui.Text("%", it.name);
                 ImGui.TableNextColumn();
@@ -838,6 +850,8 @@ profiler_window :: () {
                 ImGui.Text("%", it.hier_time);
                 ImGui.TableNextColumn();
                 ImGui.Text("%", it.calls);
+                ImGui.TableNextColumn();
+                ImGui.Text("%", it.self_time / it.calls);
                 ImGui.TableNextRow();
             }
             ImGui.EndTable();

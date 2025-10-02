@@ -1,4 +1,4 @@
-mmu_read :: (addr: u32, execute := false) -> u8 {
+mmu_read :: (addr: u32) -> u8 {
     if addr >= 0x08000000 && addr < 0x0e000000 {
         return cpu.memory.rom[addr % cpu.memory.rom.count];
     }
