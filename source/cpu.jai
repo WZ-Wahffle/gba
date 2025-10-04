@@ -458,6 +458,64 @@ immediate_operand :: (val: u16) -> (u32, bool, bool) {
     return imm, rotate != 0, (imm & 0x80000000) != 0;
 }
 
+thumb_decoder_table :: Decoder_Unit_Thumb.[
+    .{0xffc0, 0x4140, thumb_adc},
+    .{0xfe00, 0x1c00, thumb_add_1},
+    .{0xf800, 0x3000, thumb_add_2},
+    .{0xfe00, 0x1800, thumb_add_3},
+    .{0xff00, 0x4400, thumb_add_4},
+    .{0xf000, 0xa000, thumb_add_5_add_6},
+    .{0xff00, 0xb000, thumb_add_7_sub_4},
+    .{0xffc0, 0x4000, thumb_and},
+    .{0xf800, 0x1000, thumb_asr_1},
+    .{0xffc0, 0x4100, thumb_asr_2},
+    .{0xf000, 0xb000, thumb_swi_b_1},
+    .{0xf800, 0xe000, thumb_b_2},
+    .{0xffc0, 0x4380, thumb_bic},
+    .{0xff00, 0xbe00, thumb_bkpt},
+    .{0xf800, 0xf000, thumb_bl_blx_1_prefix},
+    .{0xf800, 0xf800, thumb_bl_blx_1_bl_suffix},
+    .{0xf800, 0xe800, thumb_bl_blx_1_blx_suffix},
+    .{0xff00, 0x4700, thumb_bx_blx_2},
+    .{0xffc0, 0x42c0, thumb_cmn},
+    .{0xf800, 0x2800, thumb_cmp_1},
+    .{0xffc0, 0x4280, thumb_cmp_2},
+    .{0xff00, 0x4500, thumb_cmp_3},
+    .{0xffc0, 0x4040, thumb_eor},
+    .{0xf000, 0xc000, thumb_ldmia_stmia},
+    .{0xe000, 0x6000, thumb_ldr_str_ldrb_strb_1},
+    .{0xfe00, 0x5800, thumb_ldr_2},
+    .{0xf800, 0x4800, thumb_ldr_3},
+    .{0xf800, 0x9800, thumb_ldr_4},
+    .{0xfe00, 0x5c00, thumb_ldrb_2},
+    .{0xfe00, 0x5a00, thumb_ldrh_2},
+    .{0xfe00, 0x5600, thumb_ldrsb},
+    .{0xfe00, 0x5e00, thumb_ldrsh},
+    .{0xf800, 0x0000, thumb_lsl_1},
+    .{0xffc0, 0x4080, thumb_lsl_2},
+    .{0xf800, 0x0800, thumb_lsr_1},
+    .{0xffc0, 0x40c0, thumb_lsr_2},
+    .{0xf800, 0x2000, thumb_mov_1},
+    .{0xff00, 0x4600, thumb_mov_3},
+    .{0xffc0, 0x4340, thumb_mul},
+    .{0xffc0, 0x43c0, thumb_mvn},
+    .{0xffc0, 0x4240, thumb_neg},
+    .{0xffc0, 0x4300, thumb_orr},
+    .{0xfe00, 0xbc00, thumb_pop},
+    .{0xfe00, 0xb400, thumb_push},
+    .{0xffc0, 0x41c0, thumb_ror},
+    .{0xffc0, 0x4180, thumb_sbc},
+    .{0xfe00, 0x5000, thumb_str_2},
+    .{0xf800, 0x9000, thumb_str_3},
+    .{0xfe00, 0x5400, thumb_strb_2},
+    .{0xfe00, 0x8000, thumb_strh_1},
+    .{0xfe00, 0x5200, thumb_strh_2},
+    .{0xfe00, 0x1e00, thumb_sub_1},
+    .{0xf800, 0x3800, thumb_sub_2},
+    .{0xfe00, 0x1a00, thumb_sub_3},
+    .{0xffc0, 0x4200, thumb_tst},
+];
+
 execute_next :: () {
     if cpu.state == .ARM {
         ins := next_32();
@@ -892,226 +950,10 @@ execute_next :: () {
     } else {
         ins := next_16();
         cpu.remaining_cycles -= 1;
-        if (ins >> 13) == {
-            case 0b000;
-            if (ins >> 9) == {
-                case 0b1100;
-                // add (3)
-                thumb_add_3(ins);
-                case 0b1101;
-                // sub (3)
-                thumb_sub_3(ins);
-                case 0b1110;
-                // add (1)
-                // mov (2) if immediate is 0
-                thumb_add_1(ins);
-                case 0b1111;
-                // sub (1)
-                thumb_sub_1(ins);
-                case;
-                // shift by immediate
-                if ((ins >> 11) & 0b11) == {
-                    case 0b00;
-                    // lsl (1)
-                    thumb_lsl_1(ins);
-                    case 0b01;
-                    // lsr (1)
-                    thumb_lsr_1(ins);
-                    case 0b10;
-                    // asr (1)
-                    thumb_asr_1(ins);
-                    case 0b11;
-                    // handled elsewhere
-                    assert(false);
-                }
-            }
-            case 0b001;
-            // Add/subtract/compare/move immediate
-            if ((ins >> 11) & 0b11) == {
-                case 0b00;
-                // mov (1)
-                thumb_mov_1(ins);
-                case 0b01;
-                // cmp (1)
-                thumb_cmp_1(ins);
-                case 0b10;
-                // add (2)
-                thumb_add_2(ins);
-                case 0b11;
-                // sub (2)
-                thumb_sub_2(ins);
-            }
-            case 0b010;
-            if (ins & 0x1000) != 0 {
-                // Load/store register offset
-                if ((ins >> 9) & 0b111) == {
-                    case 0b000;
-                    // str (2)
-                    thumb_str_2(ins);
-                    case 0b001;
-                    // strh (2)
-                    thumb_strh_2(ins);
-                    case 0b010;
-                    // strb (2)
-                    thumb_strb_2(ins);
-                    case 0b011;
-                    // ldrsb
-                    thumb_ldrsb(ins);
-                    case 0b100;
-                    // ldr (2)
-                    thumb_ldr_2(ins);
-                    case 0b101;
-                    // ldrh (2)
-                    thumb_ldrh_2(ins);
-                    case 0b110;
-                    // ldrb (2)
-                    thumb_ldrb_2(ins);
-                    case 0b111;
-                    // ldrsh
-                    thumb_ldrsh(ins);
-                    case;
-                    assert(false);
-                }
-            } else if (ins & 0x800) != 0 {
-                // ldr (3)
-                thumb_ldr_3(ins);
-            } else if (ins & 0x400) != 0 {
-                // special data processing + bx
-                if ((ins >> 8) & 0b11) == {
-                    case 0b00;
-                    // add (4)
-                    thumb_add_4(ins);
-                    case 0b01;
-                    // cmp (3)
-                    thumb_cmp_3(ins);
-                    case 0b10;
-                    // mov (3)
-                    thumb_mov_3(ins);
-                    case 0b11;
-                    // bx / blx (2)
-                    thumb_bx_blx_2(ins);
-                }
-            } else {
-                // data processing register
-                if ((ins >> 6) & 0xf) == {
-                    case 0b0000;
-                    // and
-                    thumb_and(ins);
-                    case 0b0001;
-                    // eor
-                    thumb_eor(ins);
-                    case 0b0010;
-                    // lsl (2)
-                    thumb_lsl_2(ins);
-                    case 0b0011;
-                    // lsr (2)
-                    thumb_lsr_2(ins);
-                    case 0b0100;
-                    // asr (2)
-                    thumb_asr_2(ins);
-                    case 0b0101;
-                    // adc
-                    thumb_adc(ins);
-                    case 0b0110;
-                    // sbc
-                    thumb_sbc(ins);
-                    case 0b0111;
-                    // ror
-                    thumb_ror(ins);
-                    case 0b1000;
-                    // tst
-                    thumb_tst(ins);
-                    case 0b1001;
-                    // neg
-                    thumb_neg(ins);
-                    case 0b1010;
-                    // cmp (2)
-                    thumb_cmp_2(ins);
-                    case 0b1011;
-                    // cmn
-                    thumb_cmn(ins);
-                    case 0b1100;
-                    // orr
-                    thumb_orr(ins);
-                    case 0b1101;
-                    // mul
-                    thumb_mul(ins);
-                    case 0b1110;
-                    // bic
-                    thumb_bic(ins);
-                    case 0b1111;
-                    // mvn
-                    thumb_mvn(ins);
-                }
-            }
-            case 0b011;
-            // Load/store word/byte immediate offset
-            thumb_ldr_str_ldrb_strb_1(ins);
-            case 0b100;
-            if (ins & 0x1000) != 0 {
-                // Load/store to/from stack
-                if (ins & 0x800) != 0 {
-                    // ldr (4)
-                    thumb_ldr_4(ins);
-                } else {
-                    // str (3)
-                    thumb_str_3(ins);
-                }
-            } else {
-                // Load/store halfword immediate offset
-                if (ins & 0x800) != 0 {
-                    // ldrh (1)
-                    thumb_ldrh_1(ins);
-                } else {
-                    // strh (1)
-                    thumb_strh_1(ins);
-                }
-            }
-            case 0b101;
-            if (ins & 0x1000) != 0 {
-                // Miscellaneous
-                if (ins & 0x200) != 0 {
-                    // software breakpoint?
-                    thumb_bkpt(ins);
-                } else if (ins & 0x400) != 0 {
-                    // push/pop register list
-                    if (ins & 0x800) != 0 {
-                        // pop
-                        thumb_pop(ins);
-                    } else {
-                        // push
-                        thumb_push(ins);
-                    }
-                } else {
-                    // add (7), sub (4)
-                    thumb_add_7_sub_4(ins);
-                }
-            } else {
-                // add (5), add (6)
-                thumb_add_5_add_6(ins);
-            }
-            case 0b110;
-            if (ins & 0x1000) != 0 {
-                // b (1)
-                thumb_b_1(ins);
-            } else {
-                // ldmia, stmia
-                thumb_ldmia_stmia(ins);
-            }
-            case 0b111;
-            if ((ins >> 11) & 0b11) == {
-                case 0b00;
-                // b (2)
-                thumb_b_2(ins);
-                case 0b01;
-                // bl, blx(1) blx suffix
-                thumb_bl_blx_1_blx_suffix(ins);
-                case 0b10;
-                // bl, blx(1) prefix
-                thumb_bl_blx_1_prefix(ins);
-                case 0b11;
-                // bl, blx(1) bl suffix
-                thumb_bl_blx_1_bl_suffix(ins);
+        for thumb_decoder_table {
+            if ins & it.mask == it.result {
+                it.function(ins);
+                break;
             }
         }
     }

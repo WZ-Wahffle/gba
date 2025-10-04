@@ -231,3 +231,9 @@ Ppu :: struct {
         special_effect := false;
     }
 }
+
+Decoder_Unit_Thumb :: struct {
+    mask: u16;
+    result: u16;
+    function: (ins: u16);
+}

@@ -369,12 +369,17 @@ thumb_add_5_add_6 :: inline (ins: u16) {
     assert(false);
 }
 
-thumb_b_1 :: inline (ins: u16) {
-    if cond(xx (ins >> 8) & 0xf) {
-        immed := (ins & 0xff) << 1;
-        cpu.pc += immed & 0xff;
-        cpu.pc -= immed & 0x100;
-        cpu.pc += 2;
+thumb_swi_b_1 :: inline (ins: u16) {
+    cond_idx : u8 = xx (ins >> 8) & 0xf;
+    if cond_idx == 0xf {
+        assert(false);
+    } else {
+        if cond(cond_idx) {
+            immed := (ins & 0xff) << 1;
+            cpu.pc += immed & 0xff;
+            cpu.pc -= immed & 0x100;
+            cpu.pc += 2;
+        }
     }
 }
 
