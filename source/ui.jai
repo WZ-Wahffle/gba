@@ -1,5 +1,4 @@
 #import "Thread";
-#import "Basic";
 #import "String";
 
 SCREEN_WIDTH :: 240;
@@ -110,6 +109,8 @@ ui :: () {
         SDL_GL_SwapWindow(win);
         __Iprof.update(true);
         report = __Iprof.create_report();
+        reset_temporary_storage();
+        // memory_visualizer_per_frame_update();
         // frame_time := seconds_since_init() - time;
         // sleep_milliseconds(xx (16.6 - frame_time));
     }

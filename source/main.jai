@@ -1,4 +1,4 @@
-#import "Basic";
+#import "Basic";//()(MEMORY_DEBUGGER=true);
 #import "File";
 #import "Thread";
 
@@ -7,6 +7,7 @@ ppu: Ppu;
 
 main :: () {
     context.logger = color_log;
+    context.assertion_failed = dump_processor_state;
     bios, success := read_entire_file("in/gba_bios.bin");
     if !success || bios.count != cpu.memory.bios._8.count {
         log_error("BIOS file not found\n");
@@ -18,9 +19,15 @@ main :: () {
     ui();
 }
 
+dump_processor_state :: (loc: Source_Code_Location, message: string) -> bool {
+    runtime_support_assertion_failed(loc, message);
+    print("PC: 0x%\n", formatInt(cpu.pc, 16, 8));
+    return true;
+}
+
 log_warn :: (format_string: string, args: .. Any, loc := #caller_location, flags := Log_Flags.NONE, user_flags: u32 = 0, section: *Log_Section = null) {
     new_flags := flags | .WARNING;
-    // log(format_string, ..args, loc, new_flags, user_flags, section);
+    log(format_string, ..args, loc, new_flags, user_flags, section);
 }
 
 #scope_file

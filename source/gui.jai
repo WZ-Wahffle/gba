@@ -100,7 +100,7 @@ disassemble_shifter :: (val: u32) -> string {
 
 disassemble_register :: (inst: u32) -> string {
     if inst < 13 {
-    return sprint("R%", formatInt(inst, 10, 1));
+    return tprint("R%", formatInt(inst, 10, 1));
     } else if inst == 13 {
         return "sp";
     } else if inst == 14 {
@@ -401,7 +401,10 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 }
             }
     }
-    return tprint("%1%2 %", opcode, cond, builder_to_string(*suffix));
+    out := builder_to_string(*suffix);
+    ret := tprint("%1%2 %", opcode, cond, out);
+    free(out);
+    return ret;
 }
 
 cond_lut_lower := string.["eq", "ne", "cs/hs", "cc/lo", "mi", "pl", "vs", "vc", "hi", "ls", "ge", "lt", "gt", "le", "", ""];
@@ -732,7 +735,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             append(*suffix, tprint("%", formatInt(offset, 16, 1)));
         }
     }
-    return tprint("% %", opcode, builder_to_string(*suffix));
+    out := builder_to_string(*suffix);
+    ret := tprint("% %", opcode, out);
+    free(out);
+    return ret;
 }
 
 disasm_jump_buffer: [5]u8;

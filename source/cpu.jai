@@ -469,7 +469,7 @@ thumb_decoder_table :: Decoder_Unit_Thumb.[
     .{0xffc0, 0x4000, thumb_and},
     .{0xf800, 0x1000, thumb_asr_1},
     .{0xffc0, 0x4100, thumb_asr_2},
-    .{0xf000, 0xb000, thumb_swi_b_1},
+    .{0xf000, 0xd000, thumb_swi_b_1},
     .{0xf800, 0xe000, thumb_b_2},
     .{0xffc0, 0x4380, thumb_bic},
     .{0xff00, 0xbe00, thumb_bkpt},
@@ -538,26 +538,26 @@ execute_next :: () {
                     arm_bx(ins);
                 } else if (ins & 0xfc000f0) == 0x0000090 {
                     // multiply
-                    arm_mul_mla :: (ins: u32) {
+                    arm_mul_mla :: inline (ins: u32) {
                         assert(false);
                     }
                     arm_mul_mla(ins);
                 } else if (ins & 0xf8000f0) == 0x0800090 {
                     // multiply long
-                    arm_umull_umlal_smull_smlal :: (ins: u32) {
+                    arm_umull_umlal_smull_smlal :: inline (ins: u32) {
                         assert(false);
                     }
                     arm_umull_umlal_smull_smlal(ins);
                 } else if (ins & 0xfb00ff0) == 0x1000090 {
                     // single data swap
-                    arm_swp_swpb :: (ins: u32) {
+                    arm_swp_swpb :: inline (ins: u32) {
                         assert(false);
                     }
                     arm_swp_swpb(ins);
-                } else if (ins & 0xe400ff0) == 0x0000090 {
+                } else if (ins & 0xe400ff0) == 0x00000b0 {
                     // halfword data transfer reg
                     assert(false);
-                } else if (ins & 0xe4000f0) == 0x0400090 {
+                } else if (ins & 0xe4000f0) == 0x04000b0 {
                     // halfword data transfer imm
                     assert(false);
                 } else if (ins & 0xe0000d0) == 0x00000d0 {
