@@ -1,47 +1,250 @@
+// the read and write functions are all very similar in composition,
+// however have been split up in order to increase performance
+
 read_8 :: (addr: u32) -> u8 {
-    return mmu_read(addr);
+    if addr < 0x4000 {
+        return cpu.memory.bios._8[addr];
+    }
+    if addr >= 0x02000000 && addr < 0x02040000 {
+        return cpu.memory.ewram._8[addr % 0x40000];
+    }
+    if addr >= 0x03000000 && addr < 0x03008000 {
+        return cpu.memory.iwram._8[addr % 0x8000];
+    }
+    if addr >= 0x04000000 && addr < 0x04000400 {
+        return mmio_read(addr);
+    }
+    if addr >= 0x05000000 && addr < 0x06000000 {
+        return ppu.memory.palette_ram._8[addr % 0x400];
+    }
+    if addr >= 0x06000000 && addr < 0x07000000 {
+        if addr % 0x20000 < 0x18000 {
+            return ppu.memory.vram._8[addr % 0x18000];
+        } else {
+            return ppu.memory.vram._8[(addr % 0x8000) + 0x10000];
+        }
+    }
+    if addr >= 0x07000000 && addr < 0x08000000 {
+        return ppu.memory.oam._8[addr % 0x400];
+    }
+    if addr >= 0x08000000 && addr < 0x0e000000 {
+        return cpu.memory.rom[addr % cpu.memory.rom.count];
+    }
+
+    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    return 0;
 }
 
 read_16 :: (addr: u32) -> u16 {
-    lo := cast(u16) read_8(addr);
-    hi := cast(u16) read_8(addr+1);
-    return lo | (hi << 8);
+    if addr < 0x4000 {
+        return cpu.memory.bios._16[addr >> 1];
+    }
+    if addr >= 0x02000000 && addr < 0x02040000 {
+        return cpu.memory.ewram._16[(addr >> 1) % 0x20000];
+    }
+    if addr >= 0x03000000 && addr < 0x03008000 {
+        return cpu.memory.iwram._16[(addr >> 1) % 0x4000];
+    }
+    if addr >= 0x04000000 && addr < 0x04000400 {
+        first : u16 = mmio_read(addr);
+        second : u16 = mmio_read(addr + 1);
+        return first | (second << 8);
+    }
+    if addr >= 0x05000000 && addr < 0x06000000 {
+        return ppu.memory.palette_ram._16[(addr >> 1) % 0x200];
+    }
+    if addr >= 0x06000000 && addr < 0x07000000 {
+        if addr % 0x20000 < 0x18000 {
+            return ppu.memory.vram._16[(addr >> 1) % 0xc000];
+        } else {
+            return ppu.memory.vram._16[((addr >> 1) % 0x4000) + 0x8000];
+        }
+    }
+    if addr >= 0x07000000 && addr < 0x08000000 {
+        return ppu.memory.oam._16[(addr >> 1) % 0x200];
+    }
+    if addr >= 0x08000000 && addr < 0x0e000000 {
+        first : u16 = cpu.memory.rom[addr % cpu.memory.rom.count];
+        second : u16 = cpu.memory.rom[(addr + 1) % cpu.memory.rom.count];
+        return first | (second << 8);
+    }
+
+    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    return 0;
 }
 
 read_32 :: (addr: u32) -> u32 {
-    lo := cast(u32) read_16(addr);
-    hi := cast(u32) read_16(addr+2);
-    return  lo | (hi << 16);
+    if addr < 0x4000 {
+        return cpu.memory.bios._32[addr >> 2];
+    }
+    if addr >= 0x02000000 && addr < 0x02040000 {
+        return cpu.memory.ewram._32[(addr >> 2) % 0x10000];
+    }
+    if addr >= 0x03000000 && addr < 0x03008000 {
+        return cpu.memory.iwram._32[(addr >> 2) % 0x2000];
+    }
+    if addr >= 0x04000000 && addr < 0x04000400 {
+        first : u32 = mmio_read(addr);
+        second : u32 = mmio_read(addr + 1);
+        third : u32 = mmio_read(addr + 2);
+        fourth : u32 = mmio_read(addr + 3);
+        return first | (second << 8) | (third << 16) | (fourth << 24);
+    }
+    if addr >= 0x05000000 && addr < 0x06000000 {
+        return ppu.memory.palette_ram._32[(addr >> 2) % 0x200];
+    }
+    if addr >= 0x06000000 && addr < 0x07000000 {
+        if addr % 0x20000 < 0x18000 {
+            return ppu.memory.vram._32[(addr >> 2) % 0x6000];
+        } else {
+            return ppu.memory.vram._32[((addr >> 2) % 0x2000) + 0x4000];
+        }
+    }
+    if addr >= 0x07000000 && addr < 0x08000000 {
+        return ppu.memory.oam._32[(addr >> 2) % 0x100];
+    }
+    if addr >= 0x08000000 && addr < 0x0e000000 {
+        first : u32 = cpu.memory.rom[addr % cpu.memory.rom.count];
+        second : u32 = cpu.memory.rom[(addr + 1) % cpu.memory.rom.count];
+        third : u32 = cpu.memory.rom[(addr + 2) % cpu.memory.rom.count];
+        fourth : u32 = cpu.memory.rom[(addr + 3) % cpu.memory.rom.count];
+        return first | (second << 8) | (third << 16) | (fourth << 24);
+    }
+
+    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    return 0;
 }
 
 write_8 :: (addr: u32, val: u8) {
-    mmu_write(addr, val);
+    if addr >= 0x02000000 && addr < 0x02040000 {
+        cpu.memory.ewram._8[addr % 0x40000] = val;
+    }
+    else if addr >= 0x03000000 && addr < 0x03008000 {
+        cpu.memory.iwram._8[addr % 0x8000] = val;
+    }
+    else if addr >= 0x04000000 && addr < 0x04000400 {
+        mmio_write(addr, val);
+    }
+    else if addr >= 0x05000000 && addr < 0x06000000 {
+        ppu.memory.palette_ram._8[addr % 0x400] = val;
+    }
+    else if addr >= 0x06000000 && addr < 0x07000000 {
+        if addr % 0x20000 < 0x18000 {
+            ppu.memory.vram._8[addr % 0x18000] = val;
+        } else {
+            ppu.memory.vram._8[(addr % 0x8000) + 0x10000] = val;
+        }
+    }
+    else if addr >= 0x07000000 && addr < 0x08000000 {
+        ppu.memory.oam._8[addr % 0x400] = val;
+    } else {
+        log_warn("Unmapped write: 0x%", formatInt(addr, 16));
+    }
 }
 
 write_16 :: (addr: u32, val: u16) {
-    write_8(addr, xx val & 0xff);
-    write_8(addr+1, xx val >> 8);
+    if addr >= 0x02000000 && addr < 0x02040000 {
+        cpu.memory.ewram._16[(addr >> 1) % 0x20000] = val;
+    }
+    else if addr >= 0x03000000 && addr < 0x03008000 {
+        cpu.memory.iwram._16[(addr >> 1) % 0x4000] = val;
+    }
+    else if addr >= 0x04000000 && addr < 0x04000400 {
+        mmio_write(addr, xx (val >> 0) & 0xff);
+        mmio_write(addr + 1, xx (val >> 8) & 0xff);
+    }
+    else if addr >= 0x05000000 && addr < 0x06000000 {
+        ppu.memory.palette_ram._16[(addr >> 1) % 0x200] = val;
+    }
+    else if addr >= 0x06000000 && addr < 0x07000000 {
+        if addr % 0x20000 < 0x18000 {
+            ppu.memory.vram._16[(addr >> 1) % 0xc000] = val;
+        } else {
+            ppu.memory.vram._16[((addr >> 1) % 0x4000) + 0x8000] = val;
+        }
+    }
+    else if addr >= 0x07000000 && addr < 0x08000000 {
+        ppu.memory.oam._16[(addr >> 1) % 0x200] = val;
+    } else {
+        log_warn("Unmapped write: 0x%", formatInt(addr, 16));
+    }
 }
 
 write_32 :: (addr: u32, val: u32) {
-    write_16(addr, xx val & 0xffff);
-    write_16(addr+2, xx val >> 16);
+    if addr >= 0x02000000 && addr < 0x02040000 {
+        cpu.memory.ewram._32[(addr >> 2) % 0x10000] = val;
+    }
+    else if addr >= 0x03000000 && addr < 0x03008000 {
+        cpu.memory.iwram._32[(addr >> 2) % 0x2000] = val;
+    }
+    else if addr >= 0x04000000 && addr < 0x04000400 {
+        mmio_write(addr, xx (val >> 0) & 0xff);
+        mmio_write(addr + 1, xx (val >> 8) & 0xff);
+        mmio_write(addr + 2, xx (val >> 16) & 0xff);
+        mmio_write(addr + 3, xx (val >> 24) & 0xff);
+    }
+    else if addr >= 0x05000000 && addr < 0x06000000 {
+        ppu.memory.palette_ram._32[(addr >> 2) % 0x100] = val;
+    }
+    else if addr >= 0x06000000 && addr < 0x07000000 {
+        if addr % 0x20000 < 0x18000 {
+            ppu.memory.vram._32[(addr >> 2) % 0x6000] = val;
+        } else {
+            ppu.memory.vram._32[((addr >> 2) % 0x2000) + 0x4000] = val;
+        }
+    }
+    else if addr >= 0x07000000 && addr < 0x08000000 {
+        ppu.memory.oam._32[(addr >> 2) % 0x100] = val;
+    } else {
+        log_warn("Unmapped write: 0x%", formatInt(addr, 16));
+    }
 }
 
-next_8 :: () -> u8 {
-    ret := read_8(cpu.pc);
-    cpu.pc += 1;
-    return ret;
-}
-
+// these do not use the generic read_* or write_* functions,
+// since these two functions are almost exclusively used in execution
+// and thus will mostly be reading from the ROM or BIOS
 next_16 :: () -> u16 {
-    ret := read_16(cpu.pc);
+    ret: u16;
+    if cpu.pc >= 0x08000000 && cpu.pc < 0x0e000000 {
+        first : u16 = cpu.memory.rom[cpu.pc % cpu.memory.rom.count];
+        second : u16 = cpu.memory.rom[(cpu.pc + 1) % cpu.memory.rom.count];
+        ret = first | (second << 8);
+    }
+    else if cpu.pc < 0x4000 {
+        ret = cpu.memory.bios._16[cpu.pc >> 1];
+    }
+    else if cpu.pc >= 0x02000000 && cpu.pc < 0x02040000 {
+        ret = cpu.memory.ewram._16[(cpu.pc >> 1) % 0x20000];
+    }
+    else if cpu.pc >= 0x03000000 && cpu.pc < 0x03008000 {
+        ret = cpu.memory.iwram._16[(cpu.pc >> 1) % 0x4000];
+    } else {
+        log_warn("Unmapped execution read: 0x%", formatInt(cpu.pc, 16));
+    }
     cpu.pc += 2;
     return ret;
 }
 
 next_32 :: () -> u32 {
-    ret := read_32(cpu.pc);
+    ret: u32;
+    if cpu.pc >= 0x08000000 && cpu.pc < 0x0e000000 {
+        first : u32 = cpu.memory.rom[cpu.pc % cpu.memory.rom.count];
+        second : u32 = cpu.memory.rom[(cpu.pc + 1) % cpu.memory.rom.count];
+        third : u32 = cpu.memory.rom[(cpu.pc + 2) % cpu.memory.rom.count];
+        fourth : u32 = cpu.memory.rom[(cpu.pc + 3) % cpu.memory.rom.count];
+        ret = first | (second << 8) | (third << 16) | (fourth << 24);
+    }
+    else if cpu.pc < 0x4000 {
+        ret = cpu.memory.bios._32[cpu.pc >> 2];
+    }
+    else if cpu.pc >= 0x02000000 && cpu.pc < 0x02040000 {
+        ret = cpu.memory.ewram._32[(cpu.pc >> 2) % 0x10000];
+    }
+    else if cpu.pc >= 0x03000000 && cpu.pc < 0x03008000 {
+        ret = cpu.memory.iwram._32[(cpu.pc >> 2) % 0x2000];
+    } else {
+        log_warn("Unmapped execution read: 0x%", formatInt(cpu.pc, 16));
+    }
     cpu.pc += 4;
     return ret;
 }

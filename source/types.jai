@@ -25,9 +25,24 @@ Cpu :: struct {
     breakpoints: [..]u32;
 
     Cpu_Mmu :: struct {
-        bios: [0x4000]u8;
-        ewram: [0x40000]u8;
-        iwram: [0x8000]u8;
+        Bios_Union :: union {
+            _8: [0x4000]u8;
+            _16: [0x2000]u16;
+            _32: [0x1000]u32;
+        }
+        bios: Bios_Union;
+        Ewram_Union :: union {
+            _8: [0x40000]u8;
+            _16: [0x20000]u16;
+            _32: [0x10000]u32;
+        }
+        ewram: Ewram_Union;
+        Iwram_Union :: union {
+            _8: [0x8000]u8;
+            _16: [0x4000]u16;
+            _32: [0x2000]u32;
+        }
+        iwram: Iwram_Union;
         rom: [..]u8;
     }
 
@@ -117,10 +132,7 @@ Interrupt_Source :: enum {
 }
 
 Ppu :: struct {
-    palette_ram: [0x400]u8;
-    vram: [0x18000]u8;
-    oam: [0x400]u8;
-
+    memory: Ppu_Mmu;
     // DISPCNT
     bg_mode := 0;
     display_frame_select := false;
@@ -167,6 +179,27 @@ Ppu :: struct {
     draw_x := 0;
     draw_y := 0;
     remaining_cycles := 0;
+
+    Ppu_Mmu :: struct {
+        Palette_Ram_Union :: union {
+            _8: [0x400]u8;
+            _16: [0x200]u16;
+            _32: [0x100]u32;
+        }
+        palette_ram: Palette_Ram_Union;
+        Vram_Union :: union {
+            _8: [0x18000]u8;
+            _16: [0xc000]u16;
+            _32: [0x6000]u32;
+        }
+        vram: Vram_Union;
+        Oam_Union :: union {
+            _8: [0x400]u8;
+            _16: [0x200]u16;
+            _32: [0x100]u32;
+        }
+        oam: Oam_Union;
+    }
 
     Background_Config :: struct {
         enable := false;

@@ -813,7 +813,7 @@ iwram_window :: () {
         ImGui.Text_CFormat("0x%04x", (it + iwram_scroll_state) * 16);
         for it2 : 0..15 {
             ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", cpu.memory.iwram[(it + iwram_scroll_state) * 16 + it2]);
+            ImGui.Text_CFormat("%02x", cpu.memory.iwram._8[(it + iwram_scroll_state) * 16 + it2]);
         }
     }
     ImGui.EndTable();

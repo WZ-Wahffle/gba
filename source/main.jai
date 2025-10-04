@@ -8,12 +8,12 @@ ppu: Ppu;
 main :: () {
     context.logger = color_log;
     bios, success := read_entire_file("in/gba_bios.bin");
-    if !success || bios.count != cpu.memory.bios.count {
+    if !success || bios.count != cpu.memory.bios._8.count {
         log_error("BIOS file not found\n");
         exit(1);
     }
 
-    memcpy(cpu.memory.bios.data, bios.data, cpu.memory.bios.count);
+    memcpy(cpu.memory.bios._8.data, bios.data, cpu.memory.bios._8.count);
 
     ui();
 }
