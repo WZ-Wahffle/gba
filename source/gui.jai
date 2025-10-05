@@ -165,15 +165,10 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 append(*suffix, ", [");
                 append(*suffix, disassemble_register((inst >> 16) & 0xf));
                 append(*suffix, "]");
-            } else if (inst & 0xe400ff0) == 0x0000090 {
-                // halfword data transfer reg
-                // assert(false);
-            } else if (inst & 0xe4000f0) == 0x0400090 {
-                // halfword data transfer imm
-                // assert(false);
-            } else if (inst & 0xe0000d0) == 0x00000d0 {
-                // signed data transfer
-                // assert(false);
+            } else if (inst & 0xe0000f0) == 0x00000b0 {
+                // ldrh / strh
+            } else if (inst & 0xe0000f0) == 0x00000d0 {
+                // ldrsb / ldrsh
             } else {
                 rn_idx := cast(u8)((inst >> 16) & 0xf);
                 rd_idx := cast(u8)((inst >> 12) & 0xf);

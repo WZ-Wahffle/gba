@@ -527,309 +527,77 @@ execute_next :: () {
             case 0b00;
                 if (ins & 0xffffff0) == 0x12fff10 {
                     // branch & exchange
-                    arm_bx :: inline (ins: u32) {
-                        rm := reg_src(cast(u8) ins & 0xf);
-                        cpu.state = ifx (rm & 1) != 0 then .THUMB else .ARM;
-                        cpu.pc = rm & 0xfffffffe;
-                        // cpu.pc += post_inc;
-                        cpu.psr &= ~cast(u32)0x10;
-                        cpu.psr |= (rm & 1) << 4;
-                    }
                     arm_bx(ins);
                 } else if (ins & 0xfc000f0) == 0x0000090 {
                     // multiply
-                    arm_mul_mla :: inline (ins: u32) {
-                        assert(false);
-                    }
                     arm_mul_mla(ins);
                 } else if (ins & 0xf8000f0) == 0x0800090 {
                     // multiply long
-                    arm_umull_umlal_smull_smlal :: inline (ins: u32) {
-                        assert(false);
-                    }
                     arm_umull_umlal_smull_smlal(ins);
                 } else if (ins & 0xfb00ff0) == 0x1000090 {
                     // single data swap
-                    arm_swp_swpb :: inline (ins: u32) {
-                        assert(false);
-                    }
                     arm_swp_swpb(ins);
                 } else if (ins & 0xe0000f0) == 0x00000b0 {
                     // ldrh / strh
-                    arm_ldrh_strh :: inline (ins: u32) {
-                        assert(false);
-                    }
                     arm_ldrh_strh(ins);
                 } else if (ins & 0xe0000f0) == 0x00000d0 {
                     // ldrsb / ldrsh
-                    arm_ldrsb_ldrsh :: inline (ins: u32) {
-                        assert(false);
-                    }
                     arm_ldrsb_ldrsh(ins);
                 } else {
-                    rn := reg_src(cast(u8)((ins >> 16) & 0xf));
-                    rd_idx := cast(u8)((ins >> 12) & 0xf);
                     // data processing and fsr
                     if (ins & 0xfb00000) == 0x1000000 {
                         // mrs
-                        arm_mrs :: inline (ins: u32, rd_idx: u8) {
-                            if (ins & 0x400000) != 0 {
-                                // spsr
-                                reg_dst(rd_idx, cpu.spsr[cpu.mode]);
-                            } else {
-                                // cpsr
-                                reg_dst(rd_idx, cpu.psr);
-                            }
-                        }
-                        arm_mrs(ins, rd_idx);
-                    } else if (ins & 0xfb00000) == 0x3200000 {
-                        // msr immediate
-                        assert(false);
-                    } else if (ins & 0xfb000f0) == 0x1200000 {
-                        // msr reg
-                        to_write := reg_src(xx (ins & 0xf));
-                        c := (ins & 0x10000) != 0;
-                        f := (ins & 0x80000) != 0;
-                        if (ins & 0x400000) != 0 {
-                            // spsr
-                            if f && cpu.mode != 0 {
-                                cpu.spsr[cpu.mode] &= 0x00ffffff;
-                                cpu.spsr[cpu.mode] |= to_write & 0xff000000;
-                            }
-                            if c && cpu.mode != 0 {
-                                cpu.spsr[cpu.mode] &= 0xffffff00;
-                                cpu.spsr[cpu.mode] |= to_write & 0x000000ff;
-                                if (to_write & 0x1f) == {
-                                    case 0b10000;
-                                        cpu.mode = .USER;
-                                    case 0b10001;
-                                        cpu.mode = .FIQ;
-                                    case 0b10010;
-                                        cpu.mode = .IRQ;
-                                    case 0b10011;
-                                        cpu.mode = .SVC;
-                                    case 0b10111;
-                                        cpu.mode = .ABT;
-                                    case 0b11011;
-                                        cpu.mode = .UND;
-                                    case 0b11111;
-                                        cpu.mode = .SYSTEM;
-                                }
-                            }
-                        } else {
-                            // cpsr
-                            if f {
-                                cpu.psr &= 0x00ffffff;
-                                cpu.psr |= to_write & 0xff000000;
-                            }
-                            if c && cpu.privileged {
-                                cpu.psr &= 0xffffff00;
-                                cpu.psr |= to_write & 0x000000ff;
-                                if (to_write & 0x1f) == {
-                                    case 0b10000;
-                                        cpu.mode = .USER;
-                                    case 0b10001;
-                                        cpu.mode = .FIQ;
-                                    case 0b10010;
-                                        cpu.mode = .IRQ;
-                                    case 0b10011;
-                                        cpu.mode = .SVC;
-                                    case 0b10111;
-                                        cpu.mode = .ABT;
-                                    case 0b11011;
-                                        cpu.mode = .UND;
-                                    case 0b11111;
-                                        cpu.mode = .SYSTEM;
-                                }
-                            }
-                        }
+                        arm_mrs(ins);
+                    } else if (ins & 0xdb000f0) == 0x1200000 {
+                        // msr
+                        arm_msr(ins);
                     } else {
-                        operand: u32;
-                        should_carry: bool;
-                        carry_out: bool;
-                        if (ins & 0x2000000) {
-                            operand, should_carry, carry_out = immediate_operand(xx (ins & 0xfff));
-                        } else {
-                            operand, should_carry, carry_out = shifter_operand(xx (ins & 0xfff));
-                            cpu.remaining_cycles -= 1;
-                        }
-                        flags := (ins & 0x100000) != 0;
                         if ((ins >> 21) & 0xf) == {
                             case 0b0000;
-                            // and
-                            arm_and :: inline (ins: u32) {
-                                operand: u32;
-                                should_carry: bool;
-                                carry_out: bool;
-                                if (ins & 0x2000000) {
-                                    operand, should_carry, carry_out = immediate_operand(xx (ins & 0xfff));
-                                } else {
-                                    operand, should_carry, carry_out = shifter_operand(xx (ins & 0xfff));
-                                    cpu.remaining_cycles -= 1;
-                                }
-                                rn := reg_src(cast(u8)((ins >> 16) & 0xf));
-                                rd_idx := cast(u8)((ins >> 12) & 0xf);
-                                flags := (ins & 0x100000) != 0;
-                                result := rn & operand;
-                                reg_dst(rd_idx, result);
-                                if flags {
-                                    if rd_idx == 15 {
-                                        cpu.psr = cpu.spsr[cpu.mode];
-                                    } else {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        if should_carry set_status_bit(.C, carry_out);
-                                    }
-                                }
-                            }
-                            arm_and(ins);
+                                // and
+                                arm_and(ins);
                             case 0b0001;
-                            // eor
-                            assert(false);
+                                // eor
+                                arm_eor(ins);
                             case 0b0010;
                                 // sub
-                                arm_sub :: inline (rn: u32, rd_idx: u8, operand: u32, flags: bool) {
-                                    result := rn - operand;
-                                    reg_dst(rd_idx, result);
-                                    if flags {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        set_status_bit(.C, rn >= operand);
-                                        set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
-                                    }
-                                }
-                                arm_sub(rn, rd_idx, operand, flags);
+                                arm_sub(ins);
                             case 0b0011;
-                            // rsb
-                                arm_rsb :: inline (rn: u32, rd_idx: u8, operand: u32, flags: bool) {
-                                    result := operand - rn;
-                                    reg_dst(rd_idx, result);
-                                    if flags {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        set_status_bit(.C, operand >= rn);
-                                        set_status_bit(.V, (operand & 0x80000000) != (rn & 0x80000000) && (result & 0x80000000) != (operand & 0x80000000));
-                                    }
-                                }
-                                arm_rsb(rn, rd_idx, operand, flags);
+                                // rsb
+                                arm_rsb(ins);
                             case 0b0100;
                                 // add
-                                arm_add :: inline (rn: u32, rd_idx: u8, operand: u32, flags: bool) {
-                                    result := rn + operand;
-                                    reg_dst(rd_idx, result);
-                                    if flags {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        set_status_bit(.C, cast(u64)(rn) + cast(u64)(operand) > 0xffffffff);
-                                        set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
-                                    }
-                                }
-                                arm_add(rn, rd_idx, operand, flags);
+                                arm_add(ins);
                             case 0b0101;
-                            // adc
-                            assert(false);
+                                // adc
+                                arm_adc(ins);
                             case 0b0110;
-                            // sbc
-                            assert(false);
+                                // sbc
+                                arm_sbc(ins);
                             case 0b0111;
-                            // rsc
-                            assert(false);
+                                // rsc
+                                arm_rsc(ins);
                             case 0b1000;
                                 // tst
-                                arm_tst :: inline (rn: u32, operand: u32, flags: bool, should_carry: bool, carry_out: bool) {
-                                    result := rn & operand;
-                                    if flags {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        if should_carry set_status_bit(.C, carry_out);
-                                    }
-                                }
-                                arm_tst(rn, operand, flags, should_carry, carry_out);
+                                arm_tst(ins);
                             case 0b1001;
                                 // teq
-                                arm_teq :: inline (rn: u32, operand: u32, flags: bool, should_carry: bool, carry_out: bool) {
-                                    result := rn ^ operand;
-                                    if flags {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        if should_carry set_status_bit(.C, carry_out);
-                                    }
-                                }
-                                arm_teq(rn, operand, flags, should_carry, carry_out);
+                                arm_teq(ins);
                             case 0b1010;
                                 // cmp
-                                arm_cmp :: inline (rn: u32, operand: u32, flags: bool) {
-                                    result := rn - operand;
-                                    if flags {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        set_status_bit(.C, rn >= operand);
-                                        set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
-                                    }
-                                }
-                                arm_cmp(rn, operand, flags);
+                                arm_cmp(ins);
                             case 0b1011;
-                            // would be msr, but handled outside
-                            assert(false);
+                                // would be msr, but handled outside
+                                assert(false);
                             case 0b1100;
-                            // orr
-                            arm_orr :: inline (ins: u32) {
-                                operand: u32;
-                                should_carry: bool;
-                                carry_out: bool;
-                                if (ins & 0x2000000) {
-                                    operand, should_carry, carry_out = immediate_operand(xx (ins & 0xfff));
-                                } else {
-                                    operand, should_carry, carry_out = shifter_operand(xx (ins & 0xfff));
-                                    cpu.remaining_cycles -= 1;
-                                }
-                                rn := reg_src(cast(u8)((ins >> 16) & 0xf));
-                                rd_idx := cast(u8)((ins >> 12) & 0xf);
-                                flags := (ins & 0x100000) != 0;
-                                result := rn | operand;
-                                reg_dst(rd_idx, result);
-                                if flags {
-                                    if rd_idx == 15 {
-                                        cpu.psr = cpu.spsr[cpu.mode];
-                                    } else {
-                                        set_status_bit(.N, (result & 0x80000000) != 0);
-                                        set_status_bit(.Z, result == 0);
-                                        if should_carry set_status_bit(.C, carry_out);
-                                    }
-                                }
-                            }
-                            arm_orr(ins);
+                                // orr
+                                arm_orr(ins);
                             case 0b1101;
                                 // mov
-                                arm_mov :: inline (rd_idx: u8, operand: u32, flags: bool, should_carry: bool, carry_out: bool) {
-                                    reg_dst(rd_idx, operand);
-                                    if flags {
-                                        if rd_idx == 15 {
-                                            cpu.psr = cpu.spsr[cpu.mode];
-                                        } else {
-                                            set_status_bit(.N, (operand & 0x80000000) != 0);
-                                            set_status_bit(.Z, operand == 0);
-                                            if should_carry set_status_bit(.C, carry_out);
-                                        }
-                                    }
-                                }
-                                arm_mov(rd_idx, operand, flags, should_carry, carry_out);
+                                arm_mov(ins);
                             case 0b1110;
                                 // bic
-                                arm_bic :: inline (rn: u32, rd_idx: u8, operand: u32, flags: bool, should_carry: bool, carry_out: bool) {
-                                    result := rn & ~operand;
-                                    reg_dst(rd_idx, result);
-                                    if flags {
-                                        if rd_idx == 15 {
-                                            cpu.psr = cpu.spsr[cpu.mode];
-                                        } else {
-                                            set_status_bit(.N, (result & 0x80000000) != 0);
-                                            set_status_bit(.Z, result == 0);
-                                            if should_carry set_status_bit(.C, carry_out);
-                                        }
-                                    }
-                                }
-                                arm_bic(rn, rd_idx, operand, flags, should_carry, carry_out);
+                                arm_bic(ins);
                             case 0b1111;
                             // mvn
                             assert(false);
@@ -838,174 +606,37 @@ execute_next :: () {
                 }
             case 0b01;
                 // immediate offset/index load/store
-                arm_ldr_str_ldrb_strb :: inline (ins: u32) {
-                    rn_idx := cast(u8)((ins >> 16) & 0xf);
-                    rn := reg_src(rn_idx);
-                    rd_idx := cast(u8)((ins >> 12) & 0xf);
-                    p := (ins & 0x1000000) != 0;
-                    u := (ins & 0x800000) != 0;
-                    b := (ins & 0x400000) != 0;
-                    w := (ins & 0x200000) != 0;
-                    l := (ins & 0x100000) != 0;
-                    offset := ins & 0xfff;
-                    address := rn;
-                    if !p {
-                        // post indexed
-                        if u {
-                            rn += offset;
-                        } else {
-                            rn -= offset;
-                        }
-                        reg_dst(rn_idx, rn);
-                    } else if !w {
-                        // offset addressing
-                        if u {
-                            address += offset;
-                        } else {
-                            address -= offset;
-                        }
-                    } else {
-                        // pre indexed
-                        if u {
-                            address += offset;
-                        } else {
-                            address -= offset;
-                        }
-                        reg_dst(rn_idx, address);
-                    }
-
-                    if l {
-                        // load
-                        cpu.remaining_cycles -= 2;
-                        if b {
-                            reg_dst(rd_idx, read_8(address));
-                        } else {
-                            reg_dst(rd_idx, read_32(address));
-                        }
-                    } else {
-                        // store
-                        cpu.remaining_cycles -= 1;
-                        if b {
-                            write_8(address, xx (reg_src(rd_idx) & 0xff));
-                        } else {
-                            write_32(address, reg_src(rd_idx));
-                        }
-                    }
-                }
                 arm_ldr_str_ldrb_strb(ins);
             case 0b10;
                 if (ins & 0x2000000) == 0 {
                     // block data transfer
-                    arm_ldm_stm :: inline (ins: u32) {
-                        p := (ins & 0x1000000) != 0; // full stack? (empty stack)
-                        u := (ins & 0x800000) != 0; // increment pointer? (decrement)
-                        s := (ins & 0x400000) != 0; // user mode registers? (current)
-                        w := (ins & 0x200000) != 0; // write back pointer?
-                        l := (ins & 0x100000) != 0; // load? (store)
-                        rn_idx : u8 = xx (ins >> 16) & 0xf;
-                        pointer := reg_src(rn_idx);
-                        regs := ins & 0xffff;
-                        if l {
-                            cpu.remaining_cycles -= 1;
-                            for 0..15 {
-                                if (regs & (1 << it)) != 0 {
-                                    cpu.remaining_cycles -= 1;
-                                    if p {
-                                        if u then pointer += 4; else pointer -= 4;
-                                    }
-                                    to_store := read_32(pointer);
-                                    if s {
-                                        if it < 13 {
-                                            cpu.gpr[it] = to_store;
-                                        } else if it == 13 {
-                                            cpu.sp[0] = to_store;
-                                        } else if it == 14 {
-                                            cpu.lr[0] = to_store;
-                                        } else {
-                                            cpu.pc = to_store;
-                                        }
-                                    } else {
-                                        reg_dst(xx it, to_store);
-                                    }
-                                    if !p {
-                                        if u then pointer += 4; else pointer -= 4;
-                                    }
-                                }
-                            }
-                            if w then reg_dst(rn_idx, pointer);
-                        } else {
-                            for #v2 < 0..15 {
-                                if (regs & (1 << it)) != 0 {
-                                    cpu.remaining_cycles -= 1;
-                                    if p {
-                                        if u then pointer += 4; else pointer -= 4;
-                                    }
-                                    to_store : u32;
-                                    if s {
-                                        if it < 13 {
-                                            to_store = cpu.gpr[it];
-                                        } else if it == 13 {
-                                            to_store = cpu.sp[0];
-                                        } else if it == 14 {
-                                            to_store = cpu.lr[0];
-                                        } else {
-                                            to_store = cpu.pc;
-                                        }
-                                    } else {
-                                        to_store = reg_src(xx it);
-                                    }
-                                    write_32(pointer, to_store);
-                                    if !p {
-                                        if u then pointer += 4; else pointer -= 4;
-                                    }
-                                }
-                            }
-                            if w then reg_dst(rn_idx, pointer);
-                        }
-                    }
                     arm_ldm_stm(ins);
                 } else {
                     // branch
-                    cpu.remaining_cycles -= 2;
                     if (ins & 0x1000000) == 0 {
                         // b
-                        arm_b :: inline (ins: u32) {
-                            addr := (ins & 0x7fffff) << 2;
-                            cpu.pc += addr;
-                            sign := (ins & 0x800000) << 2;
-                            cpu.pc -= sign;
-                            cpu.pc += 4;
-                        }
                         arm_b(ins);
                     } else {
                         // bl
-                        arm_bl :: inline (ins: u32) {
-                            cpu.lr[cpu.mode] = cpu.pc;
-                            addr := (ins & 0x7fffff) << 2;
-                            cpu.pc += addr;
-                            sign := (ins & 0x800000) << 2;
-                            cpu.pc -= sign;
-                            cpu.pc += 4;
-                        }
                         arm_bl(ins);
                     }
                 }
             case 0b11;
                 if (ins & 0x2000000) == 0 {
                     // coprocessor data transfer
-                    assert(false);
+                    arm_ldc_stc(ins);
                 } else {
                     if (ins & 0x1000000) == 0 {
                         if (ins & 0x10) == 0 {
                             // coprocessor data operation
-                            assert(false);
+                            arm_cdp(ins);
                         } else {
                             // coprocessor register transfer
-                            assert(false);
+                            arm_mcr_mrc(ins);
                         }
                     } else {
                         // software interrupt
-                        assert(false);
+                        arm_swi(ins);
                     }
                 }
         }
