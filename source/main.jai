@@ -6,6 +6,13 @@ cpu: Cpu;
 ppu: Ppu;
 
 main :: () {
+    args := get_command_line_arguments();
+    if args.count != 2 {
+        exit(1);
+    }
+    rom := read_entire_file(args[1]);
+    array_resize(*cpu.memory.rom, rom.count);
+    memcpy(cpu.memory.rom.data, rom.data, cpu.memory.rom.count);
     context.logger = color_log;
     context.assertion_failed = dump_processor_state;
     bios, success := read_entire_file("in/gba_bios.bin");

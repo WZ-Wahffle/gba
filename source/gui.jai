@@ -201,8 +201,12 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     flags := (inst & 0x100000) != 0;
                     if ((inst >> 21) & 0xf) == {
                         case 0b0000;
-                        // and
-                        // assert(false);
+                            // and
+                            opcode = ifx flags then "ANDS" else "AND";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b0001;
                         // eor
                         // assert(false);
@@ -214,8 +218,12 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             append(*suffix, disassemble_register((inst >> 16) & 0xf));
                             append(*suffix, ", ");
                         case 0b0011;
-                        // rsb
-                        // assert(false);
+                            // rsb
+                            opcode = ifx flags then "RSBS" else "RSB";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b0100;
                             // add
                             opcode = ifx flags then "ADDS" else "ADD";
@@ -254,7 +262,11 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                         // assert(false);
                         case 0b1100;
                         // orr
-                        // assert(false);
+                            opcode = ifx flags then "ORRS" else "ORR";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b1101;
                             // mov
                             opcode = ifx flags then "MOVS" else "MOV";
@@ -488,7 +500,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             append(*suffix, ", #0x");
             append(*suffix, tprint("%", formatInt(immed, 16, 2)));
             case 0b01;
-            // cmp (1)
+            opcode = "cmp";
+            append(*suffix, disassemble_register(reg_idx));
+            append(*suffix, ", #0x");
+            append(*suffix, tprint("%", formatInt(immed, 16, 2)));
             case 0b10;
             // add (2)
             opcode = "add";
@@ -520,6 +535,16 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, "]");
                 case 0b001;
                 // strh (2)
+                rd_idx : u8 = xx ins & 0b111;
+                rn_idx : u8 = xx (ins >> 3) & 0b111;
+                rm_idx : u8 = xx (ins >> 6) & 0b111;
+                opcode = "strh";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
                 case 0b010;
                 // strb (2)
                 case 0b011;
@@ -528,6 +553,16 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // ldr (2)
                 case 0b101;
                 // ldrh (2)
+                rd_idx : u8 = xx ins & 0b111;
+                rn_idx : u8 = xx (ins >> 3) & 0b111;
+                rm_idx : u8 = xx (ins >> 6) & 0b111;
+                opcode = "ldrh";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
                 case 0b110;
                 // ldrb (2)
                 case 0b111;
@@ -574,6 +609,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // and
                 case 0b0001;
                 // eor
+                opcode = "eor";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b0010;
                 // lsl (2)
                 case 0b0011;
@@ -586,6 +625,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // sbc
                 case 0b0111;
                 // ror
+                opcode = "ror";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rs_idx));
                 case 0b1000;
                 // tst
                 opcode = "tst";
@@ -596,6 +639,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // neg
                 case 0b1010;
                 // cmp (2)
+                opcode = "cmp";
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b1011;
                 // cmn
                 case 0b1100;
@@ -606,6 +653,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, disassemble_register(rm_idx));
                 case 0b1101;
                 // mul
+                opcode = "mul";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b1110;
                 // bic
                 case 0b1111;
@@ -677,7 +728,7 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // software breakpoint?
             } else if (ins & 0x400) != 0 {
                 // push/pop register list
-                opcode = "push";
+                opcode = ifx (ins & 0x800) != 0 then "pop" else "push";
                 append(*suffix, "{");
                 any := false;
                 for 0..7 {
@@ -687,7 +738,11 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                     }
                 }
                 if (ins & 0x100) != 0 {
-                    append(*suffix, ifx any then ",LR" else "LR");
+                    if (ins & 0x800) != 0 {
+                        append(*suffix, ifx any then ",PC" else "PC");
+                    } else {
+                        append(*suffix, ifx any then ",LR" else "LR");
+                    }
                 }
                 append(*suffix, "}");
             } else {
@@ -697,7 +752,13 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, tprint("%", formatInt((ins & 0x7f) << 2, 16, 1)));
             }
         } else {
-            // Add to SP or PC
+            rd_idx : u8 = xx (ins >> 8) & 0b111;
+            immed := ins & 0xff;
+            opcode = "add";
+            append(*suffix, disassemble_register(rd_idx));
+            append(*suffix, ", ");
+            append(*suffix, ifx (ins & 0x800) != 0 then "SP, #0x" else "PC, #0x");
+            append(*suffix, tprint("%", formatInt(immed * 4, 16, 1)));
         }
         case 0b110;
         if (ins & 0x1000) != 0 {
@@ -709,6 +770,19 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             append(*suffix, tprint("%", formatInt(immed, 16, 1)));
         } else {
             // Load/store multiple
+            regs := ins & 0xff;
+            rn_idx : u8 = xx (ins >> 8) & 0b111;
+            opcode = ifx (ins & 0x800) != 0 then "ldmia" else "stmia";
+            append(*suffix, disassemble_register(rn_idx));
+            append(*suffix, "!, {");
+            any := false;
+            for 0..7 {
+                if (ins & (1 << it)) != 0 {
+                    append(*suffix, ifx any then tprint(",R%", formatInt(it, 10, 1)) else tprint("R%", formatInt(it, 10, 1)));
+                    any = true;
+                }
+            }
+            append(*suffix, "}");
         }
         case 0b111;
         offset := ins & 0x7ff;
@@ -777,7 +851,7 @@ disasm_window :: () {
             ImGui.Text("%\t%", addr, to_print);
         }
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("0x%", read_32(addr));
+            ImGui.SetTooltip("0x%", ifx cpu.state == .ARM then read_32(addr) else read_16(addr));
         }
         if ImGui.IsItemClicked() {
             if contains {
