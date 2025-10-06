@@ -11,7 +11,15 @@ thumb_add_3 :: inline (ins: u16) {
 }
 
 thumb_sub_3 :: inline (ins: u16) {
-    assert(false);
+    rn := reg_src(xx ((ins >> 3) & 0b111));
+    rd_idx : u8 = xx ins & 0b111;
+    rm := reg_src(xx ((ins >> 6) & 0b111));
+    result := rn - rm;
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
+    set_status_bit(.C, rn >= rm);
+    set_status_bit(.V, (rn & 0x80000000) != (rm & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+    reg_dst(rd_idx, result);
 }
 
 thumb_add_1 :: inline (ins: u16) {
@@ -57,10 +65,10 @@ thumb_lsr_1 :: inline (ins: u16) {
     immed := (ins >> 6) & 0x1f;
     result := rn >> immed;
     if immed == 0 {
-        set_status_bit(.C, (reg_src(rd_idx) & 0x80000000) != 0);
+        set_status_bit(.C, (rn & 0x80000000) != 0);
         result = 0;
     } else {
-        set_status_bit(.C, (reg_src(rd_idx) & (1 << (immed - 1))) != 0);
+        set_status_bit(.C, (rn & (1 << (immed - 1))) != 0);
     }
     reg_dst(rd_idx, result);
     set_status_bit(.N, (result & 0x80000000) != 0);
@@ -68,7 +76,27 @@ thumb_lsr_1 :: inline (ins: u16) {
 }
 
 thumb_asr_1 :: inline (ins: u16) {
-    assert(false);
+    rm := reg_src(xx ((ins >> 3) & 0b111));
+    rd_idx : u8 = xx ins & 0b111;
+    immed := (ins >> 6) & 0x1f;
+    result := rm;
+    #asm {
+        immed === c;
+        sar.32 result, immed;
+    }
+    if immed == 0 {
+        set_status_bit(.C, (rm & 0x80000000) != 0);
+        if (rm & 0x80000000) != 0 {
+            result = 0xffffffff;
+        } else {
+            result = 0;
+        }
+    } else {
+        set_status_bit(.C, (rm & (1 << (immed - 1))) != 0);
+    }
+    reg_dst(rd_idx, result);
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
 }
 
 thumb_mov_1 :: inline (ins: u16) {
@@ -193,7 +221,12 @@ thumb_bx_blx_2 :: inline (ins: u16) {
 }
 
 thumb_and :: inline (ins: u16) {
-    assert(false);
+    rm_idx : u8 = xx (ins >> 3) & 0b111;
+    rd_idx : u8 = xx ins & 0b111;
+    result := reg_src(rm_idx) & reg_src(rd_idx);
+    reg_dst(rd_idx, result);
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
 }
 
 thumb_eor :: inline (ins: u16) {
@@ -254,7 +287,17 @@ thumb_tst :: inline (ins: u16) {
 }
 
 thumb_neg :: inline (ins: u16) {
-    assert(false);
+    rm_idx : u8 = xx (ins >> 3) & 0b111;
+    rm := reg_src(rm_idx);
+    rd_idx : u8 = xx ins & 0b111;
+    result := 0 - rm;
+    reg_dst(rd_idx, result);
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
+    // technically would be set if 0 were greater, but... yeah
+    set_status_bit(.C, false);
+    // I suspect this can only happen if result == 0x80000000?
+    set_status_bit(.V, (rm & 0x80000000) != 0 && (result & 0x80000000) != 0);
 }
 
 thumb_cmp_2 :: inline (ins: u16) {

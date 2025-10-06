@@ -20,7 +20,55 @@ arm_swp_swpb :: inline (ins: u32) {
 }
 
 arm_ldrh_strh :: inline (ins: u32) {
-    assert(false);
+    rn_idx : u8 = xx (ins >> 16) & 0xf;
+    rn := reg_src(rn_idx);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    p := (ins & 0x1000000);
+    u := (ins & 0x800000);
+    w := (ins & 0x200000);
+    l := (ins & 0x100000);
+    address := rn;
+    offset: u32;
+    if (ins & 0x400000) != 0 {
+        offset = (ins & 0x0f) | ((ins >> 4) & 0xf0);
+    } else {
+        offset = reg_src(xx ins & 0xf);
+    }
+
+    if !p {
+        // post indexed
+        if u {
+            rn += offset;
+        } else {
+            rn -= offset;
+        }
+        reg_dst(rn_idx, rn);
+    } else if !w {
+        // offset addressing
+        if u {
+            address += offset;
+        } else {
+            address -= offset;
+        }
+    } else {
+        // pre indexed
+        if u {
+            address += offset;
+        } else {
+            address -= offset;
+        }
+        reg_dst(rn_idx, address);
+    }
+
+    if l {
+        // load
+        cpu.remaining_cycles -= 2;
+        reg_dst(rd_idx, read_16(address));
+    } else {
+        // store
+        cpu.remaining_cycles -= 1;
+        write_16(address, xx (reg_src(rd_idx) & 0xffff));
+    }
 }
 
 arm_ldrsb_ldrsh :: inline (ins: u32) {
@@ -124,7 +172,29 @@ arm_and :: inline (ins: u32) {
 }
 
 arm_eor :: inline (ins: u32) {
-    assert(false);
+    operand: u32;
+    should_carry: bool;
+    carry_out: bool;
+    if (ins & 0x2000000) {
+        operand, should_carry, carry_out = immediate_operand(xx ins & 0xfff);
+    } else {
+        operand, should_carry, carry_out = shifter_operand(xx ins & 0xfff);
+        cpu.remaining_cycles -= 1;
+    }
+    rn := reg_src(xx (ins >> 16) & 0xf);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    flags := (ins & 0x100000) != 0;
+    result := rn ^ operand;
+    reg_dst(rd_idx, result);
+    if flags {
+        if rd_idx == 15 {
+            cpu.psr = cpu.spsr[cpu.mode];
+        } else {
+            set_status_bit(.N, (result & 0x80000000) != 0);
+            set_status_bit(.Z, result == 0);
+            if should_carry set_status_bit(.C, carry_out);
+        }
+    }
 }
 
 arm_sub :: inline (ins: u32) {
@@ -203,7 +273,29 @@ arm_add :: inline (ins: u32) {
 }
 
 arm_adc :: inline (ins: u32) {
-    assert(false);
+    operand: u32;
+    if (ins & 0x2000000) {
+        operand = immediate_operand(xx ins & 0xfff);
+    } else {
+        operand = shifter_operand(xx ins & 0xfff);
+        cpu.remaining_cycles -= 1;
+    }
+    rn := reg_src(xx (ins >> 16) & 0xf);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    flags := (ins & 0x100000) != 0;
+    operand += xx ifx get_status_bit(.C) then 1 else 0;
+    result := rn + operand;
+    reg_dst(rd_idx, result);
+    if flags {
+        if rd_idx == 15 {
+            cpu.psr = cpu.spsr[cpu.mode];
+        } else {
+            set_status_bit(.N, (result & 0x80000000) != 0);
+            set_status_bit(.Z, result == 0);
+            set_status_bit(.C, cast(u64)(rn) + cast(u64)(operand) > 0xffffffff);
+            set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+        }
+    }
 }
 
 arm_sbc :: inline (ins: u32) {
@@ -344,9 +436,9 @@ arm_bic :: inline (ins: u32) {
 }
 
 arm_ldr_str_ldrb_strb :: inline (ins: u32) {
-    rn_idx := cast(u8)((ins >> 16) & 0xf);
+    rn_idx : u8 = xx (ins >> 16) & 0xf;
     rn := reg_src(rn_idx);
-    rd_idx := cast(u8)((ins >> 12) & 0xf);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
     p := (ins & 0x1000000) != 0;
     u := (ins & 0x800000) != 0;
     b := (ins & 0x400000) != 0;

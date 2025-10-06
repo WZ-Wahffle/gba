@@ -167,6 +167,53 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 append(*suffix, "]");
             } else if (inst & 0xe0000f0) == 0x00000b0 {
                 // ldrh / strh
+                rd_idx : u8 = xx (inst >> 12) & 0xf;
+                rn_idx : u8 = xx (inst >> 16) & 0xf;
+                p := (inst & 0x1000000) != 0;
+                u := (inst & 0x800000) != 0;
+                i := (inst & 0x400000) != 0;
+                w := (inst & 0x200000) != 0;
+                l := (inst & 0x100000) != 0;
+
+                if l {
+                    // load
+                    opcode = "LDRH";
+                } else {
+                    // store
+                    opcode = "STRH";
+                }
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                offset := tprint("#%", formatInt((inst & 0x0f) | ((inst >> 4) & 0xf0), 10, 1));
+                offset_reg := disassemble_register(xx inst & 0xf);
+                if !p {
+                    // post indexed
+                    append(*suffix, "], ");
+                    if u {
+                        append(*suffix, tprint("%", ifx i then offset else offset_reg));
+                    } else {
+                        append(*suffix, tprint("-%", ifx i then offset else offset_reg));
+                    }
+                } else if !w {
+                    // offset addressing
+                    append(*suffix, ", ");
+                    if u {
+                        append(*suffix, tprint("%", ifx i then offset else offset_reg));
+                    } else {
+                        append(*suffix, tprint("-%", ifx i then offset else offset_reg));
+                    }
+                    append(*suffix, "]");
+                } else {
+                    // pre indexed
+                    append(*suffix, ", ");
+                    if u {
+                        append(*suffix, tprint("%", ifx i then offset else offset_reg));
+                    } else {
+                        append(*suffix, tprint("-%", ifx i then offset else offset_reg));
+                    }
+                    append(*suffix, "]!");
+                }
             } else if (inst & 0xe0000f0) == 0x00000d0 {
                 // ldrsb / ldrsh
             } else {
@@ -203,8 +250,12 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             append(*suffix, disassemble_register((inst >> 16) & 0xf));
                             append(*suffix, ", ");
                         case 0b0001;
-                        // eor
-                        // assert(false);
+                            // eor
+                            opcode = ifx flags then "EORS" else "EOR";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b0010;
                             // sub
                             opcode = ifx flags then "SUBS" else "SUB";
@@ -227,8 +278,12 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             append(*suffix, disassemble_register((inst >> 16) & 0xf));
                             append(*suffix, ", ");
                         case 0b0101;
-                        // adc
-                        // assert(false);
+                            // adc
+                            opcode = ifx flags then "ADCS" else "ADC";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b0110;
                         // sbc
                         // assert(false);
@@ -285,8 +340,8 @@ disassemble_arm_instruction :: (inst: u32) -> string {
             }
         case 0b01;
             // LDR / STR / LDRB / STRB
-            rd_idx := cast(u8)((inst >> 12) & 0xf);
-            rn_idx := cast(u8)((inst >> 16) & 0xf);
+            rd_idx : u8 = xx (inst >> 12) & 0xf;
+            rn_idx : u8 = xx (inst >> 16) & 0xf;
             p := (inst & 0x1000000) != 0;
             u := (inst & 0x800000) != 0;
             b := (inst & 0x400000) != 0;
@@ -315,26 +370,26 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 // post indexed
                 append(*suffix, "], ");
                 if u {
-                    append(*suffix, tprint("#%", offset));
+                    append(*suffix, tprint("#%", formatInt(offset, 10, 1)));
                 } else {
-                    append(*suffix, tprint("#-%", offset));
+                    append(*suffix, tprint("#-%", formatInt(offset, 10, 1)));
                 }
             } else if !w {
                 // offset addressing
                 append(*suffix, ", ");
                 if u {
-                    append(*suffix, tprint("#%", offset));
+                    append(*suffix, tprint("#%", formatInt(offset, 10, 1)));
                 } else {
-                    append(*suffix, tprint("#-%", offset));
+                    append(*suffix, tprint("#-%", formatInt(offset, 10, 1)));
                 }
                 append(*suffix, "]");
             } else {
                 // pre indexed
                 append(*suffix, ", ");
                 if u {
-                    append(*suffix, tprint("#%", offset));
+                    append(*suffix, tprint("#%", formatInt(offset, 10, 1)));
                 } else {
-                    append(*suffix, tprint("#-%", offset));
+                    append(*suffix, tprint("#-%", formatInt(offset, 10, 1)));
                 }
                 append(*suffix, "]!");
             }
@@ -434,6 +489,13 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             append(*suffix, disassemble_register(rm_idx));
             case 0b1101;
             // sub (3)
+            rm_idx : u8 = xx (ins >> 6) & 0b111;
+            opcode = "sub";
+            append(*suffix, disassemble_register(rd_idx));
+            append(*suffix, ", ");
+            append(*suffix, disassemble_register(rn_idx));
+            append(*suffix, ", ");
+            append(*suffix, disassemble_register(rm_idx));
             case 0b1110;
             // add (1)
             // mov (2) if immediate is 0
@@ -479,6 +541,12 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, tprint("%", formatInt(immed, 10, 1)));
                 case 0b10;
                 // asr (1)
+                opcode = "asr";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", #");
+                append(*suffix, tprint("%", formatInt(immed, 10, 1)));
                 case 0b11;
                 // handled elsewhere
             }
@@ -602,6 +670,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             if ((ins >> 6) & 0xf) == {
                 case 0b0000;
                 // and
+                opcode = "and";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b0001;
                 // eor
                 opcode = "eor";
@@ -632,6 +704,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, disassemble_register(rm_idx));
                 case 0b1001;
                 // neg
+                opcode = "neg";
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b1010;
                 // cmp (2)
                 opcode = "cmp";
