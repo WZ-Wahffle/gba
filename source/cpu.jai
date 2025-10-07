@@ -600,7 +600,7 @@ execute_next :: () {
                                 arm_bic(ins);
                             case 0b1111;
                             // mvn
-                            assert(false);
+                            arm_mvn(ins);
                         }
                     }
                 }

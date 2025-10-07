@@ -435,6 +435,10 @@ arm_bic :: inline (ins: u32) {
     }
 }
 
+arm_mvn :: inline (ins: u32) {
+    assert(false);
+}
+
 arm_ldr_str_ldrb_strb :: inline (ins: u32) {
     rn_idx : u8 = xx (ins >> 16) & 0xf;
     rn := reg_src(rn_idx);
