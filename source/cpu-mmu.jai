@@ -1,5 +1,7 @@
 mmio_read :: (addr: u32) -> u8 {
     if addr - 0x04000000 == {
+        // case 0x006;
+        // return ppu.draw_y;
         case 0x130;
         return xx ppu.keypad_state & 0xff;
         case 0x131;

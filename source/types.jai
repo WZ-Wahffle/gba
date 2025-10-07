@@ -177,7 +177,7 @@ Ppu :: struct {
     keypad_require_all := false;
 
     draw_x := 0;
-    draw_y := 0;
+    draw_y : u8 = 0;
     remaining_cycles := 0;
 
     Ppu_Mmu :: struct {

@@ -107,10 +107,11 @@ ui :: () {
         ImGui.Render();
         ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
         SDL_GL_SwapWindow(win);
-        __Iprof.update(true);
-        report = __Iprof.create_report();
         reset_temporary_storage();
-        // memory_visualizer_per_frame_update();
+        #if #exists(__Iprof) {
+            __Iprof.update(true);
+            report = __Iprof.create_report();
+        }
         // frame_time := seconds_since_init() - time;
         // sleep_milliseconds(xx (16.6 - frame_time));
     }
