@@ -338,7 +338,6 @@ arm_teq :: inline (ins: u32) {
     set_status_bit(.N, (result & 0x80000000) != 0);
     set_status_bit(.Z, result == 0);
     if should_carry set_status_bit(.C, carry_out);
-
 }
 
 arm_cmp :: inline (ins: u32) {

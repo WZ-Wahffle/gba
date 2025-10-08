@@ -10,6 +10,20 @@ main :: () {
     if args.count != 2 {
         exit(1);
     }
+    // fill Struct Of Array variant at runtime,
+    // because it's more convenient to initialize it as
+    // Array Of Structs
+    for arm_decoder_table {
+        arm_decoder_masks[it_index] = it.mask;
+        arm_decoder_results[it_index] = it.result;
+        arm_decoder_functions[it_index] = it.function;
+    }
+
+    for thumb_decoder_table {
+        thumb_decoder_masks[it_index] = it.mask;
+        thumb_decoder_results[it_index] = it.result;
+        thumb_decoder_functions[it_index] = it.function;
+    }
     rom := read_entire_file(args[1]);
     array_resize(*cpu.memory.rom, rom.count);
     memcpy(cpu.memory.rom.data, rom.data, cpu.memory.rom.count);

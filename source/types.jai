@@ -232,6 +232,12 @@ Ppu :: struct {
     }
 }
 
+Decoder_Unit_Arm :: struct {
+    mask: u32;
+    result: u32;
+    function: (ins: u32);
+}
+
 Decoder_Unit_Thumb :: struct {
     mask: u16;
     result: u16;
