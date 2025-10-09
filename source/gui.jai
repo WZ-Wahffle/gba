@@ -651,6 +651,12 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // add (4)
                 case 0b01;
                 // cmp (3)
+                rd_idx : u8 = xx ((ins & 0b111) | ((ins >> 4) & 0b1000));
+                rm_idx : u8 = xx ((ins >> 3) & 0xf);
+                opcode = "cmp";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b10;
                 // mov (3)
                 rd_idx : u8 = xx ((ins & 0b111) | ((ins >> 4) & 0b1000));
@@ -969,6 +975,9 @@ iwram_window :: () {
         for it2 : 0..15 {
             ImGui.TableNextColumn();
             ImGui.Text_CFormat("%02x", cpu.memory.iwram._8[(it + iwram_scroll_state) * 16 + it2]);
+            if ImGui.IsItemHovered() {
+                ImGui.SetTooltip("0x%", 0x03000000 + (it + iwram_scroll_state) * 16 + it2);
+            }
         }
     }
     ImGui.EndTable();

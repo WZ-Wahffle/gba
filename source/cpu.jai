@@ -459,14 +459,15 @@ immediate_operand :: (val: u16) -> (u32, bool, bool) {
 }
 
 arm_decoder_table :: Decoder_Unit_Arm.[
-    .{0xffffff0, 0x12fff10, arm_bx},
-    .{0xfc000f0, 0x0000090, arm_mul_mla},
     .{0xf8000f0, 0x0800090, arm_umull_umlal_smull_smlal},
-    .{0xfb00ff0, 0x1000090, arm_swp_swpb},
+    .{0xfc000f0, 0x0000090, arm_mul_mla},
+
     .{0xe0000f0, 0x00000b0, arm_ldrh_strh},
     .{0xe0000f0, 0x00000d0, arm_ldrsb_ldrsh},
-    .{0xfb00000, 0x1000000, arm_mrs},
-    .{0xdb000f0, 0x1200000, arm_msr},
+    .{0xe000000, 0x8000000, arm_ldm_stm},
+    .{0xe000000, 0xc000000, arm_ldc_stc},
+    .{0xc000000, 0x4000000, arm_ldr_str_ldrb_strb},
+
     .{0xde00000, 0x0000000, arm_and},
     .{0xde00000, 0x0200000, arm_eor},
     .{0xde00000, 0x0400000, arm_sub},
@@ -475,100 +476,116 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xde00000, 0x0a00000, arm_adc},
     .{0xde00000, 0x0c00000, arm_sbc},
     .{0xde00000, 0x0e00000, arm_rsc},
-    .{0xdf0f000, 0x1100000, arm_tst},
-    .{0xdf0f000, 0x1300000, arm_teq},
-    .{0xdf0f000, 0x1500000, arm_cmp},
     .{0xde00000, 0x1800000, arm_orr},
     .{0xdef0000, 0x1a00000, arm_mov},
     .{0xde00000, 0x1c00000, arm_bic},
     .{0xdef0000, 0x1e00000, arm_mvn},
-    .{0xc000000, 0x4000000, arm_ldr_str_ldrb_strb},
-    .{0xe000000, 0x8000000, arm_ldm_stm},
+
+    .{0xdf0f000, 0x1100000, arm_tst},
+    .{0xdf0f000, 0x1300000, arm_teq},
+    .{0xdf0f000, 0x1500000, arm_cmp},
+
+    .{0xdb000f0, 0x1200000, arm_msr},
+    .{0xfb00000, 0x1000000, arm_mrs},
+    .{0xfb00ff0, 0x1000090, arm_swp_swpb},
+    .{0xffffff0, 0x12fff10, arm_bx},
     .{0xf000000, 0xa000000, arm_b},
     .{0xf000000, 0xb000000, arm_bl},
-    .{0xe000000, 0xc000000, arm_ldc_stc},
     .{0xf000010, 0xe000000, arm_cdp},
     .{0xf000010, 0xe000010, arm_mcr_mrc},
     .{0xf000000, 0xf000000, arm_swi},
-    .{0x0000000, 0xfffffff, null}
+    .{0x0000000, 0x0000000, null}
 ];
-
-arm_decoder_masks : [#run arm_decoder_table.count]u32;
-arm_decoder_results : [#run arm_decoder_table.count]u32;
-arm_decoder_functions : [#run arm_decoder_table.count](ins: u32);
-#run assert(arm_decoder_table.count % 8 == 0, "ARM instruction table count must be divisible by 8!");
 
 thumb_decoder_table :: Decoder_Unit_Thumb.[
-    .{0xffc0, 0x4140, thumb_adc},
-    .{0xfe00, 0x1c00, thumb_add_1},
-    .{0xf800, 0x3000, thumb_add_2},
+    .{0xf800, 0x0000, thumb_lsl_1},
+    .{0xf800, 0x0800, thumb_lsr_1},
+    .{0xf800, 0x1000, thumb_asr_1},
     .{0xfe00, 0x1800, thumb_add_3},
+    .{0xfe00, 0x1a00, thumb_sub_3},
+    .{0xfe00, 0x1c00, thumb_add_1},
+    .{0xfe00, 0x1e00, thumb_sub_1},
+    .{0xf800, 0x2000, thumb_mov_1},
+    .{0xf800, 0x2800, thumb_cmp_1},
+    .{0xf800, 0x3000, thumb_add_2},
+    .{0xf800, 0x3800, thumb_sub_2},
+    .{0xffc0, 0x4000, thumb_and},
+    .{0xffc0, 0x4040, thumb_eor},
+    .{0xffc0, 0x4080, thumb_lsl_2},
+    .{0xffc0, 0x40c0, thumb_lsr_2},
+    .{0xffc0, 0x4100, thumb_asr_2},
+    .{0xffc0, 0x4140, thumb_adc},
+    .{0xffc0, 0x4180, thumb_sbc},
+    .{0xffc0, 0x41c0, thumb_ror},
+    .{0xffc0, 0x4200, thumb_tst},
+    .{0xffc0, 0x4240, thumb_neg},
+    .{0xffc0, 0x4280, thumb_cmp_2},
+    .{0xffc0, 0x42c0, thumb_cmn},
+    .{0xffc0, 0x4300, thumb_orr},
+    .{0xffc0, 0x4340, thumb_mul},
+    .{0xffc0, 0x4380, thumb_bic},
+    .{0xffc0, 0x43c0, thumb_mvn},
     .{0xff00, 0x4400, thumb_add_4},
+    .{0xff00, 0x4500, thumb_cmp_3},
+    .{0xff00, 0x4600, thumb_mov_3},
+    .{0xff00, 0x4700, thumb_bx_blx_2},
+    .{0xf800, 0x4800, thumb_ldr_3},
+    .{0xfe00, 0x5000, thumb_str_2},
+    .{0xfe00, 0x5200, thumb_strh_2},
+    .{0xfe00, 0x5400, thumb_strb_2},
+    .{0xfe00, 0x5600, thumb_ldrsb},
+    .{0xfe00, 0x5800, thumb_ldr_2},
+    .{0xfe00, 0x5a00, thumb_ldrh_2},
+    .{0xfe00, 0x5c00, thumb_ldrb_2},
+    .{0xfe00, 0x5e00, thumb_ldrsh},
+    .{0xe000, 0x6000, thumb_ldr_str_ldrb_strb_1},
+    .{0xf800, 0x8000, thumb_strh_1},
+    .{0xf800, 0x8800, thumb_ldrh_1},
+    .{0xf800, 0x9000, thumb_str_3},
+    .{0xf800, 0x9800, thumb_ldr_4},
     .{0xf000, 0xa000, thumb_add_5_add_6},
     .{0xff00, 0xb000, thumb_add_7_sub_4},
-    .{0xffc0, 0x4000, thumb_and},
-    .{0xf800, 0x1000, thumb_asr_1},
-    .{0xffc0, 0x4100, thumb_asr_2},
+    .{0xfe00, 0xb400, thumb_push},
+    .{0xfe00, 0xbc00, thumb_pop},
+    .{0xff00, 0xbe00, thumb_bkpt},
+    .{0xf000, 0xc000, thumb_ldmia_stmia},
     .{0xf000, 0xd000, thumb_swi_b_1},
     .{0xf800, 0xe000, thumb_b_2},
-    .{0xffc0, 0x4380, thumb_bic},
-    .{0xff00, 0xbe00, thumb_bkpt},
+    .{0xf800, 0xe800, thumb_bl_blx_1_blx_suffix},
     .{0xf800, 0xf000, thumb_bl_blx_1_prefix},
     .{0xf800, 0xf800, thumb_bl_blx_1_bl_suffix},
-    .{0xf800, 0xe800, thumb_bl_blx_1_blx_suffix},
-    .{0xff00, 0x4700, thumb_bx_blx_2},
-    .{0xffc0, 0x42c0, thumb_cmn},
-    .{0xf800, 0x2800, thumb_cmp_1},
-    .{0xffc0, 0x4280, thumb_cmp_2},
-    .{0xff00, 0x4500, thumb_cmp_3},
-    .{0xffc0, 0x4040, thumb_eor},
-    .{0xf000, 0xc000, thumb_ldmia_stmia},
-    .{0xe000, 0x6000, thumb_ldr_str_ldrb_strb_1},
-    .{0xfe00, 0x5800, thumb_ldr_2},
-    .{0xf800, 0x4800, thumb_ldr_3},
-    .{0xf800, 0x9800, thumb_ldr_4},
-    .{0xfe00, 0x5c00, thumb_ldrb_2},
-    .{0xfe00, 0x5a00, thumb_ldrh_2},
-    .{0xfe00, 0x5600, thumb_ldrsb},
-    .{0xfe00, 0x5e00, thumb_ldrsh},
-    .{0xf800, 0x0000, thumb_lsl_1},
-    .{0xffc0, 0x4080, thumb_lsl_2},
-    .{0xf800, 0x0800, thumb_lsr_1},
-    .{0xffc0, 0x40c0, thumb_lsr_2},
-    .{0xf800, 0x2000, thumb_mov_1},
-    .{0xff00, 0x4600, thumb_mov_3},
-    .{0xffc0, 0x4340, thumb_mul},
-    .{0xffc0, 0x43c0, thumb_mvn},
-    .{0xffc0, 0x4240, thumb_neg},
-    .{0xffc0, 0x4300, thumb_orr},
-    .{0xfe00, 0xbc00, thumb_pop},
-    .{0xfe00, 0xb400, thumb_push},
-    .{0xffc0, 0x41c0, thumb_ror},
-    .{0xffc0, 0x4180, thumb_sbc},
-    .{0xfe00, 0x5000, thumb_str_2},
-    .{0xf800, 0x9000, thumb_str_3},
-    .{0xfe00, 0x5400, thumb_strb_2},
-    .{0xfe00, 0x8000, thumb_strh_1},
-    .{0xfe00, 0x5200, thumb_strh_2},
-    .{0xfe00, 0x1e00, thumb_sub_1},
-    .{0xf800, 0x3800, thumb_sub_2},
-    .{0xfe00, 0x1a00, thumb_sub_3},
-    .{0xffc0, 0x4200, thumb_tst},
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null}, // padding, no touchy
-    .{0x0000, 0xffff, null} // padding, no touchy
+    .{0x0000, 0x0000, null}
 ];
 
-thumb_decoder_masks : [#run thumb_decoder_table.count]u16;
-thumb_decoder_results : [#run thumb_decoder_table.count]u16;
-thumb_decoder_functions : [#run thumb_decoder_table.count](ins: u16);
-#run assert(thumb_decoder_table.count % 16 == 0, "Thumb instruction table count must be divisible by 16!");
+arm_reduced_lut : [4096](ins: u32);
+thumb_reduced_lut : [1024](ins: u16);
+
+populate_arm_lut :: () {
+    for upper: 0..255 {
+        for lower: 0..16 {
+            ins : u32 = xx (lower << 4) | (upper << 20);
+            for arm_decoder_table {
+                if ins & it.mask == it.result {
+                    arm_reduced_lut[lower | (upper << 4)] = it.function;
+                    break;
+                }
+            }
+        }
+    }
+    arm_reduced_lut[0x121] = arm_bx;
+}
+
+
+populate_thumb_lut :: () {
+    for ins: 0..1023 {
+        for thumb_decoder_table {
+            if (ins << 6) & it.mask == it.result {
+                thumb_reduced_lut[ins] = it.function;
+                break;
+            }
+        }
+    }
+}
 
 execute_next :: () {
     if cpu.state == .ARM {
@@ -577,77 +594,15 @@ execute_next :: () {
         if !cond(xx (ins >> 28)) {
             return;
         }
-
-        masks_data := arm_decoder_masks.data;
-        results_data := arm_decoder_results.data;
-        functions_data := arm_decoder_functions.data;
-        result : u32;
-        #asm AVX, AVX2 {
-            // put instruction into vector 8 times
-            pbroadcastd.y ins_v:, [*ins];
+        mask : u32 = 0x0ff000f0;
+        ins_masked : u32;
+        #asm {
+            pext.32 ins_masked, ins, mask;
         }
-        idx := 0;
-        while idx < 128 {
-            #asm AVX, AVX2 {
-                // load batch of 8 masks into vector
-                movdqu.y mask_v:, [masks_data + idx];
-                // load batch of 8 match results into vector
-                movdqu.y result_v:, [results_data + idx];
-                // bitwise AND instruction and masks
-                pand.y mask_result_v:, ins_v, mask_v;
-                // check result, vector entry will be 0 if false, 0xffffffff if true
-                pcmpeqd.y mask_result_v, result_v, mask_result_v;
-                // put all 32 most significant bits into result_cnt
-                // 0b0000 if false, 0b1111 if true
-                pmovmskb result_cnt:, mask_result_v;
-                // count trailing zeros, 32 if nothing was found
-                tzcnt.32 result, result_cnt;
-            }
-            if result != 32 {
-                arm_decoder_functions[(idx + result) >> 2](ins);
-                break;
-            }
-            idx += 32;
-        }
-
+        arm_reduced_lut[ins_masked](ins);
     } else {
         ins := next_16();
         cpu.remaining_cycles -= 1;
-
-        // TODO: have a long and hard think on whether
-        // this is *really* an improvement over the
-        // commented out version... but I suppose
-        // the numbers don't lie?
-        masks_data := thumb_decoder_masks.data;
-        results_data := thumb_decoder_results.data;
-        functions_data := thumb_decoder_functions.data;
-        result : u32;
-        #asm AVX, AVX2 {
-            // put instruction into vector 16 times
-            pbroadcastw.y ins_v:, [*ins];
-        }
-        idx := 0;
-        while idx < 128 {
-            #asm AVX, AVX2 {
-                // load batch of 16 masks into vector
-                movdqu.y mask_v:, [masks_data + idx];
-                // load batch of 16 match results into vector
-                movdqu.y result_v:, [results_data + idx];
-                // bitwise AND instruction and masks
-                pand.y mask_result_v:, ins_v, mask_v;
-                // check result, vector entry will be 0 if false, 0xffff if true
-                pcmpeqw.y mask_result_v, result_v, mask_result_v;
-                // put all 32 most significant bits into result_cnt
-                // 0b00 if false, 0b11 if true
-                pmovmskb result_cnt:, mask_result_v;
-                // count trailing zeros, 32 if nothing was found
-                tzcnt.32 result, result_cnt;
-            }
-            if result != 32 {
-                thumb_decoder_functions[(idx + result) >> 1](ins);
-                break;
-            }
-            idx += 32;
-        }
+        thumb_reduced_lut[ins >> 6](ins);
     }
 }

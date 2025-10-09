@@ -1,4 +1,5 @@
 arm_bx :: inline (ins: u32) {
+    if (ins & 0xfff00) != 0xfff00 assert(false);
     rm := reg_src(cast(u8) ins & 0xf);
     cpu.state = ifx (rm & 1) != 0 then .THUMB else .ARM;
     cpu.pc = rm & 0xfffffffe;
@@ -8,6 +9,7 @@ arm_bx :: inline (ins: u32) {
 }
 
 arm_mul_mla :: inline (ins: u32) {
+    // verify 12..15 is zero if mul
     assert(false);
 }
 
@@ -16,6 +18,7 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
 }
 
 arm_swp_swpb :: inline (ins: u32) {
+    // verify that bits 8..11 are actually zero
     assert(false);
 }
 
@@ -76,6 +79,7 @@ arm_ldrsb_ldrsh :: inline (ins: u32) {
 }
 
 arm_mrs :: inline (ins: u32) {
+    if (ins & 0xf0000) != 0xf0000 assert(false);
     rd_idx : u8 = xx (ins >> 12) & 0xf;
     if (ins & 0x400000) != 0 {
         // spsr
@@ -87,7 +91,13 @@ arm_mrs :: inline (ins: u32) {
 }
 
 arm_msr :: inline (ins: u32) {
-    to_write := ifx (ins & 0x2000000) != 0 then immediate_operand(xx ins & 0xfff) else reg_src(xx (ins & 0xf));
+    to_write : u32;
+    if (ins & 0x2000000) != 0 {
+        to_write = immediate_operand(xx ins & 0xfff);
+    } else {
+        if (ins & 0xff00) != 0xf000 assert(false);
+        to_write = reg_src(xx (ins & 0xf));
+    }
     c := (ins & 0x10000) != 0;
     f := (ins & 0x80000) != 0;
     if (ins & 0x400000) != 0 {
@@ -385,6 +395,7 @@ arm_orr :: inline (ins: u32) {
 }
 
 arm_mov :: inline (ins: u32) {
+    if (ins & 0xf0000) != 0 assert(false);
     operand: u32;
     should_carry: bool;
     carry_out: bool;
@@ -435,6 +446,7 @@ arm_bic :: inline (ins: u32) {
 }
 
 arm_mvn :: inline (ins: u32) {
+    if (ins & 0xf0000) != 0 assert(false);
     assert(false);
 }
 
