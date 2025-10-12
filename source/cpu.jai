@@ -205,47 +205,47 @@ write_32 :: (addr: u32, val: u32) {
 // and thus will mostly be reading from the ROM or BIOS
 next_16 :: () -> u16 {
     ret: u16;
-    if cpu.pc >= 0x08000000 && cpu.pc < 0x0e000000 {
-        first : u16 = cpu.memory.rom[cpu.pc % cpu.memory.rom.count];
-        second : u16 = cpu.memory.rom[(cpu.pc + 1) % cpu.memory.rom.count];
+    if cpu.reg[15] >= 0x08000000 && cpu.reg[15] < 0x0e000000 {
+        first : u16 = cpu.memory.rom[cpu.reg[15] % cpu.memory.rom.count];
+        second : u16 = cpu.memory.rom[(cpu.reg[15] + 1) % cpu.memory.rom.count];
         ret = first | (second << 8);
     }
-    else if cpu.pc < 0x4000 {
-        ret = cpu.memory.bios._16[cpu.pc >> 1];
+    else if cpu.reg[15] < 0x4000 {
+        ret = cpu.memory.bios._16[cpu.reg[15] >> 1];
     }
-    else if cpu.pc >= 0x02000000 && cpu.pc < 0x02040000 {
-        ret = cpu.memory.ewram._16[(cpu.pc >> 1) % 0x20000];
+    else if cpu.reg[15] >= 0x02000000 && cpu.reg[15] < 0x02040000 {
+        ret = cpu.memory.ewram._16[(cpu.reg[15] >> 1) % 0x20000];
     }
-    else if cpu.pc >= 0x03000000 && cpu.pc < 0x03008000 {
-        ret = cpu.memory.iwram._16[(cpu.pc >> 1) % 0x4000];
+    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x03008000 {
+        ret = cpu.memory.iwram._16[(cpu.reg[15] >> 1) % 0x4000];
     } else {
-        log_warn("Unmapped execution read: 0x%", formatInt(cpu.pc, 16));
+        log_warn("Unmapped execution read: 0x%", formatInt(cpu.reg[15], 16));
     }
-    cpu.pc += 2;
+    cpu.reg[15] += 2;
     return ret;
 }
 
 next_32 :: () -> u32 {
     ret: u32;
-    if cpu.pc >= 0x08000000 && cpu.pc < 0x0e000000 {
-        first : u32 = cpu.memory.rom[cpu.pc % cpu.memory.rom.count];
-        second : u32 = cpu.memory.rom[(cpu.pc + 1) % cpu.memory.rom.count];
-        third : u32 = cpu.memory.rom[(cpu.pc + 2) % cpu.memory.rom.count];
-        fourth : u32 = cpu.memory.rom[(cpu.pc + 3) % cpu.memory.rom.count];
+    if cpu.reg[15] >= 0x08000000 && cpu.reg[15] < 0x0e000000 {
+        first : u32 = cpu.memory.rom[cpu.reg[15] % cpu.memory.rom.count];
+        second : u32 = cpu.memory.rom[(cpu.reg[15] + 1) % cpu.memory.rom.count];
+        third : u32 = cpu.memory.rom[(cpu.reg[15] + 2) % cpu.memory.rom.count];
+        fourth : u32 = cpu.memory.rom[(cpu.reg[15] + 3) % cpu.memory.rom.count];
         ret = first | (second << 8) | (third << 16) | (fourth << 24);
     }
-    else if cpu.pc < 0x4000 {
-        ret = cpu.memory.bios._32[cpu.pc >> 2];
+    else if cpu.reg[15] < 0x4000 {
+        ret = cpu.memory.bios._32[cpu.reg[15] >> 2];
     }
-    else if cpu.pc >= 0x02000000 && cpu.pc < 0x02040000 {
-        ret = cpu.memory.ewram._32[(cpu.pc >> 2) % 0x10000];
+    else if cpu.reg[15] >= 0x02000000 && cpu.reg[15] < 0x02040000 {
+        ret = cpu.memory.ewram._32[(cpu.reg[15] >> 2) % 0x10000];
     }
-    else if cpu.pc >= 0x03000000 && cpu.pc < 0x03008000 {
-        ret = cpu.memory.iwram._32[(cpu.pc >> 2) % 0x2000];
+    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x03008000 {
+        ret = cpu.memory.iwram._32[(cpu.reg[15] >> 2) % 0x2000];
     } else {
-        log_warn("Unmapped execution read: 0x%", formatInt(cpu.pc, 16));
+        log_warn("Unmapped execution read: 0x%", formatInt(cpu.reg[15], 16));
     }
-    cpu.pc += 4;
+    cpu.reg[15] += 4;
     return ret;
 }
 
@@ -264,10 +264,39 @@ set_status_bit :: inline (bit: Status_Bit, state: bool) {
 step_cpu :: () {
     if cpu.remaining_cycles > 0 {
         execute_next();
-        disasm_scroll_state = cpu.pc / ifx cpu.state == .ARM then 4 else 2;
+        disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
         for cpu.breakpoints {
-            if it == cpu.pc then cpu.emu_state = .STOPPED;
+            if it == cpu.reg[15] then cpu.emu_state = .STOPPED;
         }
+    }
+}
+
+set_mode :: (mode: u32) {
+    cpu.sp[cpu.mode] = cpu.reg[13];
+    cpu.lr[cpu.mode] = cpu.reg[14];
+    if cpu.mode == .FIQ {
+        for 8..14 cpu.reg_hi_fiq[it - 8] = cpu.reg[it];
+    }
+    if (mode & 0x1f) == {
+        case 0b10000;
+            cpu.mode = .USER;
+        case 0b10001;
+            cpu.mode = .FIQ;
+        case 0b10010;
+            cpu.mode = .IRQ;
+        case 0b10011;
+            cpu.mode = .SVC;
+        case 0b10111;
+            cpu.mode = .ABT;
+        case 0b11011;
+            cpu.mode = .UND;
+        case 0b11111;
+            cpu.mode = .SYSTEM;
+    }
+    cpu.reg[13] = cpu.sp[cpu.mode];
+    cpu.reg[14] = cpu.lr[cpu.mode];
+    if cpu.mode == .FIQ {
+        for 8..14 cpu.reg[it] = cpu.reg_hi_fiq[it - 8];
     }
 }
 
@@ -310,34 +339,12 @@ cond :: (val: u8) -> bool {
 }
 
 reg_src :: (val: u8) -> u32 {
-    if val < 13 {
-        if cpu.mode == .FIQ && val > 7 then return cpu.gpr_hi_fiq[val - 8];
-        return cpu.gpr[val];
-    } else if val == 13 {
-        return cpu.sp[cpu.mode];
-    } else if val == 14 {
-        return cpu.lr[cpu.mode];
-    } else if val == 15 {
-        return cpu.pc + xx ifx cpu.state == .ARM then 4 else 2;
-    } else {
-        assert(false);
-        return 0;
-    }
+    if val == 15 then return cpu.reg[15] + xx ifx cpu.state == .ARM then 4 else 2;
+    return cpu.reg[val];
 }
 
 reg_dst :: (val: u8, to_write: u32) {
-    if val < 13 {
-        if cpu.mode == .FIQ && val > 7 then cpu.gpr_hi_fiq[val - 8] = to_write;
-        else cpu.gpr[val] = to_write;
-    } else if val == 13 {
-        cpu.sp[cpu.mode] = to_write;
-    } else if val == 14 {
-        cpu.lr[cpu.mode] = to_write;
-    } else if val == 15 {
-        cpu.pc = to_write;
-    } else {
-        assert(false);
-    }
+    cpu.reg[val] = to_write;
 }
 
 shifter_operand :: (val: u16) -> (u32, bool, bool) {

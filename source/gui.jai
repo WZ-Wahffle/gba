@@ -31,10 +31,10 @@ iwram_scroll_state := 0;
         cpu.emu_state = .STEPPED;
     }
     ImGui.Text("Mode: %, %", cpu.mode, cpu.state);
-    ImGui.Text("PC : 0x% ", cpu.pc);
+    ImGui.Text("PC : 0x% ", cpu.reg[15]);
     ImGui.SameLine();
-    ImGui.Text("LR : 0x% ", cpu.lr[cpu.mode]);
-    ImGui.Text("SP : 0x% ", cpu.sp[cpu.mode]);
+    ImGui.Text("LR : 0x% ", cpu.reg[14]);
+    ImGui.Text("SP : 0x% ", cpu.reg[13]);
     ImGui.SameLine();
     ImGui.Text("PSR:   %1%2%3%4%5%6%7",
         ifx (cpu.psr & 0x80000000) != 0 then "N" else "-",
@@ -45,25 +45,25 @@ iwram_scroll_state := 0;
         ifx (cpu.psr & 0x00000040) != 0 then "F" else "-",
         ifx cpu.state == .THUMB then "T" else "-",
     );
-    ImGui.Text("R00: 0x% ", cpu.gpr[0]);
+    ImGui.Text("R00: 0x% ", cpu.reg[0]);
     ImGui.SameLine();
-    ImGui.Text("R01: 0x% ", cpu.gpr[1]);
-    ImGui.Text("R02: 0x% ", cpu.gpr[2]);
+    ImGui.Text("R01: 0x% ", cpu.reg[1]);
+    ImGui.Text("R02: 0x% ", cpu.reg[2]);
     ImGui.SameLine();
-    ImGui.Text("R03: 0x% ", cpu.gpr[3]);
-    ImGui.Text("R04: 0x% ", cpu.gpr[4]);
+    ImGui.Text("R03: 0x% ", cpu.reg[3]);
+    ImGui.Text("R04: 0x% ", cpu.reg[4]);
     ImGui.SameLine();
-    ImGui.Text("R05: 0x% ", cpu.gpr[5]);
-    ImGui.Text("R06: 0x% ", cpu.gpr[6]);
+    ImGui.Text("R05: 0x% ", cpu.reg[5]);
+    ImGui.Text("R06: 0x% ", cpu.reg[6]);
     ImGui.SameLine();
-    ImGui.Text("R07: 0x% ", cpu.gpr[7]);
-    ImGui.Text("R08: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[0] else cpu.gpr[8]);
+    ImGui.Text("R07: 0x% ", cpu.reg[7]);
+    ImGui.Text("R08: 0x% ", cpu.reg[8]);
     ImGui.SameLine();
-    ImGui.Text("R09: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[1] else cpu.gpr[9]);
-    ImGui.Text("R10: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[2] else cpu.gpr[10]);
+    ImGui.Text("R09: 0x% ", cpu.reg[9]);
+    ImGui.Text("R10: 0x% ", cpu.reg[10]);
     ImGui.SameLine();
-    ImGui.Text("R11: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[3] else cpu.gpr[11]);
-    ImGui.Text("R12: 0x% ", ifx cpu.mode == .FIQ then cpu.gpr_hi_fiq[4] else cpu.gpr[12]);
+    ImGui.Text("R11: 0x% ", cpu.reg[11]);
+    ImGui.Text("R12: 0x% ", cpu.reg[12]);
     ImGui.End();
 }
 
@@ -771,7 +771,7 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             // Load/store to/from stack
             imm := ins & 0xff;
             reg_idx := (ins >> 8) & 0b111;
-            addr := cpu.sp[cpu.mode] + 4 * imm;
+            addr := cpu.reg[14] + 4 * imm;
             if (ins & 0x800) != 0 {
                 // ldr (4)
                 opcode = "ldr";
@@ -908,7 +908,7 @@ disasm_window :: () {
         }
     }
     if ImGui.Button("Jump to PC") {
-        disasm_scroll_state = cpu.pc / ifx cpu.state == .ARM then 4 else 2;
+        disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
     }
     ImGui.SameLine();
     ImGui.Text("0x");
@@ -924,7 +924,7 @@ disasm_window :: () {
             disassemble_arm_instruction(read_32(addr))
         else disassemble_thumb_instruction(read_16(addr));
         contains := array_find(cpu.breakpoints, addr);
-        if addr == cpu.pc {
+        if addr == cpu.reg[15] {
             ImGui.TextColored(.{0, 255, 0, 255}, "%\t%", addr, to_print);
         } else if contains {
             ImGui.TextColored(.{255, 0, 0, 255}, "%\t%", addr, to_print);

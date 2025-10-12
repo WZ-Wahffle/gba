@@ -2,8 +2,8 @@ arm_bx :: inline (ins: u32) {
     if (ins & 0xfff00) != 0xfff00 assert(false);
     rm := reg_src(cast(u8) ins & 0xf);
     cpu.state = ifx (rm & 1) != 0 then .THUMB else .ARM;
-    cpu.pc = rm & 0xfffffffe;
-    // cpu.pc += post_inc;
+    cpu.reg[15] = rm & 0xfffffffe;
+    // cpu.reg[15] += post_inc;
     cpu.psr &= ~cast(u32)0x10;
     cpu.psr |= (rm & 1) << 4;
 }
@@ -109,22 +109,7 @@ arm_msr :: inline (ins: u32) {
         if c && cpu.mode != 0 {
             cpu.spsr[cpu.mode] &= 0xffffff00;
             cpu.spsr[cpu.mode] |= to_write & 0x000000ff;
-            if (to_write & 0x1f) == {
-                case 0b10000;
-                    cpu.mode = .USER;
-                case 0b10001;
-                    cpu.mode = .FIQ;
-                case 0b10010;
-                    cpu.mode = .IRQ;
-                case 0b10011;
-                    cpu.mode = .SVC;
-                case 0b10111;
-                    cpu.mode = .ABT;
-                case 0b11011;
-                    cpu.mode = .UND;
-                case 0b11111;
-                    cpu.mode = .SYSTEM;
-            }
+            set_mode(to_write & 0x1f);
         }
     } else {
         // cpsr
@@ -135,22 +120,7 @@ arm_msr :: inline (ins: u32) {
         if c && cpu.privileged {
             cpu.psr &= 0xffffff00;
             cpu.psr |= to_write & 0x000000ff;
-            if (to_write & 0x1f) == {
-                case 0b10000;
-                    cpu.mode = .USER;
-                case 0b10001;
-                    cpu.mode = .FIQ;
-                case 0b10010;
-                    cpu.mode = .IRQ;
-                case 0b10011;
-                    cpu.mode = .SVC;
-                case 0b10111;
-                    cpu.mode = .ABT;
-                case 0b11011;
-                    cpu.mode = .UND;
-                case 0b11111;
-                    cpu.mode = .SYSTEM;
-            }
+            set_mode(to_write & 0x1f);
         }
     }
 }
@@ -523,15 +493,15 @@ arm_ldm_stm :: inline (ins: u32) {
                     if u then pointer += 4; else pointer -= 4;
                 }
                 to_store := read_32(pointer);
-                if s {
+                if s && cpu.mode != .USER {
                     if it < 13 {
-                        cpu.gpr[it] = to_store;
+                        cpu.reg[it] = to_store;
                     } else if it == 13 {
                         cpu.sp[0] = to_store;
                     } else if it == 14 {
                         cpu.lr[0] = to_store;
                     } else {
-                        cpu.pc = to_store;
+                        cpu.reg[15] = to_store;
                     }
                 } else {
                     reg_dst(xx it, to_store);
@@ -552,13 +522,13 @@ arm_ldm_stm :: inline (ins: u32) {
                 to_store : u32;
                 if s {
                     if it < 13 {
-                        to_store = cpu.gpr[it];
+                        to_store = cpu.reg[it];
                     } else if it == 13 {
                         to_store = cpu.sp[0];
                     } else if it == 14 {
                         to_store = cpu.lr[0];
                     } else {
-                        to_store = cpu.pc;
+                        to_store = cpu.reg[15];
                     }
                 } else {
                     to_store = reg_src(xx it);
@@ -576,20 +546,20 @@ arm_ldm_stm :: inline (ins: u32) {
 arm_b :: inline (ins: u32) {
     cpu.remaining_cycles -= 2;
     addr := (ins & 0x7fffff) << 2;
-    cpu.pc += addr;
+    cpu.reg[15] += addr;
     sign := (ins & 0x800000) << 2;
-    cpu.pc -= sign;
-    cpu.pc += 4;
+    cpu.reg[15] -= sign;
+    cpu.reg[15] += 4;
 }
 
 arm_bl :: inline (ins: u32) {
     cpu.remaining_cycles -= 2;
-    cpu.lr[cpu.mode] = cpu.pc;
+    cpu.reg[14] = cpu.reg[15];
     addr := (ins & 0x7fffff) << 2;
-    cpu.pc += addr;
+    cpu.reg[15] += addr;
     sign := (ins & 0x800000) << 2;
-    cpu.pc -= sign;
-    cpu.pc += 4;
+    cpu.reg[15] -= sign;
+    cpu.reg[15] += 4;
 }
 
 arm_ldc_stc :: inline (ins: u32) {

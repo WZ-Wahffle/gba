@@ -1,10 +1,9 @@
 Cpu :: struct {
     memory: Cpu_Mmu;
-    gpr: [13]u32;
-    gpr_hi_fiq: [5]u32;
+    reg: [16]u32;
+    reg_hi_fiq: [5]u32;
     sp: [#run enum_highest_value(Cpu_Mode)+1]u32;
     lr: [#run enum_highest_value(Cpu_Mode)+1]u32;
-    pc: u32;
     psr: u32 = 0x13;
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     state := Cpu_State.ARM;

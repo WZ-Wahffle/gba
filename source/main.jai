@@ -30,7 +30,7 @@ main :: () {
 
 dump_processor_state :: (loc: Source_Code_Location, message: string) -> bool {
     runtime_support_assertion_failed(loc, message);
-    print("PC: 0x%\n", formatInt(cpu.pc, 16, 8));
+    print("PC: 0x%\n", formatInt(cpu.reg[15], 16, 8));
     return true;
 }
 
