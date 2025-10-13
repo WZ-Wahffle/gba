@@ -577,3 +577,17 @@ arm_mcr_mrc :: inline (ins: u32) {
 arm_swi :: inline (ins: u32) {
     assert(false);
 }
+
+arm_bkpt :: inline (ins: u32) {
+    if cpu.emu_state != .RUNNING {
+        idx := (ins & 0xf) | ((ins >> 4) & 0xfff0);
+        cpu.reg[15] -= 4;
+        addr := cpu.reg[15];
+        write_32(addr, cpu.breakpoints_arm[idx], true);
+        execute_next();
+        write_32(addr, ins, true);
+    } else {
+        cpu.emu_state = .STOPPED;
+        cpu.reg[15] -= 4;
+    }
+}

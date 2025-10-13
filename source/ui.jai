@@ -79,6 +79,13 @@ ui :: () {
 
         // processing
         if cpu.emu_state == {
+            case .STARTED;
+            ppu.remaining_cycles += -cpu.remaining_cycles + 1;
+            cpu.remaining_cycles += -cpu.remaining_cycles + 1;
+            while ppu.remaining_cycles > 0 step_ppu();
+            while cpu.remaining_cycles > 0 step_cpu();
+            cpu.emu_state = .RUNNING;
+            #through;
             case .RUNNING;
             for 0..228*308 {
                 cpu.remaining_cycles += 4;
@@ -86,6 +93,7 @@ ui :: () {
                 step_ppu();
                 while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
+            disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
             case .STOPPED;
             // this page intentionally left blank
             case .STEPPED;
@@ -94,6 +102,7 @@ ui :: () {
             cpu.remaining_cycles += -cpu.remaining_cycles + 1;
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();
+            disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
         }
         SDL_RenderClear(renderer);
         tex := SDL_CreateTextureFromSurface(renderer, surface);

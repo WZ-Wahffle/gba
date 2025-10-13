@@ -21,7 +21,8 @@ Cpu :: struct {
 
     emu_state := Emulation_State.STOPPED;
     remaining_cycles := 0;
-    breakpoints: [..]u32;
+    breakpoints_arm: [0x10000]u32;
+    breakpoints_thumb: [0x100]u16;
 
     Cpu_Mmu :: struct {
         Bios_Union :: union {
@@ -108,6 +109,7 @@ Cpu_Mode :: enum s32 {
 }
 
 Emulation_State :: enum {
+    STARTED;
     RUNNING;
     STOPPED;
     STEPPED;

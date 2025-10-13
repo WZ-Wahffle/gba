@@ -142,7 +142,7 @@ write_8 :: (addr: u32, val: u8) {
     }
 }
 
-write_16 :: (addr: u32, val: u16) {
+write_16 :: (addr: u32, val: u16, write_override := false) {
     if addr >= 0x02000000 && addr < 0x02040000 {
         cpu.memory.ewram._16[(addr >> 1) % 0x20000] = val;
     }
@@ -165,12 +165,17 @@ write_16 :: (addr: u32, val: u16) {
     }
     else if addr >= 0x07000000 && addr < 0x08000000 {
         ppu.memory.oam._16[(addr >> 1) % 0x200] = val;
+    } else if write_override && addr < 0x4000 {
+        cpu.memory.bios._16[addr >> 1] = val;
+    } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
+        cpu.memory.rom[addr] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[addr + 1] = xx (val >> 8) & 0xff;
     } else {
         log_warn("Unmapped write: 0x%", formatInt(addr, 16));
     }
 }
 
-write_32 :: (addr: u32, val: u32) {
+write_32 :: (addr: u32, val: u32, write_override := false) {
     if addr >= 0x02000000 && addr < 0x02040000 {
         cpu.memory.ewram._32[(addr >> 2) % 0x10000] = val;
     }
@@ -195,6 +200,13 @@ write_32 :: (addr: u32, val: u32) {
     }
     else if addr >= 0x07000000 && addr < 0x08000000 {
         ppu.memory.oam._32[(addr >> 2) % 0x100] = val;
+    } else if write_override && addr < 0x4000 {
+        cpu.memory.bios._32[addr >> 2] = val;
+    } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
+        cpu.memory.rom[addr] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[addr + 1] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[addr + 2] = xx (val >> 16) & 0xff;
+        cpu.memory.rom[addr + 3] = xx (val >> 24) & 0xff;
     } else {
         log_warn("Unmapped write: 0x%", formatInt(addr, 16));
     }
@@ -264,10 +276,6 @@ set_status_bit :: inline (bit: Status_Bit, state: bool) {
 step_cpu :: () {
     if cpu.remaining_cycles > 0 {
         execute_next();
-        disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
-        for cpu.breakpoints {
-            if it == cpu.reg[15] then cpu.emu_state = .STOPPED;
-        }
     }
 }
 
@@ -300,7 +308,7 @@ set_mode :: (mode: u32) {
     }
 }
 
-cond :: (val: u8) -> bool {
+cond :: (val: u32) -> bool {
     if val == {
         case 0;
         return get_status_bit(.Z);
@@ -338,12 +346,12 @@ cond :: (val: u8) -> bool {
     }
 }
 
-reg_src :: (val: u8) -> u32 {
+reg_src :: inline (val: u8) -> u32 {
     if val == 15 then return cpu.reg[15] + xx ifx cpu.state == .ARM then 4 else 2;
     return cpu.reg[val];
 }
 
-reg_dst :: (val: u8, to_write: u32) {
+reg_dst :: inline (val: u8, to_write: u32) {
     cpu.reg[val] = to_write;
 }
 
@@ -501,6 +509,7 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xf000010, 0xe000000, arm_cdp},
     .{0xf000010, 0xe000010, arm_mcr_mrc},
     .{0xf000000, 0xf000000, arm_swi},
+    .{0xff000f0, 0x1200070, arm_bkpt},
     .{0x0000000, 0x0000000, null}
 ];
 
@@ -598,7 +607,7 @@ execute_next :: () {
     if cpu.state == .ARM {
         ins := next_32();
         cpu.remaining_cycles -= 1;
-        if !cond(xx (ins >> 28)) {
+        if !cond(ins >> 28) {
             return;
         }
         mask : u32 = 0x0ff000f0;

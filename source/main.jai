@@ -10,6 +10,8 @@ main :: () {
     if args.count != 2 {
         exit(1);
     }
+    for * cpu.breakpoints_arm it.* = 0xffffffff;
+    for * cpu.breakpoints_thumb it.* = 0xffff;
     populate_arm_lut();
     populate_thumb_lut();
     rom := read_entire_file(args[1]);

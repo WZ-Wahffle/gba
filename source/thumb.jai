@@ -401,7 +401,17 @@ thumb_strh_1 :: inline (ins: u16) {
 }
 
 thumb_bkpt :: inline (ins: u16) {
-    assert(false);
+    if cpu.emu_state != .RUNNING {
+        idx := ins & 0xff;
+        cpu.reg[15] -= 2;
+        addr := cpu.reg[15];
+        write_16(addr, cpu.breakpoints_thumb[idx], true);
+        execute_next();
+        write_16(addr, ins, true);
+    } else {
+        cpu.emu_state = .STOPPED;
+        cpu.reg[15] -= 2;
+    }
 }
 
 thumb_pop :: inline (ins: u16) {

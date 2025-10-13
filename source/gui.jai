@@ -20,7 +20,7 @@ iwram_scroll_state := 0;
     ImGui.Begin("cpu");
     ImGui.Text("Frame time: %ms", dt * 1000);
     if ImGui.Button("Start") {
-        cpu.emu_state = .RUNNING;
+        cpu.emu_state = .STARTED;
     }
     ImGui.SameLine();
     if ImGui.Button("Stop") {
@@ -128,6 +128,10 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 // branch & exchange
                 opcode = "BX";
                 append(*suffix, disassemble_register(inst & 0xf));
+            } else if (inst & 0xff000f0) == 0x1200070 {
+                // breakpoint
+                idx := (inst & 0xf) | ((inst >> 4) & 0xfff0);
+                return disassemble_arm_instruction(cpu.breakpoints_arm[idx]);
             } else if (inst & 0xfc000f0) == 0x0000090 {
                 // multiply
                 flags := (inst & 0x100000) != 0;
@@ -806,7 +810,8 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
         if (ins & 0x1000) != 0 {
             // Miscellaneous
             if (ins & 0x200) != 0 {
-                // software breakpoint?
+                // bkpt
+                return disassemble_thumb_instruction(cpu.breakpoints_thumb[ins & 0xff]);
             } else if (ins & 0x400) != 0 {
                 // push/pop register list
                 opcode = ifx (ins & 0x800) != 0 then "pop" else "push";
@@ -923,10 +928,10 @@ disasm_window :: () {
         to_print := ifx cpu.state == .ARM then
             disassemble_arm_instruction(read_32(addr))
         else disassemble_thumb_instruction(read_16(addr));
-        contains := array_find(cpu.breakpoints, addr);
+        has_breakpoint := ifx cpu.state == .ARM then ((read_32(addr) & 0xfff000f0) == 0xe1200070) else ((read_16(addr) & 0xff00) == 0xbe00);
         if addr == cpu.reg[15] {
             ImGui.TextColored(.{0, 255, 0, 255}, "%\t%", addr, to_print);
-        } else if contains {
+        } else if has_breakpoint {
             ImGui.TextColored(.{255, 0, 0, 255}, "%\t%", addr, to_print);
         } else {
             ImGui.Text("%\t%", addr, to_print);
@@ -935,10 +940,36 @@ disasm_window :: () {
             ImGui.SetTooltip("0x%", ifx cpu.state == .ARM then read_32(addr) else read_16(addr));
         }
         if ImGui.IsItemClicked() {
-            if contains {
-                array_unordered_remove_by_value(*cpu.breakpoints, addr);
+            if cpu.state == .ARM {
+                ins := read_32(addr);
+                if has_breakpoint {
+                    idx := (ins & 0xf) | ((ins >> 8) & 0xfff);
+                    write_32(addr, cpu.breakpoints_arm[idx], true);
+                    cpu.breakpoints_arm[idx] = 0xffffffff;
+                } else {
+                    idx : u32 = 0;
+                    for cpu.breakpoints_arm if it == 0xffffffff {
+                        idx = xx it_index;
+                        break;
+                    }
+                    cpu.breakpoints_arm[idx] = ins;
+                    write_32(addr, 0xe1200070 | (idx & 0xf) | ((idx & 0xfff0) << 4), true);
+                }
             } else {
-                array_add(*cpu.breakpoints, addr);
+                ins := read_16(addr);
+                if has_breakpoint {
+                    idx := ins & 0xff;
+                    write_16(addr, cpu.breakpoints_thumb[idx], true);
+                    cpu.breakpoints_thumb[idx] = 0xffff;
+                } else {
+                    idx : u16 = 0;
+                    for cpu.breakpoints_thumb if it == 0xffff {
+                        idx = xx it_index;
+                        break;
+                    }
+                    cpu.breakpoints_thumb[idx] = ins;
+                    write_16(addr, 0xbe00 | idx, true);
+                }
             }
         }
     }
