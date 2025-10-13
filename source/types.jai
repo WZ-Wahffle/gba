@@ -18,11 +18,9 @@ Cpu :: struct {
     ie: [#run enum_highest_value(Interrupt_Source)+1]bool;
     // IF
     ifl: [#run enum_highest_value(Interrupt_Source)+1]bool;
-
-    emu_state := Emulation_State.STOPPED;
-    remaining_cycles := 0;
-    breakpoints_arm: [0x10000]u32;
-    breakpoints_thumb: [0x100]u16;
+    // WAITCNT
+    waitcnt_lo : u8 = 0;
+    waitcnt_hi : u8 = 0;
 
     Cpu_Mmu :: struct {
         Bios_Union :: union {
@@ -70,66 +68,11 @@ Cpu :: struct {
         irq := false;
         enable := false;
     }
-}
 
-Status_Bit :: enum {
-    N :: 0x80000000;
-    Z :: 0x40000000;
-    C :: 0x20000000;
-    V :: 0x10000000;
-}
-
-Dma_Start_Timing :: enum {
-    IMMED;
-    VBLANK;
-    HBLANK;
-    SPECIAL;
-}
-
-Dma_Addr_Control :: enum {
-    INC;
-    DEC;
-    FIXED;
-    INC_RELOAD;
-}
-
-Cpu_State :: enum {
-    THUMB;
-    ARM;
-}
-
-Cpu_Mode :: enum s32 {
-    USER :: 0;
-    SYSTEM :: 0;
-    IRQ :: 1;
-    FIQ :: 2;
-    SVC :: 3;
-    ABT :: 4;
-    UND :: 5;
-}
-
-Emulation_State :: enum {
-    STARTED;
-    RUNNING;
-    STOPPED;
-    STEPPED;
-}
-
-Interrupt_Source :: enum {
-    LCD_VBLANK;
-    LCD_HBLANK;
-    LCD_VCOUNTER;
-    TIM0OVERFLOW;
-    TIM1OVERFLOW;
-    TIM2OVERFLOW;
-    TIM3OVERFLOW;
-    SERIAL;
-    DMA0;
-    DMA1;
-    DMA2;
-    DMA3;
-    KEYPAD;
-    GAMEPAK;
+    emu_state := Emulation_State.STOPPED;
+    remaining_cycles := 0;
+    breakpoints_arm: [0x10000]u32;
+    breakpoints_thumb: [0x100]u16;
 }
 
 Ppu :: struct {
@@ -173,13 +116,9 @@ Ppu :: struct {
     // KEYINPUT
     keypad_state : u16 = 0;
     // KEYCNT
-    keypad_mask : u16 = 0;
+    keypad_irq_mask : u16 = 0;
     keypad_irq := false;
-    keypad_require_all := false;
-
-    draw_x := 0;
-    draw_y : u8 = 0;
-    remaining_cycles := 0;
+    keypad_irq_require_all := false;
 
     Ppu_Mmu :: struct {
         Palette_Ram_Union :: union {
@@ -231,6 +170,96 @@ Ppu :: struct {
         obj_enable := false;
         special_effect := false;
     }
+
+    draw_x := 0;
+    draw_y : u8 = 0;
+    remaining_cycles := 0;
+}
+
+Apu :: struct {
+    chan1: Pulse_Channel;
+    chan2: Pulse_Channel;
+
+    Pulse_Channel :: struct {
+        enable := false;
+        enable_left := false;
+        enable_right := false;
+
+        sweep_shift_cnt := 0;
+        sweep_freq_decrease := false;
+        sweep_time := 0;
+
+        frequency := 0;
+        use_length := false;
+        trigger := false;
+        sound_length := 0;
+        duty_cycle := 0;
+
+        envelope_speed := 0;
+        envelope_increase := false;
+        envelope_initial_volume := 0;
+    }
+}
+
+Status_Bit :: enum {
+    N :: 0x80000000;
+    Z :: 0x40000000;
+    C :: 0x20000000;
+    V :: 0x10000000;
+}
+
+Dma_Start_Timing :: enum {
+    IMMED;
+    VBLANK;
+    HBLANK;
+    SPECIAL;
+}
+
+Dma_Addr_Control :: enum {
+    INC;
+    DEC;
+    FIXED;
+    INC_RELOAD;
+}
+
+Cpu_State :: enum {
+    THUMB;
+    ARM;
+}
+
+Cpu_Mode :: enum s32 {
+    USER :: 0;
+    SYSTEM :: 0;
+    IRQ :: 1;
+    FIQ :: 2;
+    SVC :: 3;
+    ABT :: 4;
+    UND :: 5;
+}
+
+Interrupt_Source :: enum {
+    LCD_VBLANK;
+    LCD_HBLANK;
+    LCD_VCOUNTER;
+    TIM0OVERFLOW;
+    TIM1OVERFLOW;
+    TIM2OVERFLOW;
+    TIM3OVERFLOW;
+    SERIAL;
+    DMA0;
+    DMA1;
+    DMA2;
+    DMA3;
+    KEYPAD;
+    GAMEPAK;
+}
+
+
+Emulation_State :: enum {
+    STARTED;
+    RUNNING;
+    STOPPED;
+    STEPPED;
 }
 
 Decoder_Unit_Arm :: struct {

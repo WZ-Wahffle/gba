@@ -94,6 +94,7 @@ ui :: () {
                 while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
             disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
+            disasm_mode = cpu.state;
             case .STOPPED;
             // this page intentionally left blank
             case .STEPPED;

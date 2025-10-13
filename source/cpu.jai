@@ -478,7 +478,7 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xfc000f0, 0x0000090, arm_mul_mla},
 
     .{0xe0000f0, 0x00000b0, arm_ldrh_strh},
-    .{0xe0000f0, 0x00000d0, arm_ldrsb_ldrsh},
+    .{0xe0000d0, 0x00000d0, arm_ldrsb_ldrsh},
     .{0xe000000, 0x8000000, arm_ldm_stm},
     .{0xe000000, 0xc000000, arm_ldc_stc},
     .{0xc000000, 0x4000000, arm_ldr_str_ldrb_strb},

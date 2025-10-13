@@ -10,7 +10,23 @@ arm_bx :: inline (ins: u32) {
 
 arm_mul_mla :: inline (ins: u32) {
     // verify 12..15 is zero if mul
-    assert(false);
+    rd_idx : u8 = xx (ins >> 16) & 0xf;
+    rs := reg_src(xx (ins >> 8) & 0xf);
+    rm := reg_src(xx ins & 0xf);
+    flags := (ins & 0x100000) != 0;
+    result : u32;
+    if (ins & 0x200000) != 0 {
+        rn := reg_src(xx (ins >> 12) & 0xf);
+        result = rm * rs + rn;
+    } else {
+        assert(((ins >> 12) & 0xf) == 0);
+        result = rm * rs;
+    }
+    reg_dst(rd_idx, result);
+    if flags {
+        set_status_bit(.N, (result & 0x80000000) != 0);
+        set_status_bit(.Z, result == 0);
+    }
 }
 
 arm_umull_umlal_smull_smlal :: inline (ins: u32) {
@@ -75,7 +91,58 @@ arm_ldrh_strh :: inline (ins: u32) {
 }
 
 arm_ldrsb_ldrsh :: inline (ins: u32) {
-    assert(false);
+    rn_idx : u8 = xx (ins >> 16) & 0xf;
+    rn := reg_src(rn_idx);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    p := (ins & 0x1000000);
+    u := (ins & 0x800000);
+    w := (ins & 0x200000);
+    l := (ins & 0x100000);
+    address := rn;
+    offset: u32;
+    if (ins & 0x400000) != 0 {
+        offset = (ins & 0x0f) | ((ins >> 4) & 0xf0);
+    } else {
+        offset = reg_src(xx ins & 0xf);
+    }
+
+    if !p {
+        // post indexed
+        if u {
+            rn += offset;
+        } else {
+            rn -= offset;
+        }
+        reg_dst(rn_idx, rn);
+    } else if !w {
+        // offset addressing
+        if u {
+            address += offset;
+        } else {
+            address -= offset;
+        }
+    } else {
+        // pre indexed
+        if u {
+            address += offset;
+        } else {
+            address -= offset;
+        }
+        reg_dst(rn_idx, address);
+    }
+
+    cpu.remaining_cycles -= 2;
+    if (ins & 0x20) != 0 {
+        // ldrsh
+        to_write : u32 = xx read_16(address);
+        if (to_write & 0x8000) != 0 then to_write |= 0xffff0000;
+        reg_dst(rd_idx, to_write);
+    } else {
+        // ldrsb
+        to_write : u32 = xx read_8(address);
+        if (to_write & 0x80) != 0 then to_write |= 0xffffff00;
+        reg_dst(rd_idx, to_write);
+    }
 }
 
 arm_mrs :: inline (ins: u32) {

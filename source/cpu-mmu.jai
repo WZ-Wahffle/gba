@@ -1,25 +1,29 @@
 mmio_read :: (addr: u32) -> u8 {
     if addr - 0x04000000 == {
-        // case 0x006;
-        // return ppu.draw_y;
+        case 0x006;
+            return ppu.draw_y;
         case 0x088;
-        return 0;
+            return 0;
         case 0x089;
-        return 2;
+            return 2;
         case 0x98a;
-        return 0;
+            return 0;
         case 0x98b;
-        return 0;
+            return 0;
         case 0x130;
-        return xx ppu.keypad_state & 0xff;
+            return xx ppu.keypad_state & 0xff;
         case 0x131;
-        return xx ppu.keypad_state >> 8;
+            return xx ppu.keypad_state >> 8;
+        case 0x204;
+            return cpu.waitcnt_lo;
+        case 0x205;
+            return cpu.waitcnt_hi;
         case 0x300;
-        return 0;
+            return 0;
         case;
-        log_warn("Unmapped IO read: 0x%", formatInt(addr, 16));
-        return 0;
-        // assert(false);
+            log_warn("Unmapped IO read: 0x%", formatInt(addr, 16));
+            assert(false);
+            return 0;
     }
 }
 
@@ -305,6 +309,41 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x055; // not used
         case 0x056; // not used
         case 0x057; // not used
+        case 0x060;
+            apu.chan1.sweep_shift_cnt = val & 0b111;
+            apu.chan1.sweep_freq_decrease = (val & 0x08) != 0;
+            apu.chan1.sweep_time = (val >> 4) & 0b111;
+        case 0x061;
+        case 0x062;
+            apu.chan1.sound_length = val & 0x3f;
+            apu.chan1.duty_cycle = val >> 6;
+        case 0x063;
+            apu.chan1.envelope_speed = val & 0b111;
+            apu.chan1.envelope_increase = (val & 0x08) != 0;
+            apu.chan1.envelope_initial_volume = val >> 4;
+        case 0x064;
+            apu.chan1.frequency &= 0x700;
+            apu.chan1.frequency |= val;
+        case 0x065;
+            apu.chan1.frequency &= 0x0ff;
+            apu.chan1.frequency |= (cast(u16)val & 0b111) << 8;
+            apu.chan1.use_length = (val & 0x40) != 0;
+            apu.chan1.trigger = (val & 0x80) != 0;
+        case 0x068;
+            apu.chan2.sound_length = val & 0x3f;
+            apu.chan2.duty_cycle = val >> 6;
+        case 0x069;
+            apu.chan2.envelope_speed = val & 0b111;
+            apu.chan2.envelope_increase = (val & 0x08) != 0;
+            apu.chan2.envelope_initial_volume = val >> 4;
+        case 0x06c;
+            apu.chan2.frequency &= 0x700;
+            apu.chan2.frequency |= val;
+        case 0x06d;
+            apu.chan2.frequency &= 0x0ff;
+            apu.chan2.frequency |= (cast(u16)val & 0b111) << 8;
+            apu.chan2.use_length = (val & 0x40) != 0;
+            apu.chan2.trigger = (val & 0x80) != 0;
         case 0x0b0;
             cpu.dma[0].src &= 0x0fffff00;
             cpu.dma[0].src |= val;
@@ -525,6 +564,14 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.timer[3].irq = (val & 0x40) != 0;
             cpu.timer[3].enable = (val & 0x80) != 0;
         case 0x10f; // not used
+        case 0x132;
+            ppu.keypad_irq_mask &= 0x300;
+            ppu.keypad_irq_mask |= val;
+        case 0x133;
+            ppu.keypad_irq_mask &= 0x0ff;
+            ppu.keypad_irq_mask |= (cast(u16)(val & 0b11)) << 8;
+            ppu.keypad_irq = (val & 0x40) != 0;
+            ppu.keypad_irq_require_all = (val & 0x80) != 0;
         case 0x200;
             cpu.ie[Interrupt_Source.LCD_VBLANK] = (val & 0x01) != 0;
             cpu.ie[Interrupt_Source.LCD_HBLANK] = (val & 0x02) != 0;
@@ -558,7 +605,9 @@ mmio_write :: (addr: u32, val: u8) {
             if (val & 0x10) != 0 then cpu.ifl[Interrupt_Source.KEYPAD] = false;
             if (val & 0x20) != 0 then cpu.ifl[Interrupt_Source.GAMEPAK] = false;
         case 0x204;
+            cpu.waitcnt_lo = val;
         case 0x205;
+            cpu.waitcnt_hi = val;
         case 0x206;
         case 0x207;
         // WAITCNT
@@ -569,6 +618,6 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x20a;
         case 0x20b;
         case;
-        log_warn("Unmapped IO write: 0x%", formatInt(addr, 16));
+        log_warn("Unmapped IO write: 0x%, 0x%", formatInt(addr, 16), formatInt(val, 16));
     }
 }

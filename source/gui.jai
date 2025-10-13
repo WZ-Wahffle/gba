@@ -11,6 +11,7 @@ draw_gui :: () {
     context.print_style.default_format_int.minimum_digits = 1;
 }
 disasm_scroll_state := 0;
+disasm_mode := Cpu_State.ARM;
 iwram_scroll_state := 0;
 #if #exists(__Iprof) {
     report: *__Iprof.Report;
@@ -136,15 +137,19 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 // multiply
                 flags := (inst & 0x100000) != 0;
                 if (inst & 0x200000) != 0 {
-                    opcode = ifx flags then "MULS" else "MUL";
-                } else {
                     opcode = ifx flags then "MLAS" else "MLA";
+                } else {
+                    opcode = ifx flags then "MULS" else "MUL";
                 }
                 append(*suffix, disassemble_register((inst >> 16) & 0xf));
                 append(*suffix, ", ");
                 append(*suffix, disassemble_register(inst & 0xf));
                 append(*suffix, ", ");
                 append(*suffix, disassemble_register((inst >> 8) & 0xf));
+                if (inst & 0x200000) != 0 {
+                    append(*suffix, ", ");
+                    append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                }
             } else if (inst & 0xf8000f0) == 0x0800090 {
                 // multiply long
                 flags := (inst & 0x100000) != 0;
@@ -222,8 +227,54 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     }
                     append(*suffix, "]!");
                 }
-            } else if (inst & 0xe0000f0) == 0x00000d0 {
+            } else if (inst & 0xe0000d0) == 0x00000d0 {
                 // ldrsb / ldrsh
+                rd_idx : u8 = xx (inst >> 12) & 0xf;
+                rn_idx : u8 = xx (inst >> 16) & 0xf;
+                p := (inst & 0x1000000) != 0;
+                u := (inst & 0x800000) != 0;
+                i := (inst & 0x400000) != 0;
+                w := (inst & 0x200000) != 0;
+
+                if (inst & 0x20) != 0 {
+                    // load
+                    opcode = "LDRSH";
+                } else {
+                    // store
+                    opcode = "LDRSB";
+                }
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                offset := tprint("#%", formatInt((inst & 0x0f) | ((inst >> 4) & 0xf0), 10, 1));
+                offset_reg := disassemble_register(xx inst & 0xf);
+                if !p {
+                    // post indexed
+                    append(*suffix, "], ");
+                    if u {
+                        append(*suffix, tprint("%", ifx i then offset else offset_reg));
+                    } else {
+                        append(*suffix, tprint("-%", ifx i then offset else offset_reg));
+                    }
+                } else if !w {
+                    // offset addressing
+                    append(*suffix, ", ");
+                    if u {
+                        append(*suffix, tprint("%", ifx i then offset else offset_reg));
+                    } else {
+                        append(*suffix, tprint("-%", ifx i then offset else offset_reg));
+                    }
+                    append(*suffix, "]");
+                } else {
+                    // pre indexed
+                    append(*suffix, ", ");
+                    if u {
+                        append(*suffix, tprint("%", ifx i then offset else offset_reg));
+                    } else {
+                        append(*suffix, tprint("-%", ifx i then offset else offset_reg));
+                    }
+                    append(*suffix, "]!");
+                }
             } else {
                 rn_idx := cast(u8)((inst >> 16) & 0xf);
                 rd_idx := cast(u8)((inst >> 12) & 0xf);
@@ -622,6 +673,13 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // ldrsb
                 case 0b100;
                 // ldr (2)
+                opcode = "ldr";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
                 case 0b101;
                 // ldrh (2)
                 rd_idx : u8 = xx ins & 0b111;
@@ -730,6 +788,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, disassemble_register(rm_idx));
                 case 0b1011;
                 // cmn
+                opcode = "cmn";
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b1100;
                 // orr
                 opcode = "orr";
@@ -744,6 +806,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, disassemble_register(rm_idx));
                 case 0b1110;
                 // bic
+                opcode = "bic";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b1111;
                 // mvn
                 opcode = "mvn";
@@ -916,19 +982,29 @@ disasm_window :: () {
         disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
     }
     ImGui.SameLine();
+    if ImGui.Button(tprint("%\0", ifx disasm_mode == .THUMB then "T" else "A").data) {
+        if disasm_mode == .THUMB {
+            disasm_scroll_state /= 2;
+            disasm_mode = .ARM;
+        } else {
+            disasm_scroll_state *= 2;
+            disasm_mode = .THUMB;
+        }
+    }
+    ImGui.SameLine();
     ImGui.Text("0x");
     ImGui.SameLine();
     if ImGui.InputText("Jump to...", disasm_jump_buffer.data, 5) {
         str := string.{4, disasm_jump_buffer.data};
         parsed := string_to_int(str, 16);
-        disasm_scroll_state = parsed / ifx cpu.state == .ARM then 4 else 2;
+        disasm_scroll_state = parsed / ifx disasm_mode == .ARM then 4 else 2;
     }
     for 0..cast(int)ImGui.GetWindowSize().y {
-        addr : u32 = xx ((disasm_scroll_state + xx it) * ifx cpu.state == .ARM then 4 else 2);
-        to_print := ifx cpu.state == .ARM then
+        addr : u32 = xx ((disasm_scroll_state + xx it) * ifx disasm_mode == .ARM then 4 else 2);
+        to_print := ifx disasm_mode == .ARM then
             disassemble_arm_instruction(read_32(addr))
         else disassemble_thumb_instruction(read_16(addr));
-        has_breakpoint := ifx cpu.state == .ARM then ((read_32(addr) & 0xfff000f0) == 0xe1200070) else ((read_16(addr) & 0xff00) == 0xbe00);
+        has_breakpoint := ifx disasm_mode == .ARM then ((read_32(addr) & 0xfff000f0) == 0xe1200070) else ((read_16(addr) & 0xff00) == 0xbe00);
         if addr == cpu.reg[15] {
             ImGui.TextColored(.{0, 255, 0, 255}, "%\t%", addr, to_print);
         } else if has_breakpoint {
@@ -937,10 +1013,10 @@ disasm_window :: () {
             ImGui.Text("%\t%", addr, to_print);
         }
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("0x%", ifx cpu.state == .ARM then read_32(addr) else read_16(addr));
+            ImGui.SetTooltip("0x%", ifx disasm_mode == .ARM then read_32(addr) else read_16(addr));
         }
         if ImGui.IsItemClicked() {
-            if cpu.state == .ARM {
+            if disasm_mode == .ARM {
                 ins := read_32(addr);
                 if has_breakpoint {
                     idx := (ins & 0xf) | ((ins >> 8) & 0xfff);
