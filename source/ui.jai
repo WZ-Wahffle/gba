@@ -53,8 +53,19 @@ ui :: () {
             if event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(win) {
                 quit = true;
             }
-            if event.type == SDL_KEYDOWN && event.key.keysym.sym == .SDLK_ESCAPE {
-                quit = true;
+            if event.type == SDL_KEYDOWN && event.key.repeat == 0 {
+                if event.key.keysym.sym == {
+                    case .SDLK_ESCAPE;
+                        quit = true;
+                    case .SDLK_c;
+                        show_cpu = !show_cpu;
+                    case .SDLK_d;
+                        show_disasm = !show_disasm;
+                    case .SDLK_e;
+                        show_ewram = !show_ewram;
+                    case .SDLK_i;
+                        show_iwram = !show_iwram;
+                }
             }
             if event.type == SDL_CONTROLLERDEVICEADDED {
                 if controller == null
@@ -65,6 +76,8 @@ ui :: () {
                     SDL_GameControllerClose(controller);
             }
         }
+
+        // inputs
         ppu.keypad_state =
             (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A) << 0) |
             (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B) << 1) |
@@ -122,7 +135,5 @@ ui :: () {
             __Iprof.update(true);
             report = __Iprof.create_report();
         }
-        // frame_time := seconds_since_init() - time;
-        // sleep_milliseconds(xx (16.6 - frame_time));
     }
 }

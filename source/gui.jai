@@ -1,23 +1,52 @@
+show_iwram := false;
+show_ewram := false;
+show_disasm := false;
+show_cpu := false;
+
 draw_gui :: () {
     context.print_style.default_format_int.base = 16;
     context.print_style.default_format_int.minimum_digits = 8;
-    cpu_window();
-    disasm_window();
-    iwram_window();
+    if ImGui.BeginMainMenuBar() {
+        if ImGui.BeginMenu("Processors") {
+            if ImGui.MenuItem("cpu", "c") {
+                show_cpu = !show_cpu;
+            }
+            ImGui.EndMenu();
+        }
+        if ImGui.BeginMenu("Memory") {
+            if ImGui.MenuItem("iwram", "i") {
+                show_iwram = !show_iwram;
+            }
+            if ImGui.MenuItem("ewram", "e") {
+                show_ewram = !show_ewram;
+            }
+            ImGui.EndMenu();
+        }
+        if ImGui.BeginMenu("Disassembly") {
+            if ImGui.MenuItem("show", "d") {
+                show_disasm = !show_disasm;
+            }
+            ImGui.EndMenu();
+        }
+        ImGui.EndMainMenuBar();
+    }
+
+    if show_iwram iwram_window();
+    if show_ewram ewram_window();
+    if show_cpu cpu_window();
+    if show_disasm disasm_window();
     #if #exists(__Iprof) {
         profiler_window();
     }
     context.print_style.default_format_int.base = 10;
     context.print_style.default_format_int.minimum_digits = 1;
 }
-disasm_scroll_state := 0;
-disasm_mode := Cpu_State.ARM;
-iwram_scroll_state := 0;
+
 #if #exists(__Iprof) {
     report: *__Iprof.Report;
 }
 
-#scope_file cpu_window :: () {
+cpu_window :: () {
     ImGui.Begin("cpu");
     ImGui.Text("Frame time: %ms", dt * 1000);
     if ImGui.Button("Start") {
@@ -967,6 +996,8 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
     return ret;
 }
 
+disasm_scroll_state := 0;
+disasm_mode := Cpu_State.ARM;
 disasm_jump_buffer: [5]u8;
 disasm_window :: () {
     ImGui.Begin("disasm", null, .NoScrollbar | .NoScrollWithMouse);
@@ -1052,6 +1083,7 @@ disasm_window :: () {
     ImGui.End();
 }
 
+iwram_scroll_state := 0;
 iwram_jump_buffer: [5]u8;
 iwram_window :: () {
     ImGui.Begin("iwram", null, .NoScrollbar | .NoScrollWithMouse);
@@ -1084,6 +1116,46 @@ iwram_window :: () {
             ImGui.Text_CFormat("%02x", cpu.memory.iwram._8[(it + iwram_scroll_state) * 16 + it2]);
             if ImGui.IsItemHovered() {
                 ImGui.SetTooltip("0x%", 0x03000000 + (it + iwram_scroll_state) * 16 + it2);
+            }
+        }
+    }
+    ImGui.EndTable();
+    ImGui.End();
+}
+
+ewram_scroll_state := 0;
+ewram_jump_buffer: [6]u8;
+ewram_window :: () {
+    ImGui.Begin("ewram", null, .NoScrollbar | .NoScrollWithMouse);
+    ImGui.Text("0x");
+    ImGui.SameLine();
+    if ImGui.IsWindowHovered() {
+        if ImGui.GetIO().MouseWheel < 0 {
+            ewram_scroll_state += 1;
+        } else if ImGui.GetIO().MouseWheel > 0 {
+            ewram_scroll_state -= 1;
+            ewram_scroll_state = max(ewram_scroll_state, 0);
+        }
+    }
+    if ImGui.InputText("Jump to...", ewram_jump_buffer.data, 6) {
+        str := string.{5, ewram_jump_buffer.data};
+        parsed := string_to_int(str, 16);
+        ewram_scroll_state = parsed / 16;
+    }
+    ImGui.BeginTable("##ewram", 17, .Borders | .RowBg | .SizingFixedFit);
+    ImGui.TableNextRow();
+    for 0..cast(int)ImGui.GetWindowSize().y {
+        if (it + ewram_scroll_state + 1) * 16 > 0x40000 {
+            ewram_scroll_state = (0x40000 - 16 * it) / 16;
+            break;
+        }
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("0x%05x", (it + ewram_scroll_state) * 16);
+        for it2 : 0..15 {
+            ImGui.TableNextColumn();
+            ImGui.Text_CFormat("%02x", cpu.memory.ewram._8[(it + ewram_scroll_state) * 16 + it2]);
+            if ImGui.IsItemHovered() {
+                ImGui.SetTooltip("0x%", 0x02000000 + (it + ewram_scroll_state) * 16 + it2);
             }
         }
     }

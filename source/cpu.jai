@@ -8,7 +8,7 @@ read_8 :: (addr: u32) -> u8 {
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._8[addr % 0x40000];
     }
-    if addr >= 0x03000000 && addr < 0x03008000 {
+    if addr >= 0x03000000 && addr < 0x04000000 {
         return cpu.memory.iwram._8[addr % 0x8000];
     }
     if addr >= 0x04000000 && addr < 0x04000400 {
@@ -42,7 +42,7 @@ read_16 :: (addr: u32) -> u16 {
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._16[(addr >> 1) % 0x20000];
     }
-    if addr >= 0x03000000 && addr < 0x03008000 {
+    if addr >= 0x03000000 && addr < 0x04000000 {
         return cpu.memory.iwram._16[(addr >> 1) % 0x4000];
     }
     if addr >= 0x04000000 && addr < 0x04000400 {
@@ -80,7 +80,7 @@ read_32 :: (addr: u32) -> u32 {
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._32[(addr >> 2) % 0x10000];
     }
-    if addr >= 0x03000000 && addr < 0x03008000 {
+    if addr >= 0x03000000 && addr < 0x04000000 {
         return cpu.memory.iwram._32[(addr >> 2) % 0x2000];
     }
     if addr >= 0x04000000 && addr < 0x04000400 {
@@ -119,7 +119,7 @@ write_8 :: (addr: u32, val: u8) {
     if addr >= 0x02000000 && addr < 0x02040000 {
         cpu.memory.ewram._8[addr % 0x40000] = val;
     }
-    else if addr >= 0x03000000 && addr < 0x03008000 {
+    else if addr >= 0x03000000 && addr < 0x04000000 {
         cpu.memory.iwram._8[addr % 0x8000] = val;
     }
     else if addr >= 0x04000000 && addr < 0x04000400 {
@@ -146,7 +146,7 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
     if addr >= 0x02000000 && addr < 0x02040000 {
         cpu.memory.ewram._16[(addr >> 1) % 0x20000] = val;
     }
-    else if addr >= 0x03000000 && addr < 0x03008000 {
+    else if addr >= 0x03000000 && addr < 0x04000000 {
         cpu.memory.iwram._16[(addr >> 1) % 0x4000] = val;
     }
     else if addr >= 0x04000000 && addr < 0x04000400 {
@@ -179,7 +179,7 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
     if addr >= 0x02000000 && addr < 0x02040000 {
         cpu.memory.ewram._32[(addr >> 2) % 0x10000] = val;
     }
-    else if addr >= 0x03000000 && addr < 0x03008000 {
+    else if addr >= 0x03000000 && addr < 0x04000000 {
         cpu.memory.iwram._32[(addr >> 2) % 0x2000] = val;
     }
     else if addr >= 0x04000000 && addr < 0x04000400 {
@@ -228,7 +228,7 @@ next_16 :: () -> u16 {
     else if cpu.reg[15] >= 0x02000000 && cpu.reg[15] < 0x02040000 {
         ret = cpu.memory.ewram._16[(cpu.reg[15] >> 1) % 0x20000];
     }
-    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x03008000 {
+    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x04000000 {
         ret = cpu.memory.iwram._16[(cpu.reg[15] >> 1) % 0x4000];
     } else {
         log_warn("Unmapped execution read: 0x%", formatInt(cpu.reg[15], 16));
@@ -252,7 +252,7 @@ next_32 :: () -> u32 {
     else if cpu.reg[15] >= 0x02000000 && cpu.reg[15] < 0x02040000 {
         ret = cpu.memory.ewram._32[(cpu.reg[15] >> 2) % 0x10000];
     }
-    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x03008000 {
+    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x04000000 {
         ret = cpu.memory.iwram._32[(cpu.reg[15] >> 2) % 0x2000];
     } else {
         log_warn("Unmapped execution read: 0x%", formatInt(cpu.reg[15], 16));
@@ -305,6 +305,26 @@ set_mode :: (mode: u32) {
     cpu.reg[14] = cpu.lr[cpu.mode];
     if cpu.mode == .FIQ {
         for 8..14 cpu.reg[it] = cpu.reg_hi_fiq[it - 8];
+    }
+}
+
+interrupt :: (mode: Cpu_Mode) {
+    assert(mode == Cpu_Mode.IRQ || mode == Cpu_Mode.FIQ || mode == Cpu_Mode.SVC);
+    cpu.mode = mode;
+    cpu.state = .ARM;
+    cpu.spsr[cpu.mode] = cpu.psr;
+    cpu.reg[14] = cpu.reg[15];
+    cpu.psr &= 0xffffffc0;
+    if mode == {
+        case .SVC;
+        cpu.reg[15] = 0x08;
+        cpu.psr |= 0b10011;
+        case .IRQ;
+        cpu.reg[15] = 0x18;
+        cpu.psr |= 0b10010;
+        case .FIQ;
+        cpu.reg[15] = 0x1c;
+        cpu.psr |= 0b10001;
     }
 }
 
