@@ -275,7 +275,8 @@ set_status_bit :: inline (bit: Status_Bit, state: bool) {
 
 step_cpu :: () {
     if cpu.remaining_cycles > 0 {
-        execute_next();
+        cpu.remaining_cycles -= 1;
+        if !cpu.halted && !cpu.stopped then execute_next();
     }
 }
 
@@ -321,11 +322,17 @@ interrupt :: (mode: Cpu_Mode) {
         cpu.psr |= 0b10011;
         case .IRQ;
         cpu.reg[15] = 0x18;
+        cpu.reg[14] += 4;
         cpu.psr |= 0b10010;
+        set_status_bit(.I, true);
         case .FIQ;
         cpu.reg[15] = 0x1c;
+        cpu.reg[14] += 4;
         cpu.psr |= 0b10001;
+        set_status_bit(.F, true);
     }
+    cpu.halted = false;
+    cpu.stopped = false;
 }
 
 cond :: (val: u32) -> bool {
@@ -626,7 +633,6 @@ populate_thumb_lut :: () {
 execute_next :: () {
     if cpu.state == .ARM {
         ins := next_32();
-        cpu.remaining_cycles -= 1;
         if !cond(ins >> 28) {
             return;
         }
@@ -638,7 +644,6 @@ execute_next :: () {
         arm_reduced_lut[ins_masked](ins);
     } else {
         ins := next_16();
-        cpu.remaining_cycles -= 1;
         thumb_reduced_lut[ins >> 6](ins);
     }
 }

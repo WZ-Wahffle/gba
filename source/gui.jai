@@ -2,6 +2,7 @@ show_iwram := false;
 show_ewram := false;
 show_disasm := false;
 show_cpu := false;
+show_ppu := false;
 
 draw_gui :: () {
     context.print_style.default_format_int.base = 16;
@@ -10,6 +11,9 @@ draw_gui :: () {
         if ImGui.BeginMenu("Processors") {
             if ImGui.MenuItem("cpu", "c") {
                 show_cpu = !show_cpu;
+            }
+            if ImGui.MenuItem("ppu", "p") {
+                show_ppu = !show_ppu;
             }
             ImGui.EndMenu();
         }
@@ -34,6 +38,7 @@ draw_gui :: () {
     if show_iwram iwram_window();
     if show_ewram ewram_window();
     if show_cpu cpu_window();
+    if show_ppu ppu_window();
     if show_disasm disasm_window();
     #if #exists(__Iprof) {
         profiler_window();
@@ -94,6 +99,18 @@ cpu_window :: () {
     ImGui.SameLine();
     ImGui.Text("R11: 0x% ", cpu.reg[11]);
     ImGui.Text("R12: 0x% ", cpu.reg[12]);
+    ImGui.NewLine();
+    ImGui.Text("Interrupts %abled", ifx cpu.interrupt_master_enable then "en" else "dis");
+    for enum_names(Interrupt_Source) {
+        ImGui.Text("%: %abled, %triggered", it, ifx cpu.ie[it_index] != 0 then "en" else "dis", ifx cpu.ifl[it_index] != 0 then "" else "not ");
+    }
+    ImGui.End();
+}
+
+ppu_window :: () {
+    ImGui.Begin("ppu");
+    ImGui.Text("X: %", formatInt(ppu.draw_x, 10, 1));
+    ImGui.Text("Y: %", formatInt(ppu.draw_y, 10, 1));
     ImGui.End();
 }
 

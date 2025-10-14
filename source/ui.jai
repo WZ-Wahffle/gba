@@ -20,6 +20,23 @@ step_ppu :: () {
                 ppu.draw_y = 0;
             }
         }
+
+        if !get_status_bit(.I) && cpu.interrupt_master_enable {
+            if ppu.draw_x == 240 && ppu.draw_y < 160 && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 {
+                cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
+                interrupt(.IRQ);
+            }
+            if ppu.draw_x == 240 && ppu.draw_y == 160 && cpu.ie[Interrupt_Source.LCD_VBLANK] != 0 {
+                cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0x01;
+                interrupt(.IRQ);
+            }
+        }
+        if ppu.draw_x == 0 {
+            cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0;
+        }
+        if ppu.draw_y == 0 {
+            cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0;
+        }
     }
 }
 
@@ -65,6 +82,8 @@ ui :: () {
                         show_ewram = !show_ewram;
                     case .SDLK_i;
                         show_iwram = !show_iwram;
+                    case .SDLK_p;
+                        show_ppu = !show_ppu;
                 }
             }
             if event.type == SDL_CONTROLLERDEVICEADDED {
@@ -101,10 +120,11 @@ ui :: () {
             #through;
             case .RUNNING;
             for 0..228*308 {
+                if cpu.emu_state == .STOPPED break;
                 cpu.remaining_cycles += 4;
                 ppu.remaining_cycles += 4;
                 step_ppu();
-                while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
+                while cpu.remaining_cycles > 0 step_cpu();
             }
             disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
             disasm_mode = cpu.state;
@@ -117,6 +137,7 @@ ui :: () {
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();
             disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
+            disasm_mode = cpu.state;
         }
         SDL_RenderClear(renderer);
         tex := SDL_CreateTextureFromSurface(renderer, surface);

@@ -218,6 +218,7 @@ thumb_bx_blx_2 :: inline (ins: u16) {
     addr := reg_src(xx (ins >> 3) & 0xf);
     if (ins & 0x80) != 0 then cpu.reg[14] = (cpu.reg[15]) | 1;
     cpu.state = ifx (addr & 1) != 0 then .THUMB else .ARM;
+    set_status_bit(.T, (addr & 1) != 0);
     cpu.psr &= ~cast(u32)0x10;
     cpu.psr |= (addr & 1) << 4;
     cpu.reg[15] = addr & 0xfffffffe;
@@ -440,6 +441,7 @@ thumb_pop :: inline (ins: u16) {
         cpu.remaining_cycles -= 1;
         cpu.reg[15] = read_32(cpu.reg[13]);
         cpu.state = ifx (cpu.reg[15] & 1) != 0 then .THUMB else .ARM;
+        set_status_bit(.T, (cpu.reg[15] & 1) != 0);
         cpu.psr &= ~cast(u32)0x10;
         cpu.psr |= (cpu.reg[15] & 1) << 4;
         cpu.reg[15] &= 0xfffffffe;

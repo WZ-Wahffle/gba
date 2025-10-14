@@ -11,13 +11,15 @@ Cpu :: struct {
     privileged := true;
     dma: [4]Dma;
     timer: [4]Timer;
+    halted := false;
+    stopped := false;
 
     // IME
     interrupt_master_enable := false;
     // IE
-    ie: [#run enum_highest_value(Interrupt_Source)+1]bool;
+    ie: [#run enum_highest_value(Interrupt_Source)+1]u8;
     // IF
-    ifl: [#run enum_highest_value(Interrupt_Source)+1]bool;
+    ifl: [#run enum_highest_value(Interrupt_Source)+1]u8;
     // WAITCNT
     waitcnt_lo : u8 = 0;
     waitcnt_hi : u8 = 0;
@@ -206,6 +208,9 @@ Status_Bit :: enum {
     Z :: 0x40000000;
     C :: 0x20000000;
     V :: 0x10000000;
+    I :: 0x00000080;
+    F :: 0x00000040;
+    T :: 0x00000020;
 }
 
 Dma_Start_Timing :: enum {

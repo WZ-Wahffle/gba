@@ -14,6 +14,38 @@ mmio_read :: (addr: u32) -> u8 {
             return xx ppu.keypad_state & 0xff;
         case 0x131;
             return xx ppu.keypad_state >> 8;
+        case 0x200;
+            return cpu.ie[Interrupt_Source.LCD_VBLANK] |
+                cpu.ie[Interrupt_Source.LCD_HBLANK] |
+                cpu.ie[Interrupt_Source.LCD_VCOUNTER] |
+                cpu.ie[Interrupt_Source.TIM0OVERFLOW] |
+                cpu.ie[Interrupt_Source.TIM1OVERFLOW] |
+                cpu.ie[Interrupt_Source.TIM2OVERFLOW] |
+                cpu.ie[Interrupt_Source.TIM3OVERFLOW] |
+                cpu.ie[Interrupt_Source.SERIAL];
+        case 0x201;
+            return cpu.ie[Interrupt_Source.DMA0] |
+                cpu.ie[Interrupt_Source.DMA1] |
+                cpu.ie[Interrupt_Source.DMA2] |
+                cpu.ie[Interrupt_Source.DMA3] |
+                cpu.ie[Interrupt_Source.KEYPAD] |
+                cpu.ie[Interrupt_Source.GAMEPAK];
+        case 0x202;
+            return cpu.ifl[Interrupt_Source.LCD_VBLANK] |
+                cpu.ifl[Interrupt_Source.LCD_HBLANK] |
+                cpu.ifl[Interrupt_Source.LCD_VCOUNTER] |
+                cpu.ifl[Interrupt_Source.TIM0OVERFLOW] |
+                cpu.ifl[Interrupt_Source.TIM1OVERFLOW] |
+                cpu.ifl[Interrupt_Source.TIM2OVERFLOW] |
+                cpu.ifl[Interrupt_Source.TIM3OVERFLOW] |
+                cpu.ifl[Interrupt_Source.SERIAL];
+        case 0x203;
+            return cpu.ifl[Interrupt_Source.DMA0] |
+                cpu.ifl[Interrupt_Source.DMA1] |
+                cpu.ifl[Interrupt_Source.DMA2] |
+                cpu.ifl[Interrupt_Source.DMA3] |
+                cpu.ifl[Interrupt_Source.KEYPAD] |
+                cpu.ifl[Interrupt_Source.GAMEPAK];
         case 0x204;
             return cpu.waitcnt_lo;
         case 0x205;
@@ -573,37 +605,37 @@ mmio_write :: (addr: u32, val: u8) {
             ppu.keypad_irq = (val & 0x40) != 0;
             ppu.keypad_irq_require_all = (val & 0x80) != 0;
         case 0x200;
-            cpu.ie[Interrupt_Source.LCD_VBLANK] = (val & 0x01) != 0;
-            cpu.ie[Interrupt_Source.LCD_HBLANK] = (val & 0x02) != 0;
-            cpu.ie[Interrupt_Source.LCD_VCOUNTER] = (val & 0x04) != 0;
-            cpu.ie[Interrupt_Source.TIM0OVERFLOW] = (val & 0x08) != 0;
-            cpu.ie[Interrupt_Source.TIM1OVERFLOW] = (val & 0x10) != 0;
-            cpu.ie[Interrupt_Source.TIM2OVERFLOW] = (val & 0x20) != 0;
-            cpu.ie[Interrupt_Source.TIM3OVERFLOW] = (val & 0x40) != 0;
-            cpu.ie[Interrupt_Source.SERIAL] = (val & 0x80) != 0;
+            cpu.ie[Interrupt_Source.LCD_VBLANK] = (val & 0x01);
+            cpu.ie[Interrupt_Source.LCD_HBLANK] = (val & 0x02);
+            cpu.ie[Interrupt_Source.LCD_VCOUNTER] = (val & 0x04);
+            cpu.ie[Interrupt_Source.TIM0OVERFLOW] = (val & 0x08);
+            cpu.ie[Interrupt_Source.TIM1OVERFLOW] = (val & 0x10);
+            cpu.ie[Interrupt_Source.TIM2OVERFLOW] = (val & 0x20);
+            cpu.ie[Interrupt_Source.TIM3OVERFLOW] = (val & 0x40);
+            cpu.ie[Interrupt_Source.SERIAL] = (val & 0x80);
         case 0x201;
-            cpu.ie[Interrupt_Source.DMA0] = (val & 0x01) != 0;
-            cpu.ie[Interrupt_Source.DMA1] = (val & 0x02) != 0;
-            cpu.ie[Interrupt_Source.DMA2] = (val & 0x04) != 0;
-            cpu.ie[Interrupt_Source.DMA3] = (val & 0x08) != 0;
-            cpu.ie[Interrupt_Source.KEYPAD] = (val & 0x10) != 0;
-            cpu.ie[Interrupt_Source.GAMEPAK] = (val & 0x20) != 0;
+            cpu.ie[Interrupt_Source.DMA0] = (val & 0x01);
+            cpu.ie[Interrupt_Source.DMA1] = (val & 0x02);
+            cpu.ie[Interrupt_Source.DMA2] = (val & 0x04);
+            cpu.ie[Interrupt_Source.DMA3] = (val & 0x08);
+            cpu.ie[Interrupt_Source.KEYPAD] = (val & 0x10);
+            cpu.ie[Interrupt_Source.GAMEPAK] = (val & 0x20);
         case 0x202;
-            if (val & 0x01) != 0 then cpu.ifl[Interrupt_Source.LCD_VBLANK] = false;
-            if (val & 0x02) != 0 then cpu.ifl[Interrupt_Source.LCD_HBLANK] = false;
-            if (val & 0x04) != 0 then cpu.ifl[Interrupt_Source.LCD_VCOUNTER] = false;
-            if (val & 0x08) != 0 then cpu.ifl[Interrupt_Source.TIM0OVERFLOW] = false;
-            if (val & 0x10) != 0 then cpu.ifl[Interrupt_Source.TIM1OVERFLOW] = false;
-            if (val & 0x20) != 0 then cpu.ifl[Interrupt_Source.TIM2OVERFLOW] = false;
-            if (val & 0x40) != 0 then cpu.ifl[Interrupt_Source.TIM3OVERFLOW] = false;
-            if (val & 0x80) != 0 then cpu.ifl[Interrupt_Source.SERIAL] = false;
+            if (val & 0x01) != 0 then cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0;
+            if (val & 0x02) != 0 then cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0;
+            if (val & 0x04) != 0 then cpu.ifl[Interrupt_Source.LCD_VCOUNTER] = 0;
+            if (val & 0x08) != 0 then cpu.ifl[Interrupt_Source.TIM0OVERFLOW] = 0;
+            if (val & 0x10) != 0 then cpu.ifl[Interrupt_Source.TIM1OVERFLOW] = 0;
+            if (val & 0x20) != 0 then cpu.ifl[Interrupt_Source.TIM2OVERFLOW] = 0;
+            if (val & 0x40) != 0 then cpu.ifl[Interrupt_Source.TIM3OVERFLOW] = 0;
+            if (val & 0x80) != 0 then cpu.ifl[Interrupt_Source.SERIAL] = 0;
         case 0x203;
-            if (val & 0x01) != 0 then cpu.ifl[Interrupt_Source.DMA0] = false;
-            if (val & 0x02) != 0 then cpu.ifl[Interrupt_Source.DMA1] = false;
-            if (val & 0x04) != 0 then cpu.ifl[Interrupt_Source.DMA2] = false;
-            if (val & 0x08) != 0 then cpu.ifl[Interrupt_Source.DMA3] = false;
-            if (val & 0x10) != 0 then cpu.ifl[Interrupt_Source.KEYPAD] = false;
-            if (val & 0x20) != 0 then cpu.ifl[Interrupt_Source.GAMEPAK] = false;
+            if (val & 0x01) != 0 then cpu.ifl[Interrupt_Source.DMA0] = 0;
+            if (val & 0x02) != 0 then cpu.ifl[Interrupt_Source.DMA1] = 0;
+            if (val & 0x04) != 0 then cpu.ifl[Interrupt_Source.DMA2] = 0;
+            if (val & 0x08) != 0 then cpu.ifl[Interrupt_Source.DMA3] = 0;
+            if (val & 0x10) != 0 then cpu.ifl[Interrupt_Source.KEYPAD] = 0;
+            if (val & 0x20) != 0 then cpu.ifl[Interrupt_Source.GAMEPAK] = 0;
         case 0x204;
             cpu.waitcnt_lo = val;
         case 0x205;
@@ -617,6 +649,9 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x209;
         case 0x20a;
         case 0x20b;
+        case 0x301;
+            cpu.halted = (val & 0x80) == 0;
+            cpu.stopped = (val & 0x80) != 0;
         case;
         log_warn("Unmapped IO write: 0x%, 0x%", formatInt(addr, 16), formatInt(val, 16));
     }
