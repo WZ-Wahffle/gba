@@ -10,7 +10,6 @@ arm_bx :: inline (ins: u32) {
 }
 
 arm_mul_mla :: inline (ins: u32) {
-    // verify 12..15 is zero if mul
     rd_idx : u8 = xx (ins >> 16) & 0xf;
     rs := reg_src(xx (ins >> 8) & 0xf);
     rm := reg_src(xx ins & 0xf);
@@ -31,7 +30,30 @@ arm_mul_mla :: inline (ins: u32) {
 }
 
 arm_umull_umlal_smull_smlal :: inline (ins: u32) {
-    assert(false);
+    rdlo_idx : u8 = xx (ins >> 12) & 0xf;
+    rdhi_idx : u8 = xx (ins >> 16) & 0xf;
+    flags := (ins & 0x100000) != 0;
+    if (ins & 0x400000) != 0 {
+        // smull, smlal
+        assert(false);
+    } else {
+        // umull, umlal
+        rs : u64 = reg_src(xx (ins >> 8) & 0xf);
+        rm : u64 = reg_src(xx ins & 0xf);
+        if (ins & 0x200000) != 0 {
+            // umlal
+            assert(false);
+        } else {
+            // umull
+            result : u64 = rs * rm;
+            reg_dst(rdlo_idx, xx result & 0xffffffff);
+            reg_dst(rdhi_idx, xx (result >> 32) & 0xffffffff);
+            if flags {
+                set_status_bit(.N, result & 0x8000000000000000 != 0);
+                set_status_bit(.Z, result == 0);
+            }
+        }
+    }
 }
 
 arm_swp_swpb :: inline (ins: u32) {

@@ -162,7 +162,12 @@ thumb_strb_2 :: inline (ins: u16) {
 }
 
 thumb_ldrsb :: inline (ins: u16) {
-    assert(false);
+    rm := reg_src(xx ((ins >> 6) & 0b111));
+    rn := reg_src(xx ((ins >> 3) & 0b111));
+    rd_idx : u8 = xx ins & 0b111;
+    to_write : u32 = read_8(rm + rn);
+    if (to_write & 0x80) != 0 then to_write |= 0xffffff00;
+    reg_dst(rd_idx, to_write);
 }
 
 thumb_ldr_2 :: inline (ins: u16) {
@@ -180,7 +185,10 @@ thumb_ldrh_2 :: inline (ins: u16) {
 }
 
 thumb_ldrb_2 :: inline (ins: u16) {
-    assert(false);
+    rd_idx : u8 = xx ins & 0b111;
+    rn := reg_src(xx (ins >> 3) & 0b111);
+    rm := reg_src(xx (ins >> 6) & 0b111);
+    reg_dst(rd_idx, read_8(rn + rm));
 }
 
 thumb_ldrsh :: inline (ins: u16) {
@@ -247,7 +255,21 @@ thumb_lsl_2 :: inline (ins: u16) {
 }
 
 thumb_lsr_2 :: inline (ins: u16) {
-    assert(false);
+    rs := reg_src(xx ((ins >> 3) & 0b111)) & 0xff;
+    rd_idx : u8 = xx ins & 0b111;
+    result := reg_src(rd_idx) >> rs;
+    if rs == 0 {
+        // this page intentionally left blank
+    } else if rs == 32 {
+        set_status_bit(.C, (reg_src(rd_idx) & 0x80000000) != 0);
+    } else if rs > 32 {
+        set_status_bit(.C, false);
+    } else {
+        set_status_bit(.C, (reg_src(rd_idx) & (1 << (rs - 1))) != 0);
+    }
+    reg_dst(rd_idx, result);
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
 }
 
 thumb_asr_2 :: inline (ins: u16) {

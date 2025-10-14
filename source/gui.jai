@@ -717,6 +717,13 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // strb (2)
                 case 0b011;
                 // ldrsb
+                opcode = "ldrsb";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
                 case 0b100;
                 // ldr (2)
                 opcode = "ldr";
@@ -740,6 +747,16 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, "]");
                 case 0b110;
                 // ldrb (2)
+                rd_idx : u8 = xx ins & 0b111;
+                rn_idx : u8 = xx (ins >> 3) & 0b111;
+                rm_idx : u8 = xx (ins >> 6) & 0b111;
+                opcode = "ldrb";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
                 case 0b111;
                 // ldrsh
             }
@@ -802,6 +819,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 // lsl (2)
                 case 0b0011;
                 // lsr (2)
+                opcode = "lsr";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rs_idx));
                 case 0b0100;
                 // asr (2)
                 case 0b0101;

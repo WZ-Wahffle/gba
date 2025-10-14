@@ -14,6 +14,15 @@ mmio_read :: (addr: u32) -> u8 {
             return xx ppu.keypad_state & 0xff;
         case 0x131;
             return xx ppu.keypad_state >> 8;
+        // communication with gamecube not implemented
+        case 0x150;
+            return 0;
+        case 0x151;
+            return 0;
+        case 0x152;
+            return 0;
+        case 0x153;
+            return 0;
         case 0x200;
             return cpu.ie[Interrupt_Source.LCD_VBLANK] |
                 cpu.ie[Interrupt_Source.LCD_HBLANK] |

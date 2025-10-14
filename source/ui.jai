@@ -70,7 +70,7 @@ ui :: () {
             if event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(win) {
                 quit = true;
             }
-            if event.type == SDL_KEYDOWN && event.key.repeat == 0 {
+            if event.type == SDL_KEYDOWN && event.key.repeat == 0 && (event.key.keysym.mod & .KMOD_SHIFT) != 0 {
                 if event.key.keysym.sym == {
                     case .SDLK_ESCAPE;
                         quit = true;
