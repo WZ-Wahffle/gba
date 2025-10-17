@@ -31,11 +31,24 @@ step_ppu :: () {
                 interrupt(.IRQ);
             }
         }
+
         if ppu.draw_x == 0 {
             cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0;
         }
+
         if ppu.draw_y == 0 {
             cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0;
+        }
+
+        if ppu.draw_x < 240 && ppu.draw_y < 160 {
+            if ppu.bg_mode == {
+                case 0;
+                case 1;
+                case 2;
+                case 3;
+                case 4;
+                case 5;
+            }
         }
     }
 }
@@ -80,10 +93,16 @@ ui :: () {
                         show_disasm = !show_disasm;
                     case .SDLK_e;
                         show_ewram = !show_ewram;
+                    case .SDLK_g;
+                        show_ppu = !show_ppu;
                     case .SDLK_i;
                         show_iwram = !show_iwram;
+                    case .SDLK_o;
+                        show_oam = !show_oam;
                     case .SDLK_p;
-                        show_ppu = !show_ppu;
+                        show_palette_ram = !show_palette_ram;
+                    case .SDLK_v;
+                        show_vram = !show_vram;
                 }
             }
             if event.type == SDL_CONTROLLERDEVICEADDED {
