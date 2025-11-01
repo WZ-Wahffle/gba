@@ -1,9 +1,3 @@
-
-ImGui :: #import "ImGui";
-#import "SDL";
-#import "Math";
-#import "GL";
-
 // Data
 g_Time: u64 = 0;
 g_MousePressed := bool.[false, false, false];

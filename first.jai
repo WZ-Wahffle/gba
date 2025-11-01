@@ -20,10 +20,7 @@ build :: () {
     i_flags: Intercept_Flags;
     for plugins if it.before_intercept then it.before_intercept(it, *i_flags);
     compiler_begin_intercept(w, i_flags);
-    files := file_list("source");
-    for files {
-        add_build_file(it, w);
-    }
+    add_build_file("source/main.jai", w);
     for plugins if it.add_source then it.add_source(it);
     while true {
         message := compiler_wait_for_message();

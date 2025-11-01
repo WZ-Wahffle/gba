@@ -430,7 +430,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
             if shift_cnt == 0 then shift_cnt = 32;
             carry := (ret & (1 << (shift_cnt-1))) != 0;
             if ret & 0x80000000 {
-                sign_bit_fill := cast(u32)0xffffffff << (32 - shift_cnt);
+                sign_bit_fill : u32 = cast(u32)((0xffffffff << (32 - shift_cnt)) & 0xffffffff);
                 return (ret >> shift_cnt) | sign_bit_fill, true, carry;
             }
             return ret >> shift_cnt, true, carry;

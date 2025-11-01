@@ -1,6 +1,12 @@
 #import "Basic";//()(MEMORY_DEBUGGER=true);
 #import "File";
 #import "Thread";
+#import "String";
+
+ImGui :: #import "ImGui";
+#import "SDL";
+#import "Math";
+#import "GL";
 
 cpu: Cpu;
 ppu: Ppu;
@@ -39,7 +45,7 @@ dump_processor_state :: (loc: Source_Code_Location, message: string) -> bool {
 
 log_warn :: (format_string: string, args: .. Any, loc := #caller_location, flags := Log_Flags.NONE, user_flags: u32 = 0, section: *Log_Section = null) {
     new_flags := flags | .WARNING;
-    log(format_string, ..args, loc, new_flags, user_flags, section);
+    // log(format_string, ..args, loc, new_flags, user_flags, section);
 }
 
 #scope_file
@@ -62,3 +68,13 @@ color_log :: (message: string, data: *void, info: Log_Info) {
     write_string("\e[0;37m");
     if to_standard_error then exit(1);
 }
+
+#load "types.jai";
+#load "cpu.jai";
+#load "cpu-mmu.jai";
+#load "arm.jai";
+#load "thumb.jai";
+
+#load "imgui_sdl_gl.jai";
+#load "ui.jai";
+#load "gui.jai";

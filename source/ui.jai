@@ -1,6 +1,3 @@
-#import "Thread";
-#import "String";
-
 SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;
 FONT_SIZE :: 26;
@@ -175,5 +172,8 @@ ui :: () {
             __Iprof.update(true);
             report = __Iprof.create_report();
         }
+        end_time := seconds_since_init();
+        // TODO: should probably make this refresh rate dependent
+        sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
 }
