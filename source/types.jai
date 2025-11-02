@@ -151,7 +151,8 @@ Ppu :: struct {
         more_colors := false;
         screen_base_block := 0;
         wraparound := false; // BG2/BG3 only
-        size := 0;
+        wide := false;
+        tall := false;
         x_off := 0;
         y_off := 0;
         anchor_x := 0; // BG2/BG3 only

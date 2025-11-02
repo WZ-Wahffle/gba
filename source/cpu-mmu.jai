@@ -102,7 +102,8 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x009;
             ppu.bg[0].screen_base_block = val & 0x1f;
             ppu.bg[0].wraparound = (val & 0x20) != 0;
-            ppu.bg[0].size = (val >> 6) & 0b11;
+            ppu.bg[0].wide = (val & 0x40) != 0;
+            ppu.bg[0].tall = (val & 0x80) != 0;
         case 0x00a;
             ppu.bg[1].prio = val & 0b11;
             ppu.bg[1].char_base_block = (val >> 2) & 0b11;
@@ -111,7 +112,8 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x00b;
             ppu.bg[1].screen_base_block = val & 0x1f;
             ppu.bg[1].wraparound = (val & 0x20) != 0;
-            ppu.bg[1].size = (val >> 6) & 0b11;
+            ppu.bg[1].wide = (val & 0x40) != 0;
+            ppu.bg[1].tall = (val & 0x80) != 0;
         case 0x00c;
             ppu.bg[2].prio = val & 0b11;
             ppu.bg[2].char_base_block = (val >> 2) & 0b11;
@@ -120,7 +122,8 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x00d;
             ppu.bg[2].screen_base_block = val & 0x1f;
             ppu.bg[2].wraparound = (val & 0x20) != 0;
-            ppu.bg[2].size = (val >> 6) & 0b11;
+            ppu.bg[2].wide = (val & 0x40) != 0;
+            ppu.bg[2].tall = (val & 0x80) != 0;
         case 0x00e;
             ppu.bg[3].prio = val & 0b11;
             ppu.bg[3].char_base_block = (val >> 2) & 0b11;
@@ -129,7 +132,8 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x00f;
             ppu.bg[3].screen_base_block = val & 0x1f;
             ppu.bg[3].wraparound = (val & 0x20) != 0;
-            ppu.bg[3].size = (val >> 6) & 0b11;
+            ppu.bg[3].wide = (val & 0x40) != 0;
+            ppu.bg[3].tall = (val & 0x80) != 0;
         case 0x010;
             ppu.bg[0].x_off &= 0x100;
             ppu.bg[0].x_off |= val;

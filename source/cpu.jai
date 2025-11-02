@@ -91,7 +91,7 @@ read_32 :: (addr: u32) -> u32 {
         return first | (second << 8) | (third << 16) | (fourth << 24);
     }
     if addr >= 0x05000000 && addr < 0x06000000 {
-        return ppu.memory.palette_ram._32[(addr >> 2) % 0x200];
+        return ppu.memory.palette_ram._32[(addr >> 2) % 0x100];
     }
     if addr >= 0x06000000 && addr < 0x07000000 {
         if addr % 0x20000 < 0x18000 {

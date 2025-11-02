@@ -3,6 +3,36 @@ SCREEN_HEIGHT :: 160;
 FONT_SIZE :: 26;
 window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
+framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
+
+draw_line :: (y: u32, bg: u32, rotation_mode: bool) {
+    if !ppu.bg[bg].enable then return;
+    if rotation_mode {
+        y_pos := y + ppu.bg[bg].y_off;
+        line_size_px := 128 * (ifx ppu.bg[bg].wide then 2 else 1) * (ifx ppu.bg[bg].tall then 4 else 1);
+        line_size_tiles := line_size_px / 8;
+        base_addr := ppu.bg[bg].screen_base_block * 2048;
+        base_addr += (y_pos / 8) * (line_size_tiles);
+        tile_address_buffer: [128]u8;
+        for 0..line_size_tiles-1 {
+            tile_address_buffer[it] = ppu.memory.vram._8[base_addr + it];
+        }
+        pixel_buffer: [1024]u16;
+        for tile_idx: 0..line_size_tiles-1 {
+            tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx] * 64;
+            tile_base_addr += 8 * (y_pos % 8);
+            for pixel_idx: 0..7 {
+                pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[ppu.memory.vram._8[tile_base_addr + pixel_idx]];
+            }
+        }
+        for 0..239 {
+            framebuffer[y * SCREEN_WIDTH + it] = pixel_buffer[it + ppu.bg[bg].x_off];
+        }
+    } else {
+        // TODO
+        assert(false);
+    }
+}
 
 step_ppu :: () {
     if ppu.remaining_cycles > 0 {
@@ -37,11 +67,13 @@ step_ppu :: () {
             cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0;
         }
 
-        if ppu.draw_x < 240 && ppu.draw_y < 160 {
+        if ppu.draw_x == 240 && ppu.draw_y < 160 {
             if ppu.bg_mode == {
                 case 0;
                 case 1;
                 case 2;
+                    draw_line(ppu.draw_y, 2, true);
+                    draw_line(ppu.draw_y, 3, true);
                 case 3;
                 case 4;
                 case 5;
@@ -61,8 +93,6 @@ ui :: () {
     gl_context := SDL_GL_CreateContext(win);
     gl_load(*gl, SDL_GL_GetProcAddress);
     renderer := SDL_CreateRenderer(win, -1, .ACCELERATED | .TARGETTEXTURE);
-    framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
-    surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
     ImGui.CreateContext();
     ImGui_ImplSdl_Init(win);
     ImGui.StyleColorsDark();
@@ -84,6 +114,8 @@ ui :: () {
                 if event.key.keysym.sym == {
                     case .SDLK_ESCAPE;
                         quit = true;
+                    case .SDLK_TAB;
+                        show_header = !show_header;
                     case .SDLK_c;
                         show_cpu = !show_cpu;
                     case .SDLK_d;
@@ -98,6 +130,8 @@ ui :: () {
                         show_oam = !show_oam;
                     case .SDLK_p;
                         show_palette_ram = !show_palette_ram;
+                    case .SDLK_t;
+                        show_dma = !show_dma;
                     case .SDLK_v;
                         show_vram = !show_vram;
                 }
@@ -129,10 +163,10 @@ ui :: () {
         if cpu.emu_state == {
             case .STARTED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            cpu.remaining_cycles += -cpu.remaining_cycles + 1;
-            while ppu.remaining_cycles > 0 step_ppu();
-            while cpu.remaining_cycles > 0 step_cpu();
+            cpu.remaining_cycles = 1;
+            step_cpu();
             cpu.emu_state = .RUNNING;
+            while ppu.remaining_cycles > 0 step_ppu();
             #through;
             case .RUNNING;
             for 0..228*308 {
@@ -140,7 +174,7 @@ ui :: () {
                 cpu.remaining_cycles += 4;
                 ppu.remaining_cycles += 4;
                 step_ppu();
-                while cpu.remaining_cycles > 0 step_cpu();
+                while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
             disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
             disasm_mode = cpu.state;
@@ -156,6 +190,8 @@ ui :: () {
             disasm_mode = cpu.state;
         }
         SDL_RenderClear(renderer);
+        surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
+        defer SDL_FreeSurface(surface);
         tex := SDL_CreateTextureFromSurface(renderer, surface);
         defer SDL_DestroyTexture(tex);
         SDL_RenderCopy(renderer, tex, null, null);

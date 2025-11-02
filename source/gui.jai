@@ -1,8 +1,10 @@
+show_header := false;
 show_iwram := false;
 show_ewram := false;
 show_vram := false;
 show_palette_ram := false;
 show_oam := false;
+show_dma := false;
 show_disasm := false;
 show_cpu := false;
 show_ppu := false;
@@ -10,48 +12,53 @@ show_ppu := false;
 draw_gui :: () {
     context.print_style.default_format_int.base = 16;
     context.print_style.default_format_int.minimum_digits = 8;
-    if ImGui.BeginMainMenuBar() {
-        if ImGui.BeginMenu("Processors") {
-            if ImGui.MenuItem("cpu", "ctrl+c") {
-                show_cpu = !show_cpu;
+    if show_header
+        if ImGui.BeginMainMenuBar() {
+            if ImGui.BeginMenu("Processors") {
+                if ImGui.MenuItem("cpu", "ctrl+c") {
+                    show_cpu = !show_cpu;
+                }
+                if ImGui.MenuItem("ppu", "ctrl+g") {
+                    show_ppu = !show_ppu;
+                }
+                ImGui.EndMenu();
             }
-            if ImGui.MenuItem("ppu", "ctrl+g") {
-                show_ppu = !show_ppu;
+            if ImGui.BeginMenu("Memory") {
+                if ImGui.MenuItem("iwram", "ctrl+i") {
+                    show_iwram = !show_iwram;
+                }
+                if ImGui.MenuItem("ewram", "ctrl+e") {
+                    show_ewram = !show_ewram;
+                }
+                if ImGui.MenuItem("vram", "ctrl+v") {
+                    show_vram = !show_vram;
+                }
+                if ImGui.MenuItem("palette ram", "ctrl+p") {
+                    show_palette_ram = !show_palette_ram;
+                }
+                if ImGui.MenuItem("oam", "ctrl+o") {
+                    show_oam = !show_oam;
+                }
+                if ImGui.MenuItem("dma", "ctrl+t") {
+                    show_dma = !show_dma;
+                }
+                ImGui.EndMenu();
             }
-            ImGui.EndMenu();
+            if ImGui.BeginMenu("Disassembly") {
+                if ImGui.MenuItem("show", "ctrl+d") {
+                    show_disasm = !show_disasm;
+                }
+                ImGui.EndMenu();
+            }
+            ImGui.EndMainMenuBar();
         }
-        if ImGui.BeginMenu("Memory") {
-            if ImGui.MenuItem("iwram", "ctrl+i") {
-                show_iwram = !show_iwram;
-            }
-            if ImGui.MenuItem("ewram", "ctrl+e") {
-                show_ewram = !show_ewram;
-            }
-            if ImGui.MenuItem("vram", "ctrl+v") {
-                show_vram = !show_vram;
-            }
-            if ImGui.MenuItem("palette ram", "ctrl+p") {
-                show_palette_ram = !show_palette_ram;
-            }
-            if ImGui.MenuItem("oam", "ctrl+o") {
-                show_oam = !show_oam;
-            }
-            ImGui.EndMenu();
-        }
-        if ImGui.BeginMenu("Disassembly") {
-            if ImGui.MenuItem("show", "ctrl+d") {
-                show_disasm = !show_disasm;
-            }
-            ImGui.EndMenu();
-        }
-        ImGui.EndMainMenuBar();
-    }
 
     if show_iwram iwram_window();
     if show_ewram ewram_window();
     if show_vram vram_window();
     if show_palette_ram palette_ram_window();
     if show_oam oam_window();
+    if show_dma dma_window();
     if show_cpu cpu_window();
     if show_ppu ppu_window();
     if show_disasm disasm_window();
@@ -122,11 +129,25 @@ cpu_window :: () {
     ImGui.End();
 }
 
+background_selected : s32 = 0;
 ppu_window :: () {
     ImGui.Begin("ppu");
     ImGui.Text("X: %", formatInt(ppu.draw_x, 10, 1));
     ImGui.Text("Y: %", formatInt(ppu.draw_y, 10, 1));
     ImGui.Text("BG Mode: %", formatInt(ppu.bg_mode, 10, 1));
+    ImGui.InputInt("Background", *background_selected, 1, 1, .CharsDecimal);
+    if background_selected < 0 then background_selected = 0;
+    if background_selected > 3 then background_selected = 3;
+
+    ImGui.Text("%abled", ifx ppu.bg[background_selected].enable then "en" else "dis");
+    ImGui.Text("%", ifx ppu.bg[background_selected].more_colors then "256 colors, 1 palette" else "16 colors, 16 palettes");
+    ImGui.Text("Priority: %", ppu.bg[background_selected].prio);
+    ImGui.Text("Size: %1%2", ifx ppu.bg[background_selected].tall then "1" else "0", ifx ppu.bg[background_selected].wide then "1" else "0");
+    ImGui.Text("X: %", formatInt(ppu.bg[background_selected].x_off, 10, 1));
+    ImGui.Text("Y: %", formatInt(ppu.bg[background_selected].y_off, 10, 1));
+    ImGui.Text("Mosaic %abled", ifx ppu.bg[background_selected].mosaic then "en" else "dis");
+    ImGui.Text("Screen Offset: 0x%", formatInt(ppu.bg[background_selected].screen_base_block * 2048, 16));
+    ImGui.Text("Char Offset: 0x%", formatInt(ppu.bg[background_selected].char_base_block * 16384, 16));
     ImGui.End();
 }
 
@@ -1334,6 +1355,19 @@ oam_window :: () {
         }
     }
     ImGui.EndTable();
+    ImGui.End();
+}
+
+dma_selected : s32 = 0;
+dma_window :: () {
+    ImGui.Begin("oam", null, .NoScrollbar | .NoScrollWithMouse);
+    ImGui.InputInt("Channel", *dma_selected, 1, 1, .CharsDecimal);
+    if dma_selected < 0 then dma_selected = 0;
+    if dma_selected > 3 then dma_selected = 3;
+    ImGui.Text("%abled", ifx cpu.dma[dma_selected].enable then "en" else "dis");
+    ImGui.Text("Source: 0x%", formatInt(cpu.dma[dma_selected].src, 16, 1));
+    ImGui.Text("Destination: 0x%", formatInt(cpu.dma[dma_selected].dst, 16, 1));
+    ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count, 16, 1));
     ImGui.End();
 }
 
