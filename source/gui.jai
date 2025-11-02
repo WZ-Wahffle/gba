@@ -5,6 +5,7 @@ show_vram := false;
 show_palette_ram := false;
 show_oam := false;
 show_dma := false;
+show_rom := false;
 show_disasm := false;
 show_cpu := false;
 show_ppu := false;
@@ -24,6 +25,9 @@ draw_gui :: () {
                 ImGui.EndMenu();
             }
             if ImGui.BeginMenu("Memory") {
+                if ImGui.MenuItem("rom", "ctrl+r") {
+                    show_rom = !show_rom;
+                }
                 if ImGui.MenuItem("iwram", "ctrl+i") {
                     show_iwram = !show_iwram;
                 }
@@ -59,6 +63,7 @@ draw_gui :: () {
     if show_palette_ram palette_ram_window();
     if show_oam oam_window();
     if show_dma dma_window();
+    if show_rom rom_window();
     if show_cpu cpu_window();
     if show_ppu ppu_window();
     if show_disasm disasm_window();
@@ -484,6 +489,7 @@ disassemble_arm_instruction :: (inst: u32) -> string {
             // LDR / STR / LDRB / STRB
             rd_idx : u8 = xx (inst >> 12) & 0xf;
             rn_idx : u8 = xx (inst >> 16) & 0xf;
+            i := (inst & 0x2000000) != 0;
             p := (inst & 0x1000000) != 0;
             u := (inst & 0x800000) != 0;
             b := (inst & 0x400000) != 0;
@@ -511,27 +517,33 @@ disassemble_arm_instruction :: (inst: u32) -> string {
             if !p {
                 // post indexed
                 append(*suffix, "], ");
-                if u {
-                    append(*suffix, tprint("#%", formatInt(offset, 10, 1)));
+                if !i append(*suffix, "#");
+                if !u append(*suffix, "-");
+                if i {
+                    append(*suffix, disassemble_shifter(offset));
                 } else {
-                    append(*suffix, tprint("#-%", formatInt(offset, 10, 1)));
+                    append(*suffix, tprint("%", formatInt(offset, 10, 1)));
                 }
             } else if !w {
                 // offset addressing
                 append(*suffix, ", ");
-                if u {
-                    append(*suffix, tprint("#%", formatInt(offset, 10, 1)));
+                if !i append(*suffix, "#");
+                if !u append(*suffix, "-");
+                if i {
+                    append(*suffix, disassemble_shifter(offset));
                 } else {
-                    append(*suffix, tprint("#-%", formatInt(offset, 10, 1)));
+                    append(*suffix, tprint("%", formatInt(offset, 10, 1)));
                 }
                 append(*suffix, "]");
             } else {
                 // pre indexed
                 append(*suffix, ", ");
-                if u {
-                    append(*suffix, tprint("#%", formatInt(offset, 10, 1)));
+                if !i append(*suffix, "#");
+                if !u append(*suffix, "-");
+                if i {
+                    append(*suffix, disassemble_shifter(offset));
                 } else {
-                    append(*suffix, tprint("#-%", formatInt(offset, 10, 1)));
+                    append(*suffix, tprint("%", formatInt(offset, 10, 1)));
                 }
                 append(*suffix, "]!");
             }
@@ -1111,10 +1123,16 @@ disasm_window :: () {
             disassemble_arm_instruction(read_32(addr))
         else disassemble_thumb_instruction(read_16(addr));
         has_breakpoint := ifx disasm_mode == .ARM then ((read_32(addr) & 0xfff000f0) == 0xe1200070) else ((read_16(addr) & 0xff00) == 0xbe00);
+        in_history, history_idx := array_find(cpu.pc_history, addr);
         if addr == cpu.reg[15] {
-            ImGui.TextColored(.{0, 255, 0, 255}, "%\t%", addr, to_print);
+            ImGui.TextColored(.{0, 1, 0, 1}, "%\t%", addr, to_print);
         } else if has_breakpoint {
-            ImGui.TextColored(.{255, 0, 0, 255}, "%\t%", addr, to_print);
+            ImGui.TextColored(.{1, 0, 0, 1}, "%\t%", addr, to_print);
+        } else if in_history {
+            idx := cpu.pc_history_idx - history_idx - 1;
+            if idx < 0 then idx += 64;
+            if idx > 63 then idx -= 64;
+            ImGui.TextColored(.{(idx * (1.0 / 64.0)), 1, (idx * (1.0 / 64.0)), 1}, "%\t%", addr, to_print);
         } else {
             ImGui.Text("%\t%", addr, to_print);
         }
@@ -1297,7 +1315,7 @@ palette_ram_window :: () {
         parsed := string_to_int(str, 16);
         palette_ram_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##ewram", 17, .Borders | .RowBg | .SizingFixedFit);
+    ImGui.BeginTable("##palette_ram", 17, .Borders | .RowBg | .SizingFixedFit);
     ImGui.TableNextRow();
     for 0..cast(int)ImGui.GetWindowSize().y {
         if (it + palette_ram_scroll_state + 1) * 16 > 0x400 {
@@ -1337,7 +1355,7 @@ oam_window :: () {
         parsed := string_to_int(str, 16);
         oam_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##ewram", 17, .Borders | .RowBg | .SizingFixedFit);
+    ImGui.BeginTable("##oam", 17, .Borders | .RowBg | .SizingFixedFit);
     ImGui.TableNextRow();
     for 0..cast(int)ImGui.GetWindowSize().y {
         if (it + oam_scroll_state + 1) * 16 > 0x400 {
@@ -1360,7 +1378,7 @@ oam_window :: () {
 
 dma_selected : s32 = 0;
 dma_window :: () {
-    ImGui.Begin("oam", null, .NoScrollbar | .NoScrollWithMouse);
+    ImGui.Begin("dma", null, .NoScrollbar | .NoScrollWithMouse);
     ImGui.InputInt("Channel", *dma_selected, 1, 1, .CharsDecimal);
     if dma_selected < 0 then dma_selected = 0;
     if dma_selected > 3 then dma_selected = 3;
@@ -1368,6 +1386,46 @@ dma_window :: () {
     ImGui.Text("Source: 0x%", formatInt(cpu.dma[dma_selected].src, 16, 1));
     ImGui.Text("Destination: 0x%", formatInt(cpu.dma[dma_selected].dst, 16, 1));
     ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count, 16, 1));
+    ImGui.End();
+}
+
+rom_scroll_state := 0;
+rom_jump_buffer: [8]u8;
+rom_window :: () {
+    ImGui.Begin("rom", null, .NoScrollbar | .NoScrollWithMouse);
+    ImGui.Text("0x");
+    ImGui.SameLine();
+    if ImGui.IsWindowHovered() {
+        if ImGui.GetIO().MouseWheel < 0 {
+            rom_scroll_state += 1;
+        } else if ImGui.GetIO().MouseWheel > 0 {
+            rom_scroll_state -= 1;
+            rom_scroll_state = max(rom_scroll_state, 0);
+        }
+    }
+    if ImGui.InputText("Jump to...", rom_jump_buffer.data, 8) {
+        str := string.{7, rom_jump_buffer.data};
+        parsed := string_to_int(str, 16);
+        rom_scroll_state = parsed / 16;
+    }
+    ImGui.BeginTable("##rom", 17, .Borders | .RowBg | .SizingFixedFit);
+    ImGui.TableNextRow();
+    for 0..cast(int)ImGui.GetWindowSize().y {
+        if (it + rom_scroll_state + 1) * 16 > cpu.memory.rom.count {
+        oam_scroll_state = (cpu.memory.rom.count - 16 * it) / 16;
+            break;
+        }
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("0x%07x", (it + rom_scroll_state) * 16);
+        for it2 : 0..15 {
+            ImGui.TableNextColumn();
+            ImGui.Text_CFormat("%02x", cpu.memory.rom[(it + rom_scroll_state) * 16 + it2]);
+            if ImGui.IsItemHovered() {
+                ImGui.SetTooltip("0x%", 0x08000000 + (it + rom_scroll_state) * 16 + it2);
+            }
+        }
+    }
+    ImGui.EndTable();
     ImGui.End();
 }
 

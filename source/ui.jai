@@ -130,6 +130,8 @@ ui :: () {
                         show_oam = !show_oam;
                     case .SDLK_p;
                         show_palette_ram = !show_palette_ram;
+                    case .SDLK_r;
+                        show_rom = !show_rom;
                     case .SDLK_t;
                         show_dma = !show_dma;
                     case .SDLK_v;

@@ -75,6 +75,8 @@ Cpu :: struct {
     remaining_cycles := 0;
     breakpoints_arm: [0x10000]u32;
     breakpoints_thumb: [0x100]u16;
+    pc_history: [64]u32;
+    pc_history_idx : u32 = 0;
 }
 
 Ppu :: struct {

@@ -276,7 +276,12 @@ set_status_bit :: inline (bit: Status_Bit, state: bool) {
 step_cpu :: () {
     if cpu.remaining_cycles > 0 {
         cpu.remaining_cycles -= 1;
-        if !cpu.halted && !cpu.stopped then execute_next();
+        if !cpu.halted && !cpu.stopped {
+            execute_next();
+            cpu.pc_history[cpu.pc_history_idx] = cpu.reg[15];
+            cpu.pc_history_idx += 1;
+            cpu.pc_history_idx &= 63;
+        }
     }
 }
 

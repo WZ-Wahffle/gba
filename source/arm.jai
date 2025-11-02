@@ -514,12 +514,16 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
     rn_idx : u8 = xx (ins >> 16) & 0xf;
     rn := reg_src(rn_idx);
     rd_idx : u8 = xx (ins >> 12) & 0xf;
+    i := (ins & 0x2000000) != 0;
     p := (ins & 0x1000000) != 0;
     u := (ins & 0x800000) != 0;
     b := (ins & 0x400000) != 0;
     w := (ins & 0x200000) != 0;
     l := (ins & 0x100000) != 0;
     offset := ins & 0xfff;
+    if i {
+        offset = shifter_operand(xx offset);
+    }
     address := rn;
     if !p {
         // post indexed
