@@ -498,7 +498,7 @@ thumb_add_7_sub_4 :: inline (ins: u16) {
 thumb_add_5_add_6 :: inline (ins: u16) {
     rd_idx : u8 = xx (ins >> 8) & 0b111;
     immed := ins & 0xff;
-    reg_dst(rd_idx, (ifx (ins & 0x800) != 0 then cpu.reg[13] else (cpu.reg[15] & 0xfffffffc)) + immed * 4);
+    reg_dst(rd_idx, (ifx (ins & 0x800) != 0 then cpu.reg[13] else ((cpu.reg[15] + 2) & 0xfffffffc)) + immed * 4);
 }
 
 thumb_swi_b_1 :: inline (ins: u16) {

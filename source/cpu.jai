@@ -137,6 +137,7 @@ write_8 :: (addr: u32, val: u8) {
     }
     else if addr >= 0x07000000 && addr < 0x08000000 {
         ppu.memory.oam._8[addr % 0x400] = val;
+        oam_update(addr);
     } else {
         log_warn("Unmapped write: 0x%", formatInt(addr, 16));
     }
@@ -165,6 +166,8 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
     }
     else if addr >= 0x07000000 && addr < 0x08000000 {
         ppu.memory.oam._16[(addr >> 1) % 0x200] = val;
+        oam_update(addr);
+        oam_update(addr + 1);
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._16[addr >> 1] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
@@ -200,6 +203,10 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
     }
     else if addr >= 0x07000000 && addr < 0x08000000 {
         ppu.memory.oam._32[(addr >> 2) % 0x100] = val;
+        oam_update(addr);
+        oam_update(addr + 1);
+        oam_update(addr + 2);
+        oam_update(addr + 3);
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._32[addr >> 2] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {

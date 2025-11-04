@@ -98,7 +98,7 @@ mmio_write :: (addr: u32, val: u8) {
             ppu.bg[0].prio = val & 0b11;
             ppu.bg[0].char_base_block = (val >> 2) & 0b11;
             ppu.bg[0].mosaic = (val & 0x40) != 0;
-            ppu.bg[0].more_colors = (val & 0x80) != 0;
+            ppu.bg[0].single_palette = (val & 0x80) != 0;
         case 0x009;
             ppu.bg[0].screen_base_block = val & 0x1f;
             ppu.bg[0].wraparound = (val & 0x20) != 0;
@@ -108,7 +108,7 @@ mmio_write :: (addr: u32, val: u8) {
             ppu.bg[1].prio = val & 0b11;
             ppu.bg[1].char_base_block = (val >> 2) & 0b11;
             ppu.bg[1].mosaic = (val & 0x40) != 0;
-            ppu.bg[1].more_colors = (val & 0x80) != 0;
+            ppu.bg[1].single_palette = (val & 0x80) != 0;
         case 0x00b;
             ppu.bg[1].screen_base_block = val & 0x1f;
             ppu.bg[1].wraparound = (val & 0x20) != 0;
@@ -118,7 +118,7 @@ mmio_write :: (addr: u32, val: u8) {
             ppu.bg[2].prio = val & 0b11;
             ppu.bg[2].char_base_block = (val >> 2) & 0b11;
             ppu.bg[2].mosaic = (val & 0x40) != 0;
-            ppu.bg[2].more_colors = (val & 0x80) != 0;
+            ppu.bg[2].single_palette = (val & 0x80) != 0;
         case 0x00d;
             ppu.bg[2].screen_base_block = val & 0x1f;
             ppu.bg[2].wraparound = (val & 0x20) != 0;
@@ -128,7 +128,7 @@ mmio_write :: (addr: u32, val: u8) {
             ppu.bg[3].prio = val & 0b11;
             ppu.bg[3].char_base_block = (val >> 2) & 0b11;
             ppu.bg[3].mosaic = (val & 0x40) != 0;
-            ppu.bg[3].more_colors = (val & 0x80) != 0;
+            ppu.bg[3].single_palette = (val & 0x80) != 0;
         case 0x00f;
             ppu.bg[3].screen_base_block = val & 0x1f;
             ppu.bg[3].wraparound = (val & 0x20) != 0;
@@ -667,5 +667,145 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.stopped = (val & 0x80) != 0;
         case;
         log_warn("Unmapped IO write: 0x%, 0x%", formatInt(addr, 16), formatInt(val, 16));
+    }
+}
+
+oam_update :: (addr: u32) {
+    offset := addr % 0x400;
+    if (offset % 8 > 5) {
+        lower : u16 = xx ppu.memory.oam._8[(offset & 0x3f8) + 6];
+        upper : u16 = xx ppu.memory.oam._8[(offset & 0x3f8) + 7];
+        sign := (upper & 0x80) != 0;
+        if offset % 32 == {
+            case 6;
+            #through;
+            case 7;
+            ppu.oam_param[offset / 32].pa = xx upper & 0x7f;
+            ppu.oam_param[offset / 32].pa += xx lower / 256.0;
+            if sign ppu.oam_param[offset / 32].pa *= -1;
+            case 14;
+            #through;
+            case 15;
+            ppu.oam_param[offset / 32].pb = xx upper & 0x7f;
+            ppu.oam_param[offset / 32].pb += xx lower / 256.0;
+            if sign ppu.oam_param[offset / 32].pb *= -1;
+            case 22;
+            #through;
+            case 23;
+            ppu.oam_param[offset / 32].pc = xx upper & 0x7f;
+            ppu.oam_param[offset / 32].pc += xx lower / 256.0;
+            if sign ppu.oam_param[offset / 32].pc *= -1;
+            case 30;
+            #through;
+            case 31;
+            ppu.oam_param[offset / 32].pd = xx upper & 0x7f;
+            ppu.oam_param[offset / 32].pd += xx lower / 256.0;
+            if sign ppu.oam_param[offset / 32].pd *= -1;
+            case;
+            assert(false);
+        }
+    } else {
+        val := ppu.memory.oam._8[offset];
+        if offset % 8 == {
+            case 0;
+            ppu.oam[offset / 8].y = val;
+            case 1;
+            ppu.oam[offset / 8].rotate_scale = (val & 0x1) != 0;
+            ppu.oam[offset / 8].rotate_scale_double_size = (val & 0x2) != 0;
+            ppu.oam[offset / 8].mode = (val >> 2) & 0b11;
+            ppu.oam[offset / 8].mosaic = (val & 0x10) != 0;
+            ppu.oam[offset / 8].single_palette = (val & 0x20) != 0;
+            ppu.oam[offset / 8].shape = (val >> 6) & 0b11;
+            case 2;
+            ppu.oam[offset / 8].x &= 0x100;
+            ppu.oam[offset / 8].x |= val;
+            case 3;
+            ppu.oam[offset / 8].x &= 0xff;
+            if (val & 0x1) != 0 then ppu.oam[offset / 8].x |= 0x100;
+            ppu.oam[offset / 8].rotate_scale_param_idx = (val >> 1) & 0x1f;
+            ppu.oam[offset / 8].flip_h = (val & 0x10) != 0;
+            ppu.oam[offset / 8].flip_v = (val & 0x20) != 0;
+            ppu.oam[offset / 8].size = (val >> 6) & 0b11;
+            case 4;
+            ppu.oam[offset / 8].tile_idx &= 0x300;
+            ppu.oam[offset / 8].tile_idx |= val;
+            case 5;
+            ppu.oam[offset / 8].tile_idx &= 0xff;
+            ppu.oam[offset / 8].tile_idx |= ((cast(u16)val & 0x3) << 8);
+            ppu.oam[offset / 8].prio = (val >> 2) & 0b11;
+            ppu.oam[offset / 8].palette = (val >> 4) & 0xf;
+        }
+    }
+
+    for 0..127 oam_update_bounding_box(xx it);
+}
+
+oam_update_bounding_box :: (idx: u32) {
+    width := 0;
+    height := 0;
+    if ppu.oam[idx].shape == {
+        case 0;
+            size_lut :: int.[8, 16, 32, 64];
+            width = size_lut[ppu.oam[idx].size];
+            height = size_lut[ppu.oam[idx].size];
+        case 1;
+            width_lut :: int.[16, 32, 32, 64];
+            height_lut :: int.[8, 8, 16, 32];
+            width = width_lut[ppu.oam[idx].size];
+            height = height_lut[ppu.oam[idx].size];
+        case 2;
+            width_lut :: int.[8, 8, 16, 32];
+            height_lut :: int.[16, 32, 32, 64];
+            width = width_lut[ppu.oam[idx].size];
+            height = height_lut[ppu.oam[idx].size];
+        case;
+        assert(false);
+    }
+
+    if ppu.oam[idx].rotate_scale {
+        x_0 := ppu.oam[idx].x + (width >> 1);
+        y_0 := ppu.oam[idx].y + (height >> 1);
+        param := *ppu.oam_param[ppu.oam[idx].rotate_scale_param_idx];
+        if param.pa != 0.0 then param.pa = 1.0 / param.pa;
+        if param.pb != 0.0 then param.pb = 1.0 / param.pb;
+        if param.pc != 0.0 then param.pc = 1.0 / param.pc;
+        if param.pd != 0.0 then param.pd = 1.0 / param.pd;
+        x_tl : u32 =
+            xx (param.pa * (ppu.oam[idx].x - x_0) + param.pb * (ppu.oam[idx].y - y_0) + x_0);
+        x_tr : u32 =
+            xx (param.pa * (ppu.oam[idx].x + width - x_0) + param.pb * (ppu.oam[idx].y - y_0) + x_0);
+        x_bl : u32 =
+            xx (param.pa * (ppu.oam[idx].x - x_0) + param.pb * (ppu.oam[idx].y + height - y_0) + x_0);
+        x_br : u32 =
+            xx (param.pa * (ppu.oam[idx].x + width - x_0) + param.pb * (ppu.oam[idx].y + height - y_0) + x_0);
+        ppu.oam[idx].min_x = min(min(x_bl, x_br), min(x_tl, x_tr));
+        ppu.oam[idx].max_x = max(max(x_bl, x_br), max(x_tl, x_tr));
+        y_tl : u32 =
+            xx (param.pc * (ppu.oam[idx].x - x_0) + param.pd * (ppu.oam[idx].y - y_0) + y_0);
+        y_tr : u32 =
+            xx (param.pc * (ppu.oam[idx].x + width - x_0) + param.pd * (ppu.oam[idx].y - y_0) + y_0);
+        y_bl : u32 =
+            xx (param.pc * (ppu.oam[idx].x - x_0) + param.pd * (ppu.oam[idx].y + height - y_0) + y_0);
+        y_br : u32 =
+            xx (param.pc * (ppu.oam[idx].x + width - x_0) + param.pd * (ppu.oam[idx].y + height - y_0) + y_0);
+        if param.pa != 0.0 then param.pa = 1.0 / param.pa;
+        if param.pb != 0.0 then param.pb = 1.0 / param.pb;
+        if param.pc != 0.0 then param.pc = 1.0 / param.pc;
+        if param.pd != 0.0 then param.pd = 1.0 / param.pd;
+        ppu.oam[idx].min_y = min(min(y_bl, y_br), min(y_tl, y_tr));
+        ppu.oam[idx].max_y = max(max(y_bl, y_br), max(y_tl, y_tr));
+        ppu.oam[idx].min_x = max(ppu.oam[idx].min_x, 0);
+        ppu.oam[idx].min_y = max(ppu.oam[idx].min_y, 0);
+        // ppu.oam[idx].max_x = min(ppu.oam[idx].max_x, 240);
+        // ppu.oam[idx].min_x %= 512;
+        // ppu.oam[idx].max_x %= 512;
+        // ppu.oam[idx].max_y = min(ppu.oam[idx].max_y, 160);
+        // ppu.oam[idx].min_y %= 256;
+        // ppu.oam[idx].max_y %= 256;
+    } else {
+        ppu.oam[idx].min_x = ppu.oam[idx].x;
+        ppu.oam[idx].max_x = ppu.oam[idx].x + width;
+        ppu.oam[idx].min_y = ppu.oam[idx].y;
+        ppu.oam[idx].max_y = ppu.oam[idx].y + height;
     }
 }

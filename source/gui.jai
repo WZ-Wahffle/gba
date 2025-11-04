@@ -145,7 +145,7 @@ ppu_window :: () {
     if background_selected > 3 then background_selected = 3;
 
     ImGui.Text("%abled", ifx ppu.bg[background_selected].enable then "en" else "dis");
-    ImGui.Text("%", ifx ppu.bg[background_selected].more_colors then "256 colors, 1 palette" else "16 colors, 16 palettes");
+    ImGui.Text("%", ifx ppu.bg[background_selected].single_palette then "256 colors, 1 palette" else "16 colors, 16 palettes");
     ImGui.Text("Priority: %", ppu.bg[background_selected].prio);
     ImGui.Text("Size: %1%2", ifx ppu.bg[background_selected].tall then "1" else "0", ifx ppu.bg[background_selected].wide then "1" else "0");
     ImGui.Text("X: %", formatInt(ppu.bg[background_selected].x_off, 10, 1));
@@ -1339,6 +1339,11 @@ palette_ram_window :: () {
 oam_scroll_state := 0;
 oam_jump_buffer: [4]u8;
 oam_window :: () {
+    oam_sizing_lut :: []string.[
+        .["8x8", "16x16", "32x32", "64x64"],
+        .["16x8", "32x8", "32x16", "64x32"],
+        .["0x16", "8x32", "16x32", "32x64"]
+    ];
     ImGui.Begin("oam", null, .NoScrollbar | .NoScrollWithMouse);
     ImGui.Text("0x");
     ImGui.SameLine();
@@ -1353,24 +1358,70 @@ oam_window :: () {
     if ImGui.InputText("Jump to...", oam_jump_buffer.data, 4) {
         str := string.{3, oam_jump_buffer.data};
         parsed := string_to_int(str, 16);
-        oam_scroll_state = parsed / 16;
+        oam_scroll_state = parsed;
     }
-    ImGui.BeginTable("##oam", 17, .Borders | .RowBg | .SizingFixedFit);
-    ImGui.TableNextRow();
+    ImGui.BeginTable("##oam", 15, .Borders | .RowBg | .SizingFixedFit | .ScrollX);
+    ImGui.TableSetupColumn("Idx");
+    ImGui.TableSetupColumn("X");
+    ImGui.TableSetupColumn("Y");
+    ImGui.TableSetupColumn("TileIdx");
+    ImGui.TableSetupColumn("Size");
+    ImGui.TableSetupColumn("FlipH");
+    ImGui.TableSetupColumn("FlipV");
+    ImGui.TableSetupColumn("R&S");
+    ImGui.TableSetupColumn("R&SDoubleSize");
+    ImGui.TableSetupColumn("R&SParamIdx");
+    ImGui.TableSetupColumn("Mode");
+    ImGui.TableSetupColumn("Mosaic");
+    ImGui.TableSetupColumn("SinglePalette");
+    ImGui.TableSetupColumn("Prio");
+    ImGui.TableSetupColumn("Palette");
+    ImGui.TableHeadersRow();
     for 0..cast(int)ImGui.GetWindowSize().y {
-        if (it + oam_scroll_state + 1) * 16 > 0x400 {
-        oam_scroll_state = (0x400 - 16 * it) / 16;
+        if (it + oam_scroll_state + 1) > 128 {
+            oam_scroll_state = (128 - it);
             break;
         }
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("0x%03x", (it + oam_scroll_state) * 16);
-        for it2 : 0..15 {
-            ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", ppu.memory.oam._8[(it + oam_scroll_state) * 16 + it2]);
-            if ImGui.IsItemHovered() {
-                ImGui.SetTooltip("0x%", 0x07000000 + (it + oam_scroll_state) * 16 + it2);
-            }
+        ImGui.Text_CFormat("%03d", it + oam_scroll_state);
+        if ImGui.IsItemHovered() {
+            ImGui.SetTooltip("% | % | % | %", ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pa, ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pb,  ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pc, ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pd);
         }
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].x);
+        if ImGui.IsItemHovered() {
+            ImGui.SetTooltip("Min: % Max: %", formatInt(ppu.oam[it + oam_scroll_state].min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_x, 10, 1));
+        }
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].y);
+        if ImGui.IsItemHovered() {
+            ImGui.SetTooltip("Min: % Max: %", formatInt(ppu.oam[it + oam_scroll_state].min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_y, 10, 1));
+        }
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].tile_idx);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", oam_sizing_lut[ppu.oam[it + oam_scroll_state].shape][ppu.oam[it + oam_scroll_state].size].data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].flip_h then "true".data else "false".data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].flip_v then "true".data else "false".data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].rotate_scale then "true".data else "false".data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].rotate_scale_double_size then "true".data else "false".data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].rotate_scale_param_idx);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].mode);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].mosaic then "true".data else "false".data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].single_palette then "true".data else "false".data);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].prio);
+        ImGui.TableNextColumn();
+        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].palette);
+        ImGui.TableNextRow();
     }
     ImGui.EndTable();
     ImGui.End();

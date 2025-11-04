@@ -89,6 +89,8 @@ Ppu :: struct {
     forced_blank := false;
     bg: [4]Background_Config;
     obj_enable := false;
+    oam: [128]Oam_Config;
+    oam_param: [32]Oam_Transformation_Parameter_Config;
     win: [2]Window_Config;
     obj_win: Window_Config;
     outside_win_bg_enable: [4]bool;
@@ -150,7 +152,7 @@ Ppu :: struct {
         prio := 0;
         char_base_block := 0;
         mosaic := false;
-        more_colors := false;
+        single_palette := false;
         screen_base_block := 0;
         wraparound := false; // BG2/BG3 only
         wide := false;
@@ -174,6 +176,35 @@ Ppu :: struct {
         bg_enable: [4]bool;
         obj_enable := false;
         special_effect := false;
+    }
+
+    Oam_Config :: struct {
+        x := 0;
+        y := 0;
+        tile_idx := 0;
+        shape := 0;
+        size := 0;
+        flip_h := false;
+        flip_v := false;
+        rotate_scale := false;
+        rotate_scale_param_idx := 0;
+        rotate_scale_double_size := false;
+        mode := 0;
+        mosaic := false;
+        single_palette := false;
+        prio := 0;
+        palette := 0;
+        min_x := 0;
+        max_x := 0;
+        min_y := 0;
+        max_y := 0;
+    }
+
+    Oam_Transformation_Parameter_Config :: struct {
+        pa: float;
+        pb: float;
+        pc: float;
+        pd: float;
     }
 
     draw_x := 0;

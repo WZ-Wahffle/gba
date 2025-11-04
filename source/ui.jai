@@ -5,7 +5,7 @@ window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
 framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
 
-draw_line :: (y: u32, bg: u32, rotation_mode: bool) {
+draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
     if !ppu.bg[bg].enable then return;
     if rotation_mode {
         y_pos := y + ppu.bg[bg].y_off;
@@ -68,12 +68,17 @@ step_ppu :: () {
         }
 
         if ppu.draw_x == 240 && ppu.draw_y < 160 {
+            if ppu.draw_y == 0 {
+                for 0..(SCREEN_WIDTH*SCREEN_HEIGHT-1) {
+                    framebuffer[it] = 0;
+                }
+            }
             if ppu.bg_mode == {
                 case 0;
                 case 1;
                 case 2;
-                    draw_line(ppu.draw_y, 2, true);
-                    draw_line(ppu.draw_y, 3, true);
+                    draw_bg(ppu.draw_y, 2, true);
+                    draw_bg(ppu.draw_y, 3, true);
                 case 3;
                 case 4;
                 case 5;
@@ -109,6 +114,16 @@ ui :: () {
             if event.type == SDL_QUIT quit = true;
             if event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(win) {
                 quit = true;
+            }
+            if event.type == SDL_KEYDOWN {
+                if event.key.keysym.sym == {
+                    case .SDLK_F9;
+                        cpu.emu_state = .STOPPED;
+                    case .SDLK_F10;
+                        cpu.emu_state = .STARTED;
+                    case .SDLK_F11;
+                        cpu.emu_state = .STEPPED;
+                }
             }
             if event.type == SDL_KEYDOWN && event.key.repeat == 0 && (event.key.keysym.mod & .KMOD_SHIFT) != 0 {
                 if event.key.keysym.sym == {
@@ -191,6 +206,21 @@ ui :: () {
             disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
             disasm_mode = cpu.state;
         }
+        // for ppu.oam {
+        //     if !it.rotate_scale && it.rotate_scale_double_size then continue;
+        //     min_x := it.min_x % 512;
+        //     max_x := it.max_x % 512;
+        //     min_y := it.min_y % 256;
+        //     max_y := it.max_y % 256;
+        //     for min_x..max_x {
+        //         if min_y * SCREEN_WIDTH + it < 38400 then framebuffer[min_y * SCREEN_WIDTH + it] = 0xf800;
+        //         if max_y * SCREEN_WIDTH + it < 38400 then framebuffer[max_y * SCREEN_WIDTH + it] = 0xf800;
+        //     }
+        //     for min_y..max_y {
+        //         if it * SCREEN_WIDTH + min_x < 38400 then framebuffer[it * SCREEN_WIDTH + min_x] = 0xf800;
+        //         if it * SCREEN_WIDTH + max_x < 38400 then framebuffer[it * SCREEN_WIDTH + max_x] = 0xf800;
+        //     }
+        // }
         SDL_RenderClear(renderer);
         surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
         defer SDL_FreeSurface(surface);
