@@ -1391,12 +1391,12 @@ oam_window :: () {
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].x);
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("Min: % Max: %", formatInt(ppu.oam[it + oam_scroll_state].min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_x, 10, 1));
+            ImGui.SetTooltip("Sprite: %-%, Bound: %-%", formatInt(ppu.oam[it + oam_scroll_state].min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_max_x, 10, 1));
         }
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].y);
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("Min: % Max: %", formatInt(ppu.oam[it + oam_scroll_state].min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_y, 10, 1));
+            ImGui.SetTooltip("Sprite: %-%, Bound: %-%", formatInt(ppu.oam[it + oam_scroll_state].min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_max_y, 10, 1));
         }
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].tile_idx);

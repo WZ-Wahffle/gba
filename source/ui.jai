@@ -40,7 +40,6 @@ draw_obj :: (y: u32) {
         base_addr := 0x10000;
         packed := ppu.obj_character_vram_mapping_one_dimensional;
         for #v2 < ppu.oam {
-            // if it_index != 0 then break;
             if it.bounding_box_min_y <= y && it.bounding_box_max_y > y {
                 if it.rotate_scale {
                     if it.single_palette {
@@ -53,19 +52,27 @@ draw_obj :: (y: u32) {
                         if isinf(c) then c = 0;
                         if isinf(d) then d = 0;
                         w := it.max_x - it.min_x;
+                        h := it.max_y - it.min_y;
                         x_0 := (it.min_x + it.max_x) / 2;
                         y_0 := (it.min_y + it.max_y) / 2;
                         y_2 : int = y;
+                        if it.rotate_scale_double_size {
+                            y_2 -= xx (h / 2);
+                        }
                         obj_base := base_addr + it.tile_idx * 32;
-                        for x_2: 0..239 {
-                            x_1 : int = xx ((d * (x_2 + a * x_0 + b * y_0 - x_0) - b * (y_2 + c * x_0 + d * y_0 - y_0)) / (a * d - b * c));
-                            y_1 : int = xx ((y_2 + c * x_0 + d * y_0 - y_0 - c * x_1) / d);
-                            if x_1 < it.min_x || x_1 > it.max_x || y_1 < it.min_y || y_1 > it.max_y then continue;
+                        for x: 0..239 {
+                            x_2 := x;
+                            if it.rotate_scale_double_size {
+                                x_2 -= xx (w / 2);
+                            }
+                            x_1 : int = xx (((d * (x_2 + a * x_0 + b * y_0 - x_0) - b * (y_2 + c * x_0 + d * y_0 - y_0)) / (a * d - b * c)) + 0.5);
+                            y_1 : int = xx (((y_2 + c * x_0 + d * y_0 - y_0 - c * x_1) / d) + 0.5);
+                            if x_1 < it.min_x || x_1 >= it.max_x || y_1 < it.min_y || y_1 >= it.max_y then continue;
                             tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
                             tile_base := tile_line_base + ((x_1 - it.min_x) / 8) * 64;
                             line_base := tile_base + ((y_1 - it.min_y) % 8) * 8;
-                            color_idx := ppu.memory.vram._8[line_base + ((y_1 - it.min_x) % 8)];
-                            pixel_buffer[x_2] = ppu.memory.palette_ram._16[0x100 + color_idx];
+                            color_idx := ppu.memory.vram._8[line_base + ((x_1 - it.min_x) % 8)];
+                            pixel_buffer[x] = ppu.memory.palette_ram._16[0x100 + color_idx];
                         }
                         for x_dst: 0..239 {
                             if pixel_buffer[x_dst] != 0 {

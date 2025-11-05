@@ -773,10 +773,10 @@ oam_update_bounding_box :: (idx: u32) {
         ppu.oam[idx].max_x -= 512;
     }
     if ppu.oam[idx].rotate_scale && ppu.oam[idx].rotate_scale_double_size {
-        ppu.oam[idx].bounding_box_min_x = xx (ppu.oam[idx].min_x - ppu.oam[idx].width * 0.5);
-        ppu.oam[idx].bounding_box_max_x = xx (ppu.oam[idx].min_x + ppu.oam[idx].width * 1.5);
-        ppu.oam[idx].bounding_box_min_y = xx (ppu.oam[idx].min_y - ppu.oam[idx].height * 0.5);
-        ppu.oam[idx].bounding_box_max_y = xx (ppu.oam[idx].min_y + ppu.oam[idx].height * 1.5);
+        ppu.oam[idx].bounding_box_min_x = ppu.oam[idx].min_x;
+        ppu.oam[idx].bounding_box_max_x = xx (ppu.oam[idx].min_x + ppu.oam[idx].width * 2);
+        ppu.oam[idx].bounding_box_min_y = ppu.oam[idx].min_y;
+        ppu.oam[idx].bounding_box_max_y = xx (ppu.oam[idx].min_y + ppu.oam[idx].height * 2);
     } else {
         ppu.oam[idx].bounding_box_min_x = ppu.oam[idx].min_x;
         ppu.oam[idx].bounding_box_max_x = ppu.oam[idx].max_x;
