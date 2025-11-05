@@ -741,71 +741,46 @@ oam_update :: (addr: u32) {
 }
 
 oam_update_bounding_box :: (idx: u32) {
-    width := 0;
-    height := 0;
     if ppu.oam[idx].shape == {
         case 0;
             size_lut :: int.[8, 16, 32, 64];
-            width = size_lut[ppu.oam[idx].size];
-            height = size_lut[ppu.oam[idx].size];
+            ppu.oam[idx].width = size_lut[ppu.oam[idx].size];
+            ppu.oam[idx].height = size_lut[ppu.oam[idx].size];
         case 1;
             width_lut :: int.[16, 32, 32, 64];
             height_lut :: int.[8, 8, 16, 32];
-            width = width_lut[ppu.oam[idx].size];
-            height = height_lut[ppu.oam[idx].size];
+            ppu.oam[idx].width = width_lut[ppu.oam[idx].size];
+            ppu.oam[idx].height = height_lut[ppu.oam[idx].size];
         case 2;
             width_lut :: int.[8, 8, 16, 32];
             height_lut :: int.[16, 32, 32, 64];
-            width = width_lut[ppu.oam[idx].size];
-            height = height_lut[ppu.oam[idx].size];
+            ppu.oam[idx].width = width_lut[ppu.oam[idx].size];
+            ppu.oam[idx].height = height_lut[ppu.oam[idx].size];
         case;
         assert(false);
     }
 
-    if ppu.oam[idx].rotate_scale {
-        x_0 := ppu.oam[idx].x + (width >> 1);
-        y_0 := ppu.oam[idx].y + (height >> 1);
-        param := *ppu.oam_param[ppu.oam[idx].rotate_scale_param_idx];
-        if param.pa != 0.0 then param.pa = 1.0 / param.pa;
-        if param.pb != 0.0 then param.pb = 1.0 / param.pb;
-        if param.pc != 0.0 then param.pc = 1.0 / param.pc;
-        if param.pd != 0.0 then param.pd = 1.0 / param.pd;
-        x_tl : u32 =
-            xx (param.pa * (ppu.oam[idx].x - x_0) + param.pb * (ppu.oam[idx].y - y_0) + x_0);
-        x_tr : u32 =
-            xx (param.pa * (ppu.oam[idx].x + width - x_0) + param.pb * (ppu.oam[idx].y - y_0) + x_0);
-        x_bl : u32 =
-            xx (param.pa * (ppu.oam[idx].x - x_0) + param.pb * (ppu.oam[idx].y + height - y_0) + x_0);
-        x_br : u32 =
-            xx (param.pa * (ppu.oam[idx].x + width - x_0) + param.pb * (ppu.oam[idx].y + height - y_0) + x_0);
-        ppu.oam[idx].min_x = min(min(x_bl, x_br), min(x_tl, x_tr));
-        ppu.oam[idx].max_x = max(max(x_bl, x_br), max(x_tl, x_tr));
-        y_tl : u32 =
-            xx (param.pc * (ppu.oam[idx].x - x_0) + param.pd * (ppu.oam[idx].y - y_0) + y_0);
-        y_tr : u32 =
-            xx (param.pc * (ppu.oam[idx].x + width - x_0) + param.pd * (ppu.oam[idx].y - y_0) + y_0);
-        y_bl : u32 =
-            xx (param.pc * (ppu.oam[idx].x - x_0) + param.pd * (ppu.oam[idx].y + height - y_0) + y_0);
-        y_br : u32 =
-            xx (param.pc * (ppu.oam[idx].x + width - x_0) + param.pd * (ppu.oam[idx].y + height - y_0) + y_0);
-        if param.pa != 0.0 then param.pa = 1.0 / param.pa;
-        if param.pb != 0.0 then param.pb = 1.0 / param.pb;
-        if param.pc != 0.0 then param.pc = 1.0 / param.pc;
-        if param.pd != 0.0 then param.pd = 1.0 / param.pd;
-        ppu.oam[idx].min_y = min(min(y_bl, y_br), min(y_tl, y_tr));
-        ppu.oam[idx].max_y = max(max(y_bl, y_br), max(y_tl, y_tr));
-        ppu.oam[idx].min_x = max(ppu.oam[idx].min_x, 0);
-        ppu.oam[idx].min_y = max(ppu.oam[idx].min_y, 0);
-        // ppu.oam[idx].max_x = min(ppu.oam[idx].max_x, 240);
-        // ppu.oam[idx].min_x %= 512;
-        // ppu.oam[idx].max_x %= 512;
-        // ppu.oam[idx].max_y = min(ppu.oam[idx].max_y, 160);
-        // ppu.oam[idx].min_y %= 256;
-        // ppu.oam[idx].max_y %= 256;
+    ppu.oam[idx].min_x = ppu.oam[idx].x;
+    ppu.oam[idx].max_x = ppu.oam[idx].x + ppu.oam[idx].width;
+    ppu.oam[idx].min_y = ppu.oam[idx].y;
+    ppu.oam[idx].max_y = ppu.oam[idx].y + ppu.oam[idx].height;
+    while ppu.oam[idx].max_y >= 256 {
+        ppu.oam[idx].min_y -= 256;
+        ppu.oam[idx].max_y -= 256;
+    }
+    while ppu.oam[idx].max_x >= 512 {
+        ppu.oam[idx].min_x -= 512;
+        ppu.oam[idx].max_x -= 512;
+    }
+    if ppu.oam[idx].rotate_scale && ppu.oam[idx].rotate_scale_double_size {
+        ppu.oam[idx].bounding_box_min_x = xx (ppu.oam[idx].min_x - ppu.oam[idx].width * 0.5);
+        ppu.oam[idx].bounding_box_max_x = xx (ppu.oam[idx].min_x + ppu.oam[idx].width * 1.5);
+        ppu.oam[idx].bounding_box_min_y = xx (ppu.oam[idx].min_y - ppu.oam[idx].height * 0.5);
+        ppu.oam[idx].bounding_box_max_y = xx (ppu.oam[idx].min_y + ppu.oam[idx].height * 1.5);
     } else {
-        ppu.oam[idx].min_x = ppu.oam[idx].x;
-        ppu.oam[idx].max_x = ppu.oam[idx].x + width;
-        ppu.oam[idx].min_y = ppu.oam[idx].y;
-        ppu.oam[idx].max_y = ppu.oam[idx].y + height;
+        ppu.oam[idx].bounding_box_min_x = ppu.oam[idx].min_x;
+        ppu.oam[idx].bounding_box_max_x = ppu.oam[idx].max_x;
+        ppu.oam[idx].bounding_box_min_y = ppu.oam[idx].min_y;
+        ppu.oam[idx].bounding_box_max_y = ppu.oam[idx].max_y;
     }
 }

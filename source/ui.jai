@@ -34,6 +34,79 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
     }
 }
 
+draw_obj :: (y: u32) {
+    if ppu.obj_enable {
+        pixel_buffer: [240]u16;
+        base_addr := 0x10000;
+        packed := ppu.obj_character_vram_mapping_one_dimensional;
+        for #v2 < ppu.oam {
+            // if it_index != 0 then break;
+            if it.bounding_box_min_y <= y && it.bounding_box_max_y > y {
+                if it.rotate_scale {
+                    if it.single_palette {
+                        a := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pa;
+                        b := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pb;
+                        c := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pc;
+                        d := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pd;
+                        if isinf(a) then a = 0;
+                        if isinf(b) then b = 0;
+                        if isinf(c) then c = 0;
+                        if isinf(d) then d = 0;
+                        w := it.max_x - it.min_x;
+                        x_0 := (it.min_x + it.max_x) / 2;
+                        y_0 := (it.min_y + it.max_y) / 2;
+                        y_2 : int = y;
+                        obj_base := base_addr + it.tile_idx * 32;
+                        for x_2: 0..239 {
+                            x_1 : int = xx ((d * (x_2 + a * x_0 + b * y_0 - x_0) - b * (y_2 + c * x_0 + d * y_0 - y_0)) / (a * d - b * c));
+                            y_1 : int = xx ((y_2 + c * x_0 + d * y_0 - y_0 - c * x_1) / d);
+                            if x_1 < it.min_x || x_1 > it.max_x || y_1 < it.min_y || y_1 > it.max_y then continue;
+                            tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
+                            tile_base := tile_line_base + ((x_1 - it.min_x) / 8) * 64;
+                            line_base := tile_base + ((y_1 - it.min_y) % 8) * 8;
+                            color_idx := ppu.memory.vram._8[line_base + ((y_1 - it.min_x) % 8)];
+                            pixel_buffer[x_2] = ppu.memory.palette_ram._16[0x100 + color_idx];
+                        }
+                        for x_dst: 0..239 {
+                            if pixel_buffer[x_dst] != 0 {
+                                framebuffer[y * SCREEN_WIDTH + x_dst] = pixel_buffer[x_dst];
+                            }
+                        }
+                    } else {
+                        // TODO
+                    }
+                } else {
+                    if it.rotate_scale_double_size then continue;
+                    obj_base := base_addr + it.tile_idx * 32;
+                    if it.single_palette {
+                        w := it.max_x - it.min_x;
+                        // single palette, so tiles are 64 bytes each
+                        // thus, a single line sliver of a tile is 8 bytes, or one u64
+                        y_obj := y - it.min_y;
+                        obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
+                        vertical_offset_into_tile := (y_obj % 8);
+                        x := it.min_x;
+                        for 0..(w / 8)-1 { // 8 pixels equates to 16 bytes of info
+                            pixel_line : u64 = ppu.memory.vram._64[(obj_base >> 3) + vertical_offset_into_tile];
+                            if ((pixel_line >> 0) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 0] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 0) & 0xff)];
+                            if ((pixel_line >> 8) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 1] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 8) & 0xff)];
+                            if ((pixel_line >> 16) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 2] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 16) & 0xff)];
+                            if ((pixel_line >> 24) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 3] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 24) & 0xff)];
+                            if ((pixel_line >> 32) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 4] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 32) & 0xff)];
+                            if ((pixel_line >> 40) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 5] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 40) & 0xff)];
+                            if ((pixel_line >> 48) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 6] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 48) & 0xff)];
+                            if ((pixel_line >> 56) & 0xff) != 0 then framebuffer[y * SCREEN_WIDTH + x + it * 8 + 7] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> 56) & 0xff)];
+                            obj_base += 64;
+                        }
+                    } else {
+                        // TODO
+                    }
+                }
+            }
+        }
+    }
+}
+
 step_ppu :: () {
     if ppu.remaining_cycles > 0 {
         ppu.remaining_cycles -= 4;
@@ -70,15 +143,17 @@ step_ppu :: () {
         if ppu.draw_x == 240 && ppu.draw_y < 160 {
             if ppu.draw_y == 0 {
                 for 0..(SCREEN_WIDTH*SCREEN_HEIGHT-1) {
-                    framebuffer[it] = 0;
+                    // black and grey checkerboard to more easily gauge pixel distances
+                    framebuffer[it] = xx ((((it + it / SCREEN_WIDTH) & 1)) * 0x421);
                 }
             }
             if ppu.bg_mode == {
                 case 0;
                 case 1;
                 case 2;
-                    draw_bg(ppu.draw_y, 2, true);
-                    draw_bg(ppu.draw_y, 3, true);
+                    // draw_bg(ppu.draw_y, 2, true);
+                    // draw_bg(ppu.draw_y, 3, true);
+                    draw_obj(ppu.draw_y);
                 case 3;
                 case 4;
                 case 5;

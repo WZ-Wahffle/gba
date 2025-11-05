@@ -578,13 +578,21 @@ arm_ldm_stm :: inline (ins: u32) {
     rn_idx : u8 = xx (ins >> 16) & 0xf;
     pointer := reg_src(rn_idx);
     regs := ins & 0xffff;
+    if !u {
+        bit_count : u32;
+        #asm {
+            popcnt.32 bit_count, regs;
+        }
+        pointer -= bit_count * 4;
+        if w then reg_dst(rn_idx, pointer);
+    }
     if l {
         cpu.remaining_cycles -= 1;
         for 0..15 {
             if (regs & (1 << it)) != 0 {
                 cpu.remaining_cycles -= 1;
-                if p {
-                    if u then pointer += 4; else pointer -= 4;
+                if p ^ (!u) {
+                    pointer += 4;
                 }
                 to_store := read_32(pointer);
                 if s && cpu.mode != .USER {
@@ -600,18 +608,18 @@ arm_ldm_stm :: inline (ins: u32) {
                 } else {
                     reg_dst(xx it, to_store);
                 }
-                if !p {
-                    if u then pointer += 4; else pointer -= 4;
+                if (!p) ^ (!u) {
+                    pointer += 4;
                 }
             }
         }
-        if w then reg_dst(rn_idx, pointer);
+        if w && u then reg_dst(rn_idx, pointer);
     } else {
-        for #v2 < 0..15 {
+        for 0..15 {
             if (regs & (1 << it)) != 0 {
                 cpu.remaining_cycles -= 1;
-                if p {
-                    if u then pointer += 4; else pointer -= 4;
+                if p ^ (!u) {
+                    pointer += 4;
                 }
                 to_store : u32;
                 if s {
@@ -628,12 +636,12 @@ arm_ldm_stm :: inline (ins: u32) {
                     to_store = reg_src(xx it);
                 }
                 write_32(pointer, to_store);
-                if !p {
-                    if u then pointer += 4; else pointer -= 4;
+                if (!p) ^ (!u) {
+                    pointer += 4;
                 }
             }
         }
-        if w then reg_dst(rn_idx, pointer);
+        if w && u then reg_dst(rn_idx, pointer);
     }
 }
 

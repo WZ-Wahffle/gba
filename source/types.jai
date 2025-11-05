@@ -137,6 +137,7 @@ Ppu :: struct {
             _8: [0x18000]u8;
             _16: [0xc000]u16;
             _32: [0x6000]u32;
+            _64: [0x3000]u64;
         }
         vram: Vram_Union;
         Oam_Union :: union {
@@ -198,6 +199,12 @@ Ppu :: struct {
         max_x := 0;
         min_y := 0;
         max_y := 0;
+        bounding_box_min_x := 0;
+        bounding_box_max_x := 0;
+        bounding_box_min_y := 0;
+        bounding_box_max_y := 0;
+        width := 0;
+        height := 0;
     }
 
     Oam_Transformation_Parameter_Config :: struct {

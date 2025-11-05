@@ -139,6 +139,7 @@ ppu_window :: () {
     ImGui.Begin("ppu");
     ImGui.Text("X: %", formatInt(ppu.draw_x, 10, 1));
     ImGui.Text("Y: %", formatInt(ppu.draw_y, 10, 1));
+    ImGui.Text("Character Format: %-dimensional", ifx ppu.obj_character_vram_mapping_one_dimensional then "1" else "2");
     ImGui.Text("BG Mode: %", formatInt(ppu.bg_mode, 10, 1));
     ImGui.InputInt("Background", *background_selected, 1, 1, .CharsDecimal);
     if background_selected < 0 then background_selected = 0;

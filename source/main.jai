@@ -2,6 +2,7 @@
 #import "File";
 #import "Thread";
 #import "String";
+#import "Math";
 
 ImGui :: #import "ImGui";
 #import "SDL";
