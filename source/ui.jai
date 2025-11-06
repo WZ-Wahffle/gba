@@ -8,12 +8,15 @@ framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
 draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
     if !ppu.bg[bg].enable then return;
     if rotation_mode {
-        y_pos := y + ppu.bg[bg].y_off;
         line_size_px := 128 * (ifx ppu.bg[bg].wide then 2 else 1) * (ifx ppu.bg[bg].tall then 4 else 1);
+        y_pos : int = xx (y + ppu.bg[bg].anchor_y);
+        while y_pos < 0 {
+            y_pos += line_size_px;
+        }
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
         base_addr += (y_pos / 8) * (line_size_tiles);
-        tile_address_buffer: [128]u8;
+        tile_address_buffer: [128]u16;
         for 0..line_size_tiles-1 {
             tile_address_buffer[it] = ppu.memory.vram._8[base_addr + it];
         }
@@ -26,7 +29,11 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
             }
         }
         for 0..239 {
-            framebuffer[y * SCREEN_WIDTH + it] = pixel_buffer[it + ppu.bg[bg].x_off];
+            x_pos : int = xx (it + ppu.bg[bg].anchor_x);
+            while x_pos < 0 {
+                x_pos += line_size_px;
+            }
+            framebuffer[y * SCREEN_WIDTH + it] = pixel_buffer[x_pos];
         }
     } else {
         // TODO

@@ -160,8 +160,10 @@ Ppu :: struct {
         tall := false;
         x_off := 0;
         y_off := 0;
-        anchor_x := 0; // BG2/BG3 only
-        anchor_y := 0; // BG2/BG3 only
+        anchor_x_raw : u32 = 0; // BG2/BG3 only
+        anchor_y_raw : u32 = 0; // BG2/BG3 only
+        anchor_x := 0.0; // BG2/BG3 only
+        anchor_y := 0.0; // BG2/BG3 only
         dx := 0; // BG2/BG3 only
         dmx := 0; // BG2/BG3 only
         dy := 0; // BG2/BG3 only
