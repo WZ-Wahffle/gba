@@ -1,7 +1,7 @@
 mmio_read :: (addr: u32) -> u8 {
     if addr - 0x04000000 == {
         case 0x006;
-            return ppu.draw_y;
+            return xx ppu.draw_y;
         case 0x088;
             return 0;
         case 0x089;

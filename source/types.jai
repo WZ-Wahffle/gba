@@ -215,7 +215,7 @@ Ppu :: struct {
     }
 
     draw_x := 0;
-    draw_y : u8 = 0;
+    draw_y : u32 = 0;
     remaining_cycles := 0;
 }
 
