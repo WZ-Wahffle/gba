@@ -5,6 +5,7 @@ show_vram := false;
 show_palette_ram := false;
 show_oam := false;
 show_dma := false;
+show_window := false;
 show_rom := false;
 show_disasm := false;
 show_cpu := false;
@@ -15,41 +16,44 @@ draw_gui :: () {
     context.print_style.default_format_int.minimum_digits = 8;
     if show_header
         if ImGui.BeginMainMenuBar() {
-            if ImGui.BeginMenu("Processors") {
-                if ImGui.MenuItem("cpu", "ctrl+c") {
+            if ImGui.BeginMenu("General") {
+                if ImGui.MenuItem("cpu", "shift+c") {
                     show_cpu = !show_cpu;
                 }
-                if ImGui.MenuItem("ppu", "ctrl+g") {
+                if ImGui.MenuItem("ppu", "shift+g") {
                     show_ppu = !show_ppu;
+                }
+                if ImGui.MenuItem("dma", "shift+t") {
+                    show_dma = !show_dma;
+                }
+                if ImGui.MenuItem("window", "shift+w") {
+                    show_window = !show_window;
                 }
                 ImGui.EndMenu();
             }
             if ImGui.BeginMenu("Memory") {
-                if ImGui.MenuItem("rom", "ctrl+r") {
+                if ImGui.MenuItem("rom", "shift+r") {
                     show_rom = !show_rom;
                 }
-                if ImGui.MenuItem("iwram", "ctrl+i") {
+                if ImGui.MenuItem("iwram", "shift+i") {
                     show_iwram = !show_iwram;
                 }
-                if ImGui.MenuItem("ewram", "ctrl+e") {
+                if ImGui.MenuItem("ewram", "shift+e") {
                     show_ewram = !show_ewram;
                 }
-                if ImGui.MenuItem("vram", "ctrl+v") {
+                if ImGui.MenuItem("vram", "shift+v") {
                     show_vram = !show_vram;
                 }
-                if ImGui.MenuItem("palette ram", "ctrl+p") {
+                if ImGui.MenuItem("palette ram", "shift+p") {
                     show_palette_ram = !show_palette_ram;
                 }
-                if ImGui.MenuItem("oam", "ctrl+o") {
+                if ImGui.MenuItem("oam", "shift+o") {
                     show_oam = !show_oam;
-                }
-                if ImGui.MenuItem("dma", "ctrl+t") {
-                    show_dma = !show_dma;
                 }
                 ImGui.EndMenu();
             }
             if ImGui.BeginMenu("Disassembly") {
-                if ImGui.MenuItem("show", "ctrl+d") {
+                if ImGui.MenuItem("show", "shift+d") {
                     show_disasm = !show_disasm;
                 }
                 ImGui.EndMenu();
@@ -63,6 +67,7 @@ draw_gui :: () {
     if show_palette_ram palette_ram_window();
     if show_oam oam_window();
     if show_dma dma_window();
+    if show_window window_window();
     if show_rom rom_window();
     if show_cpu cpu_window();
     if show_ppu ppu_window();
@@ -1403,21 +1408,21 @@ oam_window :: () {
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%s", oam_sizing_lut[ppu.oam[it + oam_scroll_state].shape][ppu.oam[it + oam_scroll_state].size].data);
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].flip_h then "true".data else "false".data);
+        ImGui.Text("%", ppu.oam[it + oam_scroll_state].flip_h);
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].flip_v then "true".data else "false".data);
+        ImGui.Text("%", ppu.oam[it + oam_scroll_state].flip_v);
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].rotate_scale then "true".data else "false".data);
+        ImGui.Text("%", ppu.oam[it + oam_scroll_state].rotate_scale);
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].rotate_scale_double_size then "true".data else "false".data);
+        ImGui.Text("%", ppu.oam[it + oam_scroll_state].rotate_scale_double_size);
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].rotate_scale_param_idx);
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].mode);
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].mosaic then "true".data else "false".data);
+        ImGui.Text("%", ppu.oam[it + oam_scroll_state].mosaic);
         ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", ifx ppu.oam[it + oam_scroll_state].single_palette then "true".data else "false".data);
+        ImGui.Text("%", ppu.oam[it + oam_scroll_state].single_palette);
         ImGui.TableNextColumn();
         ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].prio);
         ImGui.TableNextColumn();
@@ -1438,6 +1443,57 @@ dma_window :: () {
     ImGui.Text("Source: 0x%", formatInt(cpu.dma[dma_selected].src, 16, 1));
     ImGui.Text("Destination: 0x%", formatInt(cpu.dma[dma_selected].dst, 16, 1));
     ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count, 16, 1));
+    ImGui.End();
+}
+
+window_window :: ()  {
+    ImGui.Begin("window");
+    ImGui.Text("Window 1:");
+    ImGui.Text("%abled, %2%3%4%5%6", ifx ppu.win[0].enable then "En" else "Dis",
+        ifx ppu.win[0].bg_enable[0] then "1" else "-",
+        ifx ppu.win[0].bg_enable[1] then "2" else "-",
+        ifx ppu.win[0].bg_enable[2] then "3" else "-",
+        ifx ppu.win[0].bg_enable[3] then "4" else "-",
+        ifx ppu.win[0].obj_enable then "O" else "-",
+    );
+    ImGui.Text("Special effects %abled", ifx ppu.win[0].special_effect then "en" else "dis");
+    ImGui.Text("Min X: %", formatInt(ppu.win[0].min_x, 10, 1));
+    ImGui.Text("Max X: %", formatInt(ppu.win[0].max_x, 10, 1));
+    ImGui.Text("Min Y: %", formatInt(ppu.win[0].min_y, 10, 1));
+    ImGui.Text("Max Y: %", formatInt(ppu.win[0].max_y, 10, 1));
+    ImGui.NewLine();
+    ImGui.Text("Window 2:");
+    ImGui.Text("%abled, %2%3%4%5%6", ifx ppu.win[1].enable then "En" else "Dis",
+        ifx ppu.win[1].bg_enable[0] then "1" else "-",
+        ifx ppu.win[1].bg_enable[1] then "2" else "-",
+        ifx ppu.win[1].bg_enable[2] then "3" else "-",
+        ifx ppu.win[1].bg_enable[3] then "4" else "-",
+        ifx ppu.win[1].obj_enable then "O" else "-",
+    );
+    ImGui.Text("Special effects %abled", ifx ppu.win[1].special_effect then "en" else "dis");
+    ImGui.Text("Min X: %", formatInt(ppu.win[1].min_x, 10, 1));
+    ImGui.Text("Max X: %", formatInt(ppu.win[1].max_x, 10, 1));
+    ImGui.Text("Min Y: %", formatInt(ppu.win[1].min_y, 10, 1));
+    ImGui.Text("Max Y: %", formatInt(ppu.win[1].max_y, 10, 1));
+    ImGui.NewLine();
+    ImGui.Text("Outside Windows:");
+    ImGui.Text("%1%2%3%4%5",
+        ifx ppu.outside_win_bg_enable[0] then "1" else "-",
+        ifx ppu.outside_win_bg_enable[1] then "2" else "-",
+        ifx ppu.outside_win_bg_enable[2] then "3" else "-",
+        ifx ppu.outside_win_bg_enable[3] then "4" else "-",
+        ifx ppu.outside_win_obj_enable then "O" else "-",
+    );
+    ImGui.NewLine();
+    ImGui.Text("OBJ Window:");
+    ImGui.Text("%abled, %2%3%4%5%6", ifx ppu.obj_win.enable then "En" else "Dis",
+        ifx ppu.obj_win.bg_enable[0] then "1" else "-",
+        ifx ppu.obj_win.bg_enable[1] then "2" else "-",
+        ifx ppu.obj_win.bg_enable[2] then "3" else "-",
+        ifx ppu.obj_win.bg_enable[3] then "4" else "-",
+        ifx ppu.obj_win.obj_enable then "O" else "-",
+    );
+    ImGui.Text("Special effects %abled", ifx ppu.obj_win.special_effect then "en" else "dis");
     ImGui.End();
 }
 
