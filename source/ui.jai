@@ -227,7 +227,7 @@ step_ppu :: () {
                 obj_win_buffer[it] = false;
                 // black and grey checkerboard to more easily gauge pixel distances
                 // framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = xx ((((it + ppu.draw_y) & 1)) * 0x421);
-                framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = 0x7fff;
+                framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = ppu.memory.palette_ram._16[0];
             }
 
             if ppu.bg_mode == {
