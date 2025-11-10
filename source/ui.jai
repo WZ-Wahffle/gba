@@ -8,11 +8,12 @@ line_priority_buffer: [SCREEN_WIDTH]u8;
 obj_line_buffer: [SCREEN_WIDTH]u16;
 obj_prio_buffer: [SCREEN_WIDTH]u8;
 obj_win_buffer: [SCREEN_WIDTH]bool;
+obj_use_alpha_buffer: [SCREEN_WIDTH]bool;
 
 // priorities: (the lower, the higher)
 // backdrop: 8
 // OBJ: priority * 2 + 1
-// BGx: x * 2
+// BG: priority * 2
 
 draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
     if !ppu.bg[bg].enable then return;
@@ -29,47 +30,49 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         for 0..line_size_tiles-1 {
             tile_address_buffer[it] = ppu.memory.vram._8[base_addr + it];
         }
-        pixel_buffer: [1024]u16;
+        pixel_buffer: [1024]int;
         for tile_idx: 0..line_size_tiles-1 {
             tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx] * 64;
             tile_base_addr += 8 * (y_pos % 8);
             for pixel_idx: 0..7 {
-                pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[ppu.memory.vram._8[tile_base_addr + pixel_idx]];
+                if ppu.memory.vram._8[tile_base_addr + pixel_idx] == 0 {
+                    pixel_buffer[8 * tile_idx + pixel_idx] = -1;
+                } else {
+                    pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[ppu.memory.vram._8[tile_base_addr + pixel_idx]];
+                }
             }
         }
 
         win_1_in_y := ppu.win[0].min_y <= y && ppu.win[0].max_y >= y;
         win_2_in_y := ppu.win[1].min_y <= y && ppu.win[1].max_y >= y;
         for 0..239 {
-            if bg * 2 >= line_priority_buffer[it] continue;
+            if ppu.bg[bg].prio * 2 >= line_priority_buffer[it] continue;
             win_1_in := win_1_in_y && ppu.win[0].min_x <= it && ppu.win[0].max_x >= it;
             win_2_in := win_2_in_y && ppu.win[1].min_x <= it && ppu.win[1].max_x >= it;
 
-            if ppu.win[0].enable {
-                if win_1_in && !ppu.win[0].bg_enable[bg] {
-                    continue;
-                }
-            }
-            if ppu.win[1].enable {
-                if win_2_in && !ppu.win[1].bg_enable[bg] {
-                    continue;
-                }
-            }
-            if !win_1_in && !win_2_in && !ppu.outside_win_bg_enable[bg] {
+            if ppu.win[0].enable && win_1_in && !ppu.win[0].bg_enable[bg] {
                 continue;
             }
-            if ppu.obj_win.enable {
-                if obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
-                    continue;
-                }
+            if ppu.win[1].enable && win_2_in && !ppu.win[1].bg_enable[bg] {
+                continue;
+            }
+            // TODO probably not right? I'm guessing it should be checking every
+            // window/inside combination individually
+            if ((ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[it])) && !ppu.outside_win_bg_enable[bg] {
+                continue;
+            }
+            if ppu.obj_win.enable && obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
+                continue;
             }
 
             x_pos : int = xx (it + ppu.bg[bg].anchor_x);
             while x_pos < 0 {
                 x_pos += line_size_px;
             }
-            framebuffer[y * SCREEN_WIDTH + it] = pixel_buffer[x_pos];
-            line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
+            if pixel_buffer[x_pos] != -1 {
+                framebuffer[y * SCREEN_WIDTH + it] = xx pixel_buffer[x_pos];
+                line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
+            }
         }
     } else {
         // TODO
@@ -133,6 +136,7 @@ draw_obj :: (y: u32) {
                             pixel_buffer[x] = ppu.memory.palette_ram._16[0x100 + color_idx];
                         }
                         objwin := it.mode == 0b10;
+                        objalpha := it.mode == 0b01;
                         for x_dst: 0..239 {
                             if pixel_buffer[x_dst] != 0 {
                                 if objwin {
@@ -141,6 +145,7 @@ draw_obj :: (y: u32) {
                                     if obj_prio_buffer[x_dst] > it.prio * 2 + 1 {
                                         obj_prio_buffer[x_dst] = xx (it.prio * 2 + 1);
                                         obj_line_buffer[x_dst] = pixel_buffer[x_dst];
+                                        obj_use_alpha_buffer[x_dst] = objalpha;
                                     }
                                 }
                             }
@@ -161,6 +166,7 @@ draw_obj :: (y: u32) {
                         x := it.min_x;
                         prio := it.prio;
                         objwin := it.mode == 0b10;
+                        objalpha := it.mode == 0b01;
                         for coarse_x: 0..(w / 8)-1 { // 8 pixels equates to 16 bytes of info
                             pixel_line : u64 = ppu.memory.vram._64[(obj_base >> 3) + vertical_offset_into_tile];
                             for finer_x: 0..7 {
@@ -171,6 +177,7 @@ draw_obj :: (y: u32) {
                                         if obj_prio_buffer[x + coarse_x * 8 + finer_x] > prio * 2 + 1 {
                                             obj_line_buffer[x + coarse_x * 8 + finer_x] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> (8 * xx finer_x)) & 0xff)];
                                             obj_prio_buffer[x + coarse_x * 8 + finer_x] = xx (prio * 2 + 1);
+                                            obj_use_alpha_buffer[x + coarse_x * 8 + finer_x] = objalpha;
                                         }
                                     }
                                 }
@@ -225,6 +232,7 @@ step_ppu :: () {
                 obj_line_buffer[it] = 0;
                 obj_prio_buffer[it] = 8;
                 obj_win_buffer[it] = false;
+                obj_use_alpha_buffer[it] = false;
                 // black and grey checkerboard to more easily gauge pixel distances
                 // framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = xx ((((it + ppu.draw_y) & 1)) * 0x421);
                 framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = ppu.memory.palette_ram._16[0];
@@ -234,7 +242,9 @@ step_ppu :: () {
                 case 0;
                 case 1;
                 case 2;
-                    draw_obj(ppu.draw_y);
+                    draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
+                    draw_bg(ppu.draw_y, 2, true);
+                    draw_bg(ppu.draw_y, 3, true);
                     win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y >= ppu.draw_y;
                     win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y >= ppu.draw_y;
                     for x: 0..239 {
@@ -249,19 +259,26 @@ step_ppu :: () {
                         }
                         // TODO probably not right? I'm guessing it should be checking every
                         // window/inside combination individually
-                        if (ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable) && !win_1_in && !win_2_in && !obj_win_buffer[x] && !ppu.outside_win_obj_enable {
+                        if (ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[x]) && !ppu.outside_win_obj_enable {
                             continue;
                         }
                         if ppu.obj_win.enable && obj_win_buffer[x] && !ppu.obj_win.obj_enable {
                             continue;
                         }
                         if obj_line_buffer[x] != 0 {
-                            framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = obj_line_buffer[x];
+                            if obj_use_alpha_buffer[x] && line_priority_buffer[x] == obj_prio_buffer[x]+1 {
+                                bottom := framebuffer[ppu.draw_y * SCREEN_WIDTH + x];
+                                top := obj_line_buffer[x];
+                                r : u16 = xx (((bottom >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                                g : u16 = xx (((bottom >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                                b : u16 = xx (((bottom >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
+                            } else {
+                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = obj_line_buffer[x];
+                            }
                             line_priority_buffer[x] = obj_prio_buffer[x];
                         }
                     }
-                    draw_bg(ppu.draw_y, 2, true);
-                    draw_bg(ppu.draw_y, 3, true);
                 case 3;
                 case 4;
                 case 5;
@@ -277,6 +294,22 @@ dt : float64;
 ui :: () {
     quit := false;
     SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
+
+    spec: SDL_AudioSpec;
+    spec.channels = 1;
+    spec.format = AUDIO_S8;
+    spec.callback = apu_callback;
+    spec.freq = 32768;
+    apu.dev = SDL_OpenAudioDevice(null, 0, *spec, null, 0);
+    if apu.dev == 0 {
+        str: string;
+        str.data = SDL_GetError();
+        str.count = c_style_strlen(str.data);
+        print("Failed to initialize audio context: %\n", str);
+        exit(1);
+    }
+    SDL_PauseAudioDevice(apu.dev, 0);
+
     win := SDL_CreateWindow("gba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     gl_context := SDL_GL_CreateContext(win);
     gl_load(*gl, SDL_GL_GetProcAddress);
@@ -314,6 +347,10 @@ ui :: () {
                         quit = true;
                     case .SDLK_TAB;
                         show_header = !show_header;
+                    case .SDLK_a;
+                        show_apu = !show_apu;
+                    case .SDLK_b;
+                        show_blend = !show_blend;
                     case .SDLK_c;
                         show_cpu = !show_cpu;
                     case .SDLK_d;
@@ -324,6 +361,8 @@ ui :: () {
                         show_ppu = !show_ppu;
                     case .SDLK_i;
                         show_iwram = !show_iwram;
+                    case .SDLK_m;
+                        show_dma = !show_dma;
                     case .SDLK_o;
                         show_oam = !show_oam;
                     case .SDLK_p;
@@ -331,7 +370,7 @@ ui :: () {
                     case .SDLK_r;
                         show_rom = !show_rom;
                     case .SDLK_t;
-                        show_dma = !show_dma;
+                        show_timer = !show_timer;
                     case .SDLK_v;
                         show_vram = !show_vram;
                     case .SDLK_w;
@@ -365,6 +404,7 @@ ui :: () {
         if cpu.emu_state == {
             case .STARTED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
+            advance_timers(-cpu.remaining_cycles + 1);
             cpu.remaining_cycles = 1;
             step_cpu();
             cpu.emu_state = .RUNNING;
@@ -375,6 +415,7 @@ ui :: () {
                 if cpu.emu_state == .STOPPED break;
                 cpu.remaining_cycles += 4;
                 ppu.remaining_cycles += 4;
+                advance_timers(4);
                 step_ppu();
                 while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
@@ -385,6 +426,7 @@ ui :: () {
             case .STEPPED;
             cpu.emu_state = .STOPPED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
+            advance_timers(-cpu.remaining_cycles + 1);
             cpu.remaining_cycles += -cpu.remaining_cycles + 1;
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();

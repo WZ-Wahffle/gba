@@ -64,7 +64,9 @@ Cpu :: struct {
     }
 
     Timer :: struct {
-        reload : u16 = 0;
+        prescaler_counter := 0;
+        counter := 0;
+        reload := 0;
         prescaler_selection := 0;
         ignore_prescaler := false;
         irq := false;
@@ -222,27 +224,60 @@ Ppu :: struct {
 }
 
 Apu :: struct {
-    chan1: Pulse_Channel;
-    chan2: Pulse_Channel;
+    dev: SDL_AudioDeviceID;
+
+    chan_1: Pulse_Channel;
+    chan_2: Pulse_Channel;
+    chan_3: Wave_Channel;
+    chan_a: Direct_Channel;
+    chan_b: Direct_Channel;
+    fifo_a: Fifo;
+    fifo_b: Fifo;
 
     Pulse_Channel :: struct {
-        enable := false;
-        enable_left := false;
-        enable_right := false;
-
         sweep_shift_cnt := 0;
         sweep_freq_decrease := false;
         sweep_time := 0;
 
-        frequency := 0;
-        use_length := false;
-        trigger := false;
-        sound_length := 0;
-        duty_cycle := 0;
-
         envelope_speed := 0;
         envelope_increase := false;
         envelope_initial_volume := 0;
+
+        use_length := false;
+        sound_length := 0;
+
+        duty_cycle := 0;
+        frequency := 0;
+        trigger := false;
+    }
+
+    Wave_Channel :: struct {
+        enable := false;
+        use_upper_bank := false;
+        play_all := false;
+        force_volume_to_75_percent := false;
+
+        use_length := false;
+        sound_length := 0;
+
+        volume := 0;
+        frequency := 0;
+        trigger := false;
+    }
+
+    Direct_Channel :: struct {
+        reset := false;
+        timer_select := 0;
+    }
+
+    Fifo :: struct {
+        buffer: union {
+            _8: [32]u8;
+            _32: [8]u32;
+        }
+        r := 0;
+        w := 0;
+        cnt := 0;
     }
 }
 

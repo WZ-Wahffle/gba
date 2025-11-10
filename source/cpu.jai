@@ -347,6 +347,138 @@ interrupt :: (mode: Cpu_Mode) {
     cpu.stopped = false;
 }
 
+advance_timers :: (cycles: int) {
+    prescaler_values := u16.[1, 64, 256, 1024];
+    for * cpu.timer {
+        if !it.enable then continue;
+        if !it.ignore_prescaler {
+            it.prescaler_counter += cycles;
+            inc_count : int = it.prescaler_counter / prescaler_values[it.prescaler_selection];
+            it.counter += inc_count;
+            it.prescaler_counter -= inc_count * prescaler_values[it.prescaler_selection];
+            if it.counter > 0xffff {
+                timer_overflow(it_index);
+            }
+        }
+    }
+}
+
+timer_overflow :: (idx: int) {
+    cpu.timer[idx].counter = cpu.timer[idx].reload;
+    interrupts := Interrupt_Source.[.TIM0OVERFLOW, .TIM1OVERFLOW, .TIM2OVERFLOW, .TIM3OVERFLOW];
+    if cpu.timer[idx].irq && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
+        cpu.ifl[interrupts[idx]] = xx 1 << interrupts[idx];
+        interrupt(.IRQ);
+    }
+    if idx < 3 && cpu.timer[idx+1].ignore_prescaler {
+        cpu.timer[idx+1].counter += 1;
+        if cpu.timer[idx+1].counter > 0xffff {
+            timer_overflow(idx+1);
+        }
+    }
+    if idx < 2 {
+        if apu.chan_a.timer_select == idx {
+            if cpu.dma[1].dst == 0x40000a0 && cpu.dma[1].repeat {
+                cpu.dma[1].dst_addr_control = .FIXED;
+                if apu.fifo_a.r == 0 {
+                    apu.fifo_a.r == 32;
+                } else {
+                    apu.fifo_a.r = ifx apu.fifo_a.r == 1 then 31 else apu.fifo_a.r - 1;
+                }
+                apu.fifo_a.cnt -= 1;
+                while apu.fifo_a.cnt < 16 {
+                    transfer(1);
+                }
+            }
+            if cpu.dma[2].dst == 0x40000a0 && cpu.dma[2].repeat {
+                cpu.dma[2].dst_addr_control = .FIXED;
+                if apu.fifo_a.r == 0 {
+                    apu.fifo_a.r == 32;
+                } else {
+                    apu.fifo_a.r = ifx apu.fifo_a.r == 1 then 31 else apu.fifo_a.r - 1;
+                }
+                apu.fifo_a.cnt -= 1;
+                while apu.fifo_a.cnt < 16 {
+                    transfer(2);
+                }
+            }
+        }
+        if apu.chan_b.timer_select == idx {
+            if cpu.dma[1].dst == 0x40000a4 && cpu.dma[1].repeat {
+                cpu.dma[1].dst_addr_control = .FIXED;
+                if apu.fifo_b.r == 0 {
+                    apu.fifo_b.r == 32;
+                } else {
+                    apu.fifo_b.r = ifx apu.fifo_b.r == 1 then 31 else apu.fifo_b.r - 1;
+                }
+                apu.fifo_b.cnt -= 1;
+                while apu.fifo_b.cnt < 16 {
+                    transfer(1);
+                }
+            }
+            if cpu.dma[2].dst == 0x40000a4 && cpu.dma[2].repeat {
+                cpu.dma[2].dst_addr_control = .FIXED;
+                if apu.fifo_b.r == 0 {
+                    apu.fifo_b.r == 32;
+                } else {
+                    apu.fifo_b.r = ifx apu.fifo_b.r == 1 then 31 else apu.fifo_b.r - 1;
+                }
+                apu.fifo_b.cnt -= 1;
+                while apu.fifo_b.cnt < 16 {
+                    transfer(2);
+                }
+            }
+        }
+    }
+}
+
+transfer :: (idx: int) {
+    if cpu.dma[idx].enable {
+        if cpu.dma[idx].large_transfer {
+            write_32(cpu.dma[idx].dst_int, read_32(cpu.dma[idx].src_int));
+            if cpu.dma[idx].src_addr_control == {
+                case .INC;
+                    cpu.dma[idx].src_int += 4;
+                case .DEC;
+                    cpu.dma[idx].src_int -= 4;
+            }
+            if cpu.dma[idx].dst_addr_control == {
+                case .INC;
+                    cpu.dma[idx].dst_int += 4;
+                case .DEC;
+                    cpu.dma[idx].dst_int -= 4;
+            }
+        } else {
+            write_16(cpu.dma[idx].dst_int, read_16(cpu.dma[idx].src_int));
+            if cpu.dma[idx].src_addr_control == {
+                case .INC;
+                    cpu.dma[idx].src_int += 2;
+                case .DEC;
+                    cpu.dma[idx].src_int -= 2;
+            }
+            if cpu.dma[idx].dst_addr_control == {
+                case .INC;
+                    cpu.dma[idx].dst_int += 2;
+                case .DEC;
+                    cpu.dma[idx].dst_int -= 2;
+            }
+        }
+        cpu.dma[idx].count_int -= 1;
+        if cpu.dma[idx].count == 0 {
+            interrupts := Interrupt_Source.[.DMA0, .DMA1, .DMA2, .DMA3];
+            if cpu.dma[idx].irq && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
+                cpu.ifl[interrupts[idx]] = xx 1 << interrupts[idx];
+                interrupt(.IRQ);
+            }
+        }
+        if cpu.dma[idx].repeat {
+            cpu.dma[idx].count_int = ifx cpu.dma[idx].count == 0 then 0x400 else cpu.dma[idx].count;
+        } else {
+            cpu.dma[idx].enable = false;
+        }
+    }
+}
+
 cond :: (val: u32) -> bool {
     if val == {
         case 0;

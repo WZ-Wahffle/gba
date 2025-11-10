@@ -6,10 +6,13 @@ show_palette_ram := false;
 show_oam := false;
 show_dma := false;
 show_window := false;
+show_blend := false;
+show_timer := false;
 show_rom := false;
 show_disasm := false;
 show_cpu := false;
 show_ppu := false;
+show_apu := false;
 
 draw_gui :: () {
     context.print_style.default_format_int.base = 16;
@@ -23,11 +26,20 @@ draw_gui :: () {
                 if ImGui.MenuItem("ppu", "shift+g") {
                     show_ppu = !show_ppu;
                 }
-                if ImGui.MenuItem("dma", "shift+t") {
+                if ImGui.MenuItem("apu", "shift+a") {
+                    show_apu = !show_apu;
+                }
+                if ImGui.MenuItem("dma", "shift+m") {
                     show_dma = !show_dma;
                 }
                 if ImGui.MenuItem("window", "shift+w") {
                     show_window = !show_window;
+                }
+                if ImGui.MenuItem("blend", "shift+b") {
+                    show_blend = !show_blend;
+                }
+                if ImGui.MenuItem("timer", "shift+t") {
+                    show_timer = !show_timer;
                 }
                 ImGui.EndMenu();
             }
@@ -68,9 +80,12 @@ draw_gui :: () {
     if show_oam oam_window();
     if show_dma dma_window();
     if show_window window_window();
+    if show_blend blend_window();
+    if show_timer timer_window();
     if show_rom rom_window();
     if show_cpu cpu_window();
     if show_ppu ppu_window();
+    if show_apu apu_window();
     if show_disasm disasm_window();
     #if #exists(__Iprof) {
         profiler_window();
@@ -159,6 +174,41 @@ ppu_window :: () {
     ImGui.Text("Mosaic %abled", ifx ppu.bg[background_selected].mosaic then "en" else "dis");
     ImGui.Text("Screen Offset: 0x%", formatInt(ppu.bg[background_selected].screen_base_block * 2048, 16));
     ImGui.Text("Char Offset: 0x%", formatInt(ppu.bg[background_selected].char_base_block * 16384, 16));
+    ImGui.End();
+}
+
+channel_selected : s32 = 1;
+apu_window :: () {
+    ImGui.Begin("apu");
+    ImGui.InputInt("Channel", *channel_selected, 1, 1, .CharsDecimal);
+    if channel_selected < 1 then channel_selected = 1;
+    if channel_selected > 6 then channel_selected = 6;
+    if channel_selected == {
+        case 1;
+        ImGui.Text_CFormat("Sweep Shift Count: %d", apu.chan_1.sweep_shift_cnt);
+        ImGui.Text("Sweep Direction: %crease", ifx apu.chan_1.sweep_freq_decrease then "De" else "In");
+        ImGui.Text_CFormat("Sweep Time: %d", apu.chan_1.sweep_time);
+        ImGui.Text_CFormat("Envelope Initial Volume: %d", apu.chan_1.envelope_initial_volume);
+        ImGui.Text("Envelope Direction: %crease", ifx apu.chan_1.envelope_increase then "De" else "In");
+        ImGui.Text_CFormat("Envelope Speed: %d", apu.chan_1.envelope_speed);
+        ImGui.Text_CFormat("Duty Cycle: %d", apu.chan_1.duty_cycle);
+        ImGui.Text("Use Length: %", apu.chan_1.use_length);
+        ImGui.Text_CFormat("Sound Length: %d", apu.chan_1.sound_length);
+        ImGui.Text_CFormat("Frequency: %d", apu.chan_1.frequency);
+        case 2;
+        ImGui.Text_CFormat("Envelope Initial Volume: %d", apu.chan_2.envelope_initial_volume);
+        ImGui.Text("Envelope Direction: %crease", ifx apu.chan_2.envelope_increase then "De" else "In");
+        ImGui.Text_CFormat("Envelope Speed: %d", apu.chan_2.envelope_speed);
+        ImGui.Text_CFormat("Duty Cycle: %d", apu.chan_2.duty_cycle);
+        ImGui.Text("Use Length: %", apu.chan_2.use_length);
+        ImGui.Text_CFormat("Sound Length: %d", apu.chan_2.sound_length);
+        ImGui.Text_CFormat("Frequency: %d", apu.chan_2.frequency);
+        case 5;
+        ImGui.Text_CFormat("Timer Select: %d", apu.chan_a.timer_select);
+        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_a.r);
+        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_a.w);
+        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_a.cnt);
+    }
     ImGui.End();
 }
 
@@ -1442,7 +1492,14 @@ dma_window :: () {
     ImGui.Text("%abled", ifx cpu.dma[dma_selected].enable then "en" else "dis");
     ImGui.Text("Source: 0x%", formatInt(cpu.dma[dma_selected].src, 16, 1));
     ImGui.Text("Destination: 0x%", formatInt(cpu.dma[dma_selected].dst, 16, 1));
-    ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count, 16, 1));
+    ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count_int, 16, 1));
+    ImGui.Text("Enable: %", cpu.dma[dma_selected].enable);
+    ImGui.Text("IRQ on complete: %", cpu.dma[dma_selected].irq);
+    ImGui.Text("Repeat: %", cpu.dma[dma_selected].repeat);
+    ImGui.Text("Transfer Size: %-bit", ifx cpu.dma[dma_selected].large_transfer then "32" else "16");
+    ImGui.Text("Source Address Control: %", cpu.dma[dma_selected].src_addr_control);
+    ImGui.Text("Destination Address Control: %", cpu.dma[dma_selected].dst_addr_control);
+    ImGui.Text("Start Timing: %", cpu.dma[dma_selected].start_timing);
     ImGui.End();
 }
 
@@ -1494,6 +1551,28 @@ window_window :: ()  {
         ifx ppu.obj_win.obj_enable then "O" else "-",
     );
     ImGui.Text("Special effects %abled", ifx ppu.obj_win.special_effect then "en" else "dis");
+    ImGui.End();
+}
+
+blend_window :: () {
+    ImGui.Begin("blend");
+    ImGui.Text_CFormat("Coefficient A: %d", ppu.eva);
+    ImGui.Text_CFormat("Coefficient B: %d", ppu.evb);
+    ImGui.End();
+}
+
+timer_selected : s32 = 0;
+timer_window :: () {
+    ImGui.Begin("timer");
+    ImGui.InputInt("Channel", *timer_selected, 1, 1, .CharsDecimal);
+    if timer_selected < 0 timer_selected = 0;
+    if timer_selected > 3 timer_selected = 3;
+    ImGui.Text("Enabled: %", cpu.timer[timer_selected].enable);
+    ImGui.Text("IRQ: %", cpu.timer[timer_selected].irq);
+    ImGui.Text("Count-Up Mode: %", cpu.timer[timer_selected].ignore_prescaler);
+    ImGui.Text_CFormat("Counter: 0x%04x", cpu.timer[timer_selected].counter);
+    ImGui.Text_CFormat("Reload: 0x%04x", cpu.timer[timer_selected].reload);
+    ImGui.Text_CFormat("Prescaler: %d", int.[1, 64, 256, 1024][cpu.timer[timer_selected].prescaler_selection]);
     ImGui.End();
 }
 
