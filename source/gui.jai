@@ -112,7 +112,15 @@ cpu_window :: () {
     if ImGui.Button("Step") {
         cpu.emu_state = .STEPPED;
     }
-    ImGui.Text("Mode: %, %", cpu.mode, cpu.state);
+    ImGui.SameLine();
+    if ImGui.Button("Print History") {
+        print("%\n", cpu.pc_history);
+    }
+    if cpu.mode == .USER && cpu.privileged {
+        ImGui.Text("Mode: SYSTEM, %", cpu.state);
+    } else {
+        ImGui.Text("Mode: %, %", cpu.mode, cpu.state);
+    }
     ImGui.Text("PC : 0x% ", cpu.reg[15]);
     ImGui.SameLine();
     ImGui.Text("LR : 0x% ", cpu.reg[14]);
@@ -922,6 +930,10 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, disassemble_register(rm_idx));
                 case 0b0010;
                 // lsl (2)
+                opcode = "lsl";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rs_idx));
                 case 0b0011;
                 // lsr (2)
                 opcode = "lsr";
@@ -995,6 +1007,7 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
         l := (ins & 0x800) != 0; // load? (store)
         s := (ins & 0x1000) != 0; // byte? (word)
         imm := (ins >> 6) & 0x1f;
+        if !s then imm *= 4;
         rn_idx : u8 = xx (ins >> 3) & 0b111;
         rd_idx : u8 = xx (ins & 0b111);
         if l {
@@ -1040,8 +1053,8 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             append(*suffix, disassemble_register(rd_idx));
             append(*suffix, ", [");
             append(*suffix, disassemble_register(rn_idx));
-            append(*suffix, ", #");
-            append(*suffix, tprint("%", formatInt(immed * 2, 10, 1)));
+            append(*suffix, ", #0x");
+            append(*suffix, tprint("%", formatInt(immed * 2, 16, 1)));
             append(*suffix, "]");
         }
         case 0b101;
@@ -1141,7 +1154,7 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
 
 disasm_scroll_state := 0;
 disasm_mode := Cpu_State.ARM;
-disasm_jump_buffer: [5]u8;
+disasm_jump_buffer: [8]u8;
 disasm_window :: () {
     ImGui.Begin("disasm", null, .NoScrollbar | .NoScrollWithMouse);
     if ImGui.IsWindowHovered() {
@@ -1168,8 +1181,8 @@ disasm_window :: () {
     ImGui.SameLine();
     ImGui.Text("0x");
     ImGui.SameLine();
-    if ImGui.InputText("Jump to...", disasm_jump_buffer.data, 5) {
-        str := string.{4, disasm_jump_buffer.data};
+    if ImGui.InputText("Jump to...", disasm_jump_buffer.data, 8) {
+        str := string.{7, disasm_jump_buffer.data};
         parsed := string_to_int(str, 16);
         disasm_scroll_state = parsed / ifx disasm_mode == .ARM then 4 else 2;
     }

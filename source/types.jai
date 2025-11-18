@@ -4,7 +4,7 @@ Cpu :: struct {
     reg_hi_fiq: [5]u32;
     sp: [#run enum_highest_value(Cpu_Mode)+1]u32;
     lr: [#run enum_highest_value(Cpu_Mode)+1]u32;
-    psr: u32 = 0x13;
+    psr: u32 = 0xd3;
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     state := Cpu_State.ARM;
     mode := Cpu_Mode.SVC;
@@ -61,6 +61,7 @@ Cpu :: struct {
         start_timing: Dma_Start_Timing;
         irq := false;
         enable := false;
+        control_int : u16 = 0;
     }
 
     Timer :: struct {
@@ -275,8 +276,8 @@ Apu :: struct {
             _8: [32]u8;
             _32: [8]u32;
         }
-        r := 0;
-        w := 0;
+        r : u8 = 0;
+        w : u8 = 0;
         cnt := 0;
     }
 }

@@ -208,11 +208,11 @@ step_ppu :: () {
         }
 
         if !get_status_bit(.I) && cpu.interrupt_master_enable {
-            if ppu.draw_x == 240 && ppu.draw_y < 160 && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 {
+            if ppu.draw_x == 240 && ppu.draw_y < 160 && !get_status_bit(.I) && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 {
                 cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
                 interrupt(.IRQ);
             }
-            if ppu.draw_x == 240 && ppu.draw_y == 160 && cpu.ie[Interrupt_Source.LCD_VBLANK] != 0 {
+            if ppu.draw_x == 240 && ppu.draw_y == 160 && !get_status_bit(.I) && cpu.ie[Interrupt_Source.LCD_VBLANK] != 0 {
                 cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0x01;
                 interrupt(.IRQ);
             }
@@ -404,7 +404,7 @@ ui :: () {
         if cpu.emu_state == {
             case .STARTED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            advance_timers(-cpu.remaining_cycles + 1);
+            // advance_timers(-cpu.remaining_cycles + 1);
             cpu.remaining_cycles = 1;
             step_cpu();
             cpu.emu_state = .RUNNING;
@@ -415,7 +415,7 @@ ui :: () {
                 if cpu.emu_state == .STOPPED break;
                 cpu.remaining_cycles += 4;
                 ppu.remaining_cycles += 4;
-                advance_timers(4);
+                // advance_timers(4);
                 step_ppu();
                 while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
@@ -426,7 +426,7 @@ ui :: () {
             case .STEPPED;
             cpu.emu_state = .STOPPED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            advance_timers(-cpu.remaining_cycles + 1);
+            // advance_timers(-cpu.remaining_cycles + 1);
             cpu.remaining_cycles += -cpu.remaining_cycles + 1;
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();

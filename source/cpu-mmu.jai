@@ -2,6 +2,14 @@ mmio_read :: (addr: u32) -> u8 {
     if addr - 0x04000000 == {
         case 0x006;
             return xx ppu.draw_y;
+        case 0x0dc;
+            return xx (cpu.dma[3].count_int >> 0) & 0xff;
+        case 0x0dd;
+            return xx (cpu.dma[3].count_int >> 8) & 0xff;
+        case 0x0de;
+            return xx (cpu.dma[3].control_int >> 0) & 0xff;
+        case 0x0df;
+            return xx (cpu.dma[3].control_int >> 8) & 0xff;
         case 0x088;
             return 0;
         case 0x089;
@@ -59,10 +67,14 @@ mmio_read :: (addr: u32) -> u8 {
             return cpu.waitcnt_lo;
         case 0x205;
             return cpu.waitcnt_hi;
+        case 0x208;
+            return xx ifx cpu.interrupt_master_enable then 1 else 0;
+        case 0x209;
+            return 0;
         case 0x300;
             return 0;
         case;
-            log_warn("Unmapped IO read: 0x%", formatInt(addr, 16));
+            log_error("Unmapped IO read: 0x%", formatInt(addr, 16));
             assert(false);
             return 0;
     }
@@ -429,8 +441,9 @@ mmio_write :: (addr: u32, val: u8) {
             apu.fifo_a.buffer._8[apu.fifo_a.w] = val;
             apu.fifo_a.w += 1;
             apu.fifo_a.w %= 32;
-            apu.fifo_a.cnt += 1;
-            apu.fifo_a.cnt = max(apu.fifo_a.cnt, 32);
+            if apu.fifo_a.cnt < 32 {
+                apu.fifo_a.cnt += 1;
+            }
         case 0x0a4; #through;
         case 0x0a5; #through;
         case 0x0a6; #through;
@@ -438,8 +451,9 @@ mmio_write :: (addr: u32, val: u8) {
             apu.fifo_b.buffer._8[apu.fifo_b.w] = val;
             apu.fifo_b.w += 1;
             apu.fifo_b.w %= 32;
-            apu.fifo_b.cnt += 1;
-            apu.fifo_b.cnt = max(apu.fifo_b.cnt, 32);
+            if apu.fifo_b.cnt < 32 {
+                apu.fifo_b.cnt += 1;
+            }
         case 0x0b0;
             cpu.dma[0].src &= 0x0fffff00;
             cpu.dma[0].src |= val;
@@ -484,7 +498,15 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[0].dst_addr_control = xx (val >> 5) & 0b11;
             cpu.dma[0].src_addr_control &= 0b10;
             cpu.dma[0].src_addr_control |= xx (val >> 7) & 0b1;
+            cpu.dma[0].control_int &= 0xff00;
+            cpu.dma[0].control_int |= val;
         case 0x0bb;
+            if !cpu.dma[0].enable && (val & 0x80) != 0 {
+                cpu.dma[0].src_int = cpu.dma[0].src;
+                cpu.dma[0].dst_int = cpu.dma[0].dst;
+                cpu.dma[0].count_int = ifx cpu.dma[0].count == 0 then 0x4000 else cpu.dma[0].count;
+            }
+
             cpu.dma[0].src_addr_control &= 0b01;
             cpu.dma[0].src_addr_control |= xx (val & 0b1) << 1;
             cpu.dma[0].repeat = (val & 0x2) != 0;
@@ -493,6 +515,13 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[0].start_timing = xx (val >> 4) & 0b11;
             cpu.dma[0].irq = (val & 0x40) != 0;
             cpu.dma[0].enable = (val & 0x80) != 0;
+            cpu.dma[0].control_int &= 0xff;
+            cpu.dma[0].control_int |= (cast(u16)val) << 8;
+
+            if cpu.dma[0].enable && cpu.dma[0].start_timing == .IMMED {
+                while cpu.dma[0].enable transfer(0);
+                cpu.dma[0].control_int &= 0x7fff;
+            }
         case 0x0bc;
             cpu.dma[1].src &= 0x0fffff00;
             cpu.dma[1].src |= val;
@@ -537,7 +566,15 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[1].dst_addr_control = xx (val >> 5) & 0b11;
             cpu.dma[1].src_addr_control &= 0b10;
             cpu.dma[1].src_addr_control |= xx (val >> 7) & 0b1;
+            cpu.dma[1].control_int &= 0xff00;
+            cpu.dma[1].control_int |= val;
         case 0x0c7;
+            if !cpu.dma[1].enable && (val & 0x80) != 0 {
+                cpu.dma[1].src_int = cpu.dma[1].src;
+                cpu.dma[1].dst_int = cpu.dma[1].dst;
+                cpu.dma[1].count_int = ifx cpu.dma[1].count == 0 then 0x4000 else cpu.dma[1].count;
+            }
+
             cpu.dma[1].src_addr_control &= 0b01;
             cpu.dma[1].src_addr_control |= xx (val & 0b1) << 1;
             cpu.dma[1].repeat = (val & 0x2) != 0;
@@ -546,6 +583,13 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[1].start_timing = xx (val >> 4) & 0b11;
             cpu.dma[1].irq = (val & 0x40) != 0;
             cpu.dma[1].enable = (val & 0x80) != 0;
+            cpu.dma[1].control_int &= 0xff;
+            cpu.dma[1].control_int |= (cast(u16)val) << 8;
+
+            if cpu.dma[1].enable && cpu.dma[1].start_timing == .IMMED {
+                while cpu.dma[1].enable transfer(1);
+                cpu.dma[1].control_int &= 0x7fff;
+            }
         case 0x0c8;
             cpu.dma[2].src &= 0x0fffff00;
             cpu.dma[2].src |= val;
@@ -581,16 +625,24 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x0d0;
             cpu.dma[2].count &= 0xff00;
             cpu.dma[2].count |= val;
-            cpu.dma[2].count_int = ifx cpu.dma[2].count == 0 then 0x400 else cpu.dma[2].count;
+            cpu.dma[2].count_int = ifx cpu.dma[2].count == 0 then 0x4000 else cpu.dma[2].count;
         case 0x0d1;
             cpu.dma[2].count &= 0x00ff;
             cpu.dma[2].count |= (cast(u16)val) << 8;
-            cpu.dma[2].count_int = ifx cpu.dma[2].count == 0 then 0x400 else cpu.dma[2].count;
+            cpu.dma[2].count_int = ifx cpu.dma[2].count == 0 then 0x4000 else cpu.dma[2].count;
         case 0x0d2;
             cpu.dma[2].dst_addr_control = xx (val >> 5) & 0b11;
             cpu.dma[2].src_addr_control &= 0b10;
             cpu.dma[2].src_addr_control |= xx (val >> 7) & 0b1;
+            cpu.dma[2].control_int &= 0xff00;
+            cpu.dma[2].control_int |= val;
         case 0x0d3;
+            if !cpu.dma[2].enable && (val & 0x80) != 0 {
+                cpu.dma[2].src_int = cpu.dma[2].src;
+                cpu.dma[2].dst_int = cpu.dma[2].dst;
+                cpu.dma[2].count_int = ifx cpu.dma[2].count == 0 then 0x4000 else cpu.dma[2].count;
+            }
+
             cpu.dma[2].src_addr_control &= 0b01;
             cpu.dma[2].src_addr_control |= xx (val & 0b1) << 1;
             cpu.dma[2].repeat = (val & 0x2) != 0;
@@ -599,6 +651,13 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[2].start_timing = xx (val >> 4) & 0b11;
             cpu.dma[2].irq = (val & 0x40) != 0;
             cpu.dma[2].enable = (val & 0x80) != 0;
+            cpu.dma[2].control_int &= 0xff;
+            cpu.dma[2].control_int |= (cast(u16)val) << 8;
+
+            if cpu.dma[2].enable && cpu.dma[2].start_timing == .IMMED {
+                while cpu.dma[2].enable transfer(2);
+                cpu.dma[2].control_int &= 0x7fff;
+            }
         case 0x0d4;
             cpu.dma[3].src &= 0x0fffff00;
             cpu.dma[3].src |= val;
@@ -634,16 +693,24 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x0dc;
             cpu.dma[3].count &= 0xff00;
             cpu.dma[3].count |= val;
-            cpu.dma[3].count_int = ifx cpu.dma[3].count == 0 then 0x400 else cpu.dma[3].count;
+            cpu.dma[3].count_int = ifx cpu.dma[3].count == 0 then 0x4000 else cpu.dma[3].count;
         case 0x0dd;
             cpu.dma[3].count &= 0x00ff;
             cpu.dma[3].count |= (cast(u16)val) << 8;
-            cpu.dma[3].count_int = ifx cpu.dma[3].count == 0 then 0x400 else cpu.dma[3].count;
+            cpu.dma[3].count_int = ifx cpu.dma[3].count == 0 then 0x4000 else cpu.dma[3].count;
         case 0x0de;
             cpu.dma[3].dst_addr_control = xx (val >> 5) & 0b11;
             cpu.dma[3].src_addr_control &= 0b10;
             cpu.dma[3].src_addr_control |= xx (val >> 7) & 0b1;
+            cpu.dma[3].control_int &= 0xff00;
+            cpu.dma[3].control_int |= val;
         case 0x0df;
+            if !cpu.dma[3].enable && (val & 0x80) != 0 {
+                cpu.dma[3].src_int = cpu.dma[3].src;
+                cpu.dma[3].dst_int = cpu.dma[3].dst;
+                cpu.dma[3].count_int = ifx cpu.dma[3].count == 0 then 0x4000 else cpu.dma[3].count;
+            }
+
             cpu.dma[3].src_addr_control &= 0b01;
             cpu.dma[3].src_addr_control |= xx (val & 0b1) << 1;
             cpu.dma[3].repeat = (val & 0x2) != 0;
@@ -652,6 +719,13 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[3].start_timing = xx (val >> 4) & 0b11;
             cpu.dma[3].irq = (val & 0x40) != 0;
             cpu.dma[3].enable = (val & 0x80) != 0;
+            cpu.dma[3].control_int &= 0xff;
+            cpu.dma[3].control_int |= (cast(u16)val) << 8;
+
+            if cpu.dma[3].enable && cpu.dma[3].start_timing == .IMMED {
+                while cpu.dma[3].enable transfer(3);
+                cpu.dma[3].control_int &= 0x7fff;
+            }
         case 0x100;
             cpu.timer[0].reload &= 0xff00;
             cpu.timer[0].reload |= val;

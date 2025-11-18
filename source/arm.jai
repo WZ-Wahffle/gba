@@ -233,6 +233,7 @@ arm_and :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -259,6 +260,7 @@ arm_eor :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -283,6 +285,7 @@ arm_sub :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -308,6 +311,7 @@ arm_rsb :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -333,6 +337,7 @@ arm_add :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -359,6 +364,7 @@ arm_adc :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -446,6 +452,7 @@ arm_orr :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
@@ -471,6 +478,7 @@ arm_mov :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (operand & 0x80000000) != 0);
             set_status_bit(.Z, operand == 0);
@@ -497,6 +505,7 @@ arm_bic :: inline (ins: u32) {
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);

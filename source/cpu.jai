@@ -171,8 +171,8 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._16[addr >> 1] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
-        cpu.memory.rom[addr] = xx (val >> 0) & 0xff;
-        cpu.memory.rom[addr + 1] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[addr % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[(addr + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
     } else {
         log_warn("Unmapped write: 0x%", formatInt(addr, 16));
     }
@@ -210,10 +210,10 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._32[addr >> 2] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
-        cpu.memory.rom[addr] = xx (val >> 0) & 0xff;
-        cpu.memory.rom[addr + 1] = xx (val >> 8) & 0xff;
-        cpu.memory.rom[addr + 2] = xx (val >> 16) & 0xff;
-        cpu.memory.rom[addr + 3] = xx (val >> 24) & 0xff;
+        cpu.memory.rom[addr % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[(addr + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[(addr + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
+        cpu.memory.rom[(addr + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
     } else {
         log_warn("Unmapped write: 0x%", formatInt(addr, 16));
     }
@@ -295,6 +295,7 @@ step_cpu :: () {
 set_mode :: (mode: u32) {
     cpu.sp[cpu.mode] = cpu.reg[13];
     cpu.lr[cpu.mode] = cpu.reg[14];
+    if cpu.mode != .USER then cpu.spsr[cpu.mode] = cpu.psr;
     if cpu.mode == .FIQ {
         for 8..14 cpu.reg_hi_fiq[it - 8] = cpu.reg[it];
     }
@@ -316,6 +317,7 @@ set_mode :: (mode: u32) {
     }
     cpu.reg[13] = cpu.sp[cpu.mode];
     cpu.reg[14] = cpu.lr[cpu.mode];
+    if cpu.mode != .USER then cpu.psr = cpu.spsr[cpu.mode];
     if cpu.mode == .FIQ {
         for 8..14 cpu.reg[it] = cpu.reg_hi_fiq[it - 8];
     }
@@ -323,24 +325,21 @@ set_mode :: (mode: u32) {
 
 interrupt :: (mode: Cpu_Mode) {
     assert(mode == Cpu_Mode.IRQ || mode == Cpu_Mode.FIQ || mode == Cpu_Mode.SVC);
-    cpu.mode = mode;
     cpu.state = .ARM;
-    cpu.spsr[cpu.mode] = cpu.psr;
-    cpu.reg[14] = cpu.reg[15];
-    cpu.psr &= 0xffffffc0;
     if mode == {
         case .SVC;
+        set_mode(0b10011);
+        cpu.reg[14] = cpu.reg[15];
         cpu.reg[15] = 0x08;
-        cpu.psr |= 0b10011;
         case .IRQ;
+        set_mode(0b10010);
+        cpu.reg[14] = cpu.reg[15] + 4;
         cpu.reg[15] = 0x18;
-        cpu.reg[14] += 4;
-        cpu.psr |= 0b10010;
         set_status_bit(.I, true);
         case .FIQ;
+        set_mode(0b10001);
+        cpu.reg[14] = cpu.reg[15] + 4;
         cpu.reg[15] = 0x1c;
-        cpu.reg[14] += 4;
-        cpu.psr |= 0b10001;
         set_status_bit(.F, true);
     }
     cpu.halted = false;
@@ -364,9 +363,10 @@ advance_timers :: (cycles: int) {
 }
 
 timer_overflow :: (idx: int) {
-    cpu.timer[idx].counter = cpu.timer[idx].reload;
+    cpu.timer[idx].counter -= 0xffff;
+    cpu.timer[idx].counter += cpu.timer[idx].reload;
     interrupts := Interrupt_Source.[.TIM0OVERFLOW, .TIM1OVERFLOW, .TIM2OVERFLOW, .TIM3OVERFLOW];
-    if cpu.timer[idx].irq && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
+    if cpu.timer[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
         cpu.ifl[interrupts[idx]] = xx 1 << interrupts[idx];
         interrupt(.IRQ);
     }
@@ -380,25 +380,25 @@ timer_overflow :: (idx: int) {
         if apu.chan_a.timer_select == idx {
             if cpu.dma[1].dst == 0x40000a0 && cpu.dma[1].repeat {
                 cpu.dma[1].dst_addr_control = .FIXED;
-                if apu.fifo_a.r == 0 {
-                    apu.fifo_a.r == 32;
-                } else {
-                    apu.fifo_a.r = ifx apu.fifo_a.r == 1 then 31 else apu.fifo_a.r - 1;
-                }
+                apu.fifo_a.r += 1;
+                apu.fifo_a.r %= 32;
                 apu.fifo_a.cnt -= 1;
-                while apu.fifo_a.cnt < 16 {
+                if apu.fifo_a.cnt < 16 {
+                    transfer(1);
+                    transfer(1);
+                    transfer(1);
                     transfer(1);
                 }
             }
             if cpu.dma[2].dst == 0x40000a0 && cpu.dma[2].repeat {
                 cpu.dma[2].dst_addr_control = .FIXED;
-                if apu.fifo_a.r == 0 {
-                    apu.fifo_a.r == 32;
-                } else {
-                    apu.fifo_a.r = ifx apu.fifo_a.r == 1 then 31 else apu.fifo_a.r - 1;
-                }
+                apu.fifo_a.r += 1;
+                apu.fifo_a.r %= 32;
                 apu.fifo_a.cnt -= 1;
-                while apu.fifo_a.cnt < 16 {
+                if apu.fifo_a.cnt < 16 {
+                    transfer(2);
+                    transfer(2);
+                    transfer(2);
                     transfer(2);
                 }
             }
@@ -406,25 +406,25 @@ timer_overflow :: (idx: int) {
         if apu.chan_b.timer_select == idx {
             if cpu.dma[1].dst == 0x40000a4 && cpu.dma[1].repeat {
                 cpu.dma[1].dst_addr_control = .FIXED;
-                if apu.fifo_b.r == 0 {
-                    apu.fifo_b.r == 32;
-                } else {
-                    apu.fifo_b.r = ifx apu.fifo_b.r == 1 then 31 else apu.fifo_b.r - 1;
-                }
+                apu.fifo_b.r += 1;
+                apu.fifo_b.r %= 32;
                 apu.fifo_b.cnt -= 1;
-                while apu.fifo_b.cnt < 16 {
+                if apu.fifo_b.cnt < 16 {
+                    transfer(1);
+                    transfer(1);
+                    transfer(1);
                     transfer(1);
                 }
             }
             if cpu.dma[2].dst == 0x40000a4 && cpu.dma[2].repeat {
                 cpu.dma[2].dst_addr_control = .FIXED;
-                if apu.fifo_b.r == 0 {
-                    apu.fifo_b.r == 32;
-                } else {
-                    apu.fifo_b.r = ifx apu.fifo_b.r == 1 then 31 else apu.fifo_b.r - 1;
-                }
+                apu.fifo_b.r += 1;
+                apu.fifo_b.r %= 32;
                 apu.fifo_b.cnt -= 1;
-                while apu.fifo_b.cnt < 16 {
+                if apu.fifo_b.cnt < 16 {
+                    transfer(2);
+                    transfer(2);
+                    transfer(2);
                     transfer(2);
                 }
             }
@@ -464,17 +464,19 @@ transfer :: (idx: int) {
             }
         }
         cpu.dma[idx].count_int -= 1;
-        if cpu.dma[idx].count == 0 {
+        if cpu.dma[idx].count_int == 0 {
             interrupts := Interrupt_Source.[.DMA0, .DMA1, .DMA2, .DMA3];
-            if cpu.dma[idx].irq && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
+            if cpu.dma[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
                 cpu.ifl[interrupts[idx]] = xx 1 << interrupts[idx];
                 interrupt(.IRQ);
             }
-        }
-        if cpu.dma[idx].repeat {
-            cpu.dma[idx].count_int = ifx cpu.dma[idx].count == 0 then 0x400 else cpu.dma[idx].count;
-        } else {
-            cpu.dma[idx].enable = false;
+            if cpu.dma[idx].repeat {
+                cpu.dma[idx].count_int = ifx cpu.dma[idx].count == 0 then 0x4000 else cpu.dma[idx].count;
+                cpu.dma[idx].src_int = cpu.dma[idx].src;
+                cpu.dma[idx].dst_int = cpu.dma[idx].dst;
+            } else {
+                cpu.dma[idx].enable = false;
+            }
         }
     }
 }
