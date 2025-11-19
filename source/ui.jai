@@ -193,6 +193,8 @@ draw_obj :: (y: u32) {
     }
 }
 
+vblank_happened := false;
+hblank_happened := false;
 step_ppu :: () {
     if ppu.remaining_cycles > 0 {
         ppu.remaining_cycles -= 4;
@@ -200,20 +202,24 @@ step_ppu :: () {
         // 240 visible + 68 hblank
         if ppu.draw_x == 308 {
             ppu.draw_x = 0;
+            hblank_happened = false;
             ppu.draw_y += 1;
             // 160 visible + 68 vblank
             if ppu.draw_y == 228 {
                 ppu.draw_y = 0;
+                vblank_happened = false;
             }
         }
 
-        if !get_status_bit(.I) && cpu.interrupt_master_enable {
-            if ppu.draw_x == 240 && ppu.draw_y < 160 && !get_status_bit(.I) && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 {
-                cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
+        if cpu.interrupt_master_enable && !get_status_bit(.I) {
+            if ppu.vblank_irq_enable && cpu.ie[Interrupt_Source.LCD_VBLANK] != 0 && ppu.draw_y >= 160 && !vblank_happened {
+                vblank_happened = true;
+                cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0x01;
                 interrupt(.IRQ);
             }
-            if ppu.draw_x == 240 && ppu.draw_y == 160 && !get_status_bit(.I) && cpu.ie[Interrupt_Source.LCD_VBLANK] != 0 {
-                cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0x01;
+            if ppu.hblank_irq_enable && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 && ppu.draw_x >= 240 && !hblank_happened {
+                hblank_happened = true;
+                cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
                 interrupt(.IRQ);
             }
         }
@@ -411,16 +417,23 @@ ui :: () {
             while ppu.remaining_cycles > 0 step_ppu();
             #through;
             case .RUNNING;
-            for 0..228*308 {
+            for 0..228-1 {
+                scanline_start := seconds_since_init();
+                for 0..308-1 {
+                    if cpu.emu_state == .STOPPED break;
+                    cpu.remaining_cycles += 4;
+                    ppu.remaining_cycles += 4;
+                    step_ppu();
+                    while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
+                }
                 if cpu.emu_state == .STOPPED break;
-                cpu.remaining_cycles += 4;
-                ppu.remaining_cycles += 4;
+                scanline_end := seconds_since_init();
+                #import "POSIX";
+                usleep(xx ((scanline_end - scanline_start) / 1000000));
                 // advance_timers(4);
-                step_ppu();
-                while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
             }
-            disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
-            disasm_mode = cpu.state;
+            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+            disasm_mode = get_status_bit(.T);
             case .STOPPED;
             // this page intentionally left blank
             case .STEPPED;
@@ -430,8 +443,8 @@ ui :: () {
             cpu.remaining_cycles += -cpu.remaining_cycles + 1;
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();
-            disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
-            disasm_mode = cpu.state;
+            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+            disasm_mode = get_status_bit(.T);
         }
         // for ppu.oam {
         //     if !it.rotate_scale && it.rotate_scale_double_size then continue;
@@ -469,6 +482,6 @@ ui :: () {
         }
         end_time := seconds_since_init();
         // TODO: should probably make this refresh rate dependent
-        sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
+        // sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
 }

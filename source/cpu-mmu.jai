@@ -438,7 +438,7 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x0a1; #through;
         case 0x0a2; #through;
         case 0x0a3;
-            apu.fifo_a.buffer._8[apu.fifo_a.w] = val;
+            apu.fifo_a.buffer[apu.fifo_a.w] = val;
             apu.fifo_a.w += 1;
             apu.fifo_a.w %= 32;
             if apu.fifo_a.cnt < 32 {
@@ -448,7 +448,7 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x0a5; #through;
         case 0x0a6; #through;
         case 0x0a7;
-            apu.fifo_b.buffer._8[apu.fifo_b.w] = val;
+            apu.fifo_b.buffer[apu.fifo_b.w] = val;
             apu.fifo_b.w += 1;
             apu.fifo_b.w %= 32;
             if apu.fifo_b.cnt < 32 {

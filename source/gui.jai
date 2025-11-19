@@ -117,9 +117,9 @@ cpu_window :: () {
         print("%\n", cpu.pc_history);
     }
     if cpu.mode == .USER && cpu.privileged {
-        ImGui.Text("Mode: SYSTEM, %", cpu.state);
+        ImGui.Text("Mode: SYSTEM, %", ifx get_status_bit(.T) then "THUMB" else "ARM");
     } else {
-        ImGui.Text("Mode: %, %", cpu.mode, cpu.state);
+        ImGui.Text("Mode: %, %", cpu.mode, ifx get_status_bit(.T) then "THUMB" else "ARM");
     }
     ImGui.Text("PC : 0x% ", cpu.reg[15]);
     ImGui.SameLine();
@@ -133,7 +133,7 @@ cpu_window :: () {
         ifx (cpu.psr & 0x10000000) != 0 then "V" else "-",
         ifx (cpu.psr & 0x00000080) != 0 then "I" else "-",
         ifx (cpu.psr & 0x00000040) != 0 then "F" else "-",
-        ifx cpu.state == .THUMB then "T" else "-",
+        ifx (cpu.psr & 0x00000020) != 0 then "T" else "-",
     );
     ImGui.Text("R00: 0x% ", cpu.reg[0]);
     ImGui.SameLine();
@@ -1153,7 +1153,7 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
 }
 
 disasm_scroll_state := 0;
-disasm_mode := Cpu_State.ARM;
+disasm_mode := false;
 disasm_jump_buffer: [8]u8;
 disasm_window :: () {
     ImGui.Begin("disasm", null, .NoScrollbar | .NoScrollWithMouse);
@@ -1166,16 +1166,16 @@ disasm_window :: () {
         }
     }
     if ImGui.Button("Jump to PC") {
-        disasm_scroll_state = cpu.reg[15] / ifx cpu.state == .ARM then 4 else 2;
+        disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
     }
     ImGui.SameLine();
-    if ImGui.Button(tprint("%\0", ifx disasm_mode == .THUMB then "T" else "A").data) {
-        if disasm_mode == .THUMB {
+    if ImGui.Button(tprint("%\0", ifx disasm_mode then "T" else "A").data) {
+        if disasm_mode {
             disasm_scroll_state /= 2;
-            disasm_mode = .ARM;
+            disasm_mode = false;
         } else {
             disasm_scroll_state *= 2;
-            disasm_mode = .THUMB;
+            disasm_mode = true;
         }
     }
     ImGui.SameLine();
@@ -1184,14 +1184,14 @@ disasm_window :: () {
     if ImGui.InputText("Jump to...", disasm_jump_buffer.data, 8) {
         str := string.{7, disasm_jump_buffer.data};
         parsed := string_to_int(str, 16);
-        disasm_scroll_state = parsed / ifx disasm_mode == .ARM then 4 else 2;
+        disasm_scroll_state = parsed / ifx disasm_mode then 2 else 4;
     }
     for 0..cast(int)ImGui.GetWindowSize().y {
-        addr : u32 = xx ((disasm_scroll_state + xx it) * ifx disasm_mode == .ARM then 4 else 2);
-        to_print := ifx disasm_mode == .ARM then
+        addr : u32 = xx ((disasm_scroll_state + xx it) * ifx disasm_mode then 2 else 4);
+        to_print := ifx !disasm_mode then
             disassemble_arm_instruction(read_32(addr))
         else disassemble_thumb_instruction(read_16(addr));
-        has_breakpoint := ifx disasm_mode == .ARM then ((read_32(addr) & 0xfff000f0) == 0xe1200070) else ((read_16(addr) & 0xff00) == 0xbe00);
+        has_breakpoint := ifx !disasm_mode then ((read_32(addr) & 0xfff000f0) == 0xe1200070) else ((read_16(addr) & 0xff00) == 0xbe00);
         in_history, history_idx := array_find(cpu.pc_history, addr);
         if addr == cpu.reg[15] {
             ImGui.TextColored(.{0, 1, 0, 1}, "%\t%", addr, to_print);
@@ -1206,10 +1206,10 @@ disasm_window :: () {
             ImGui.Text("%\t%", addr, to_print);
         }
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("0x%", ifx disasm_mode == .ARM then read_32(addr) else read_16(addr));
+            ImGui.SetTooltip("0x%", ifx !disasm_mode then read_32(addr) else read_16(addr));
         }
         if ImGui.IsItemClicked() {
-            if disasm_mode == .ARM {
+            if !disasm_mode {
                 ins := read_32(addr);
                 if has_breakpoint {
                     idx := (ins & 0xf) | ((ins >> 8) & 0xfff);

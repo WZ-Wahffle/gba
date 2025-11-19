@@ -293,39 +293,34 @@ step_cpu :: () {
 }
 
 set_mode :: (mode: u32) {
-    cpu.sp[cpu.mode] = cpu.reg[13];
-    cpu.lr[cpu.mode] = cpu.reg[14];
-    if cpu.mode != .USER then cpu.spsr[cpu.mode] = cpu.psr;
-    if cpu.mode == .FIQ {
-        for 8..14 cpu.reg_hi_fiq[it - 8] = cpu.reg[it];
-    }
+    new_mode: Cpu_Mode;
     if (mode & 0x1f) == {
         case 0b10000;
-            cpu.mode = .USER;
+            new_mode = .USER;
         case 0b10001;
-            cpu.mode = .FIQ;
+            new_mode = .FIQ;
         case 0b10010;
-            cpu.mode = .IRQ;
+            new_mode = .IRQ;
         case 0b10011;
-            cpu.mode = .SVC;
+            new_mode = .SVC;
         case 0b10111;
-            cpu.mode = .ABT;
+            new_mode = .ABT;
         case 0b11011;
-            cpu.mode = .UND;
+            new_mode = .UND;
         case 0b11111;
-            cpu.mode = .SYSTEM;
+            new_mode = .SYSTEM;
     }
-    cpu.reg[13] = cpu.sp[cpu.mode];
-    cpu.reg[14] = cpu.lr[cpu.mode];
+    cpu.sp[cpu.mode] = cpu.reg[13];
+    cpu.lr[cpu.mode] = cpu.reg[14];
+    if new_mode != .USER then cpu.spsr[new_mode] = cpu.psr;
     if cpu.mode != .USER then cpu.psr = cpu.spsr[cpu.mode];
-    if cpu.mode == .FIQ {
-        for 8..14 cpu.reg[it] = cpu.reg_hi_fiq[it - 8];
-    }
+    cpu.reg[13] = cpu.sp[new_mode];
+    cpu.reg[14] = cpu.lr[new_mode];
+    cpu.mode = new_mode;
 }
 
 interrupt :: (mode: Cpu_Mode) {
     assert(mode == Cpu_Mode.IRQ || mode == Cpu_Mode.FIQ || mode == Cpu_Mode.SVC);
-    cpu.state = .ARM;
     if mode == {
         case .SVC;
         set_mode(0b10011);
@@ -342,6 +337,7 @@ interrupt :: (mode: Cpu_Mode) {
         cpu.reg[15] = 0x1c;
         set_status_bit(.F, true);
     }
+    set_status_bit(.T, false);
     cpu.halted = false;
     cpu.stopped = false;
 }
@@ -479,6 +475,7 @@ transfer :: (idx: int) {
             }
         }
     }
+    cpu.remaining_cycles -= 2;
 }
 
 cond :: (val: u32) -> bool {
@@ -520,7 +517,7 @@ cond :: (val: u32) -> bool {
 }
 
 reg_src :: inline (val: u8) -> u32 {
-    if val == 15 then return cpu.reg[15] + xx ifx cpu.state == .ARM then 4 else 2;
+    if val == 15 then return cpu.reg[15] + xx ifx get_status_bit(.T) then 2 else 4;
     return cpu.reg[val];
 }
 
@@ -777,7 +774,7 @@ populate_thumb_lut :: () {
 }
 
 execute_next :: () {
-    if cpu.state == .ARM {
+    if !get_status_bit(.T) {
         ins := next_32();
         if !cond(ins >> 28) {
             return;

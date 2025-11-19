@@ -1,7 +1,6 @@
 arm_bx :: inline (ins: u32) {
     if (ins & 0xfff00) != 0xfff00 assert(false);
     rm := reg_src(cast(u8) ins & 0xf);
-    cpu.state = ifx (rm & 1) != 0 then .THUMB else .ARM;
     set_status_bit(.T, (rm & 1) != 0);
     cpu.reg[15] = rm & 0xfffffffe;
     // cpu.reg[15] += post_inc;

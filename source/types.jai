@@ -6,7 +6,6 @@ Cpu :: struct {
     lr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     psr: u32 = 0xd3;
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
-    state := Cpu_State.ARM;
     mode := Cpu_Mode.SVC;
     privileged := true;
     dma: [4]Dma;
@@ -272,10 +271,7 @@ Apu :: struct {
     }
 
     Fifo :: struct {
-        buffer: union {
-            _8: [32]u8;
-            _32: [8]u32;
-        }
+        buffer: [32]u8;
         r : u8 = 0;
         w : u8 = 0;
         cnt := 0;
@@ -304,11 +300,6 @@ Dma_Addr_Control :: enum {
     DEC;
     FIXED;
     INC_RELOAD;
-}
-
-Cpu_State :: enum {
-    THUMB;
-    ARM;
 }
 
 Cpu_Mode :: enum s32 {
