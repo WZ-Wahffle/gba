@@ -10,6 +10,7 @@ show_blend := false;
 show_timer := false;
 show_rom := false;
 show_disasm := false;
+show_keypad := false;
 show_cpu := false;
 show_ppu := false;
 show_apu := false;
@@ -28,6 +29,9 @@ draw_gui :: () {
                 }
                 if ImGui.MenuItem("apu", "shift+a") {
                     show_apu = !show_apu;
+                }
+                if ImGui.MenuItem("keypad", "shift+k") {
+                    show_keypad = !show_keypad;
                 }
                 if ImGui.MenuItem("dma", "shift+m") {
                     show_dma = !show_dma;
@@ -87,6 +91,7 @@ draw_gui :: () {
     if show_ppu ppu_window();
     if show_apu apu_window();
     if show_disasm disasm_window();
+    if show_keypad keypad_window();
     #if #exists(__Iprof) {
         profiler_window();
     }
@@ -1248,6 +1253,85 @@ disasm_window :: () {
             }
         }
     }
+    ImGui.End();
+}
+
+keypad_window :: () {
+    controller_string := #string DONE
+       _______________________
+  ____/                       \____
+ /__/     _________________     \__\
+|        |                 |        |
+|   ^    |                 |        |
+|  < >   |                 |     O  |
+|   v  o |                 |  O     |
+|      o |                 |        |
+ \__     \_________________/     __/
+    \___________________________/
+DONE
+    controller_split := string.["       _______________________",
+    "  ___", "_/                       \\_", "___",
+    " /", "__/     _________________     \\__", "\\",
+    "|        |                 |        |",
+    "|   ", "^", "    |                 |        |",
+    "|  ", "<", " >", "   |                 |     ", "O", "  |",
+    "|   ", "v", "  ", "o", " |                 |  ", "O", "     |",
+    "|      ", "o", " |                 |        |",
+    " \\__     \\_________________/     __/",
+    "    \\___________________________/"];
+    off := Vector4.{1.0, 1.0, 1.0, 1.0};
+    on := Vector4.{1.0, 0.0, 0.0, 1.0};
+    ImGui.Begin("keypad");
+    ImGui.PushStyleVar(.ItemSpacing, .{0.0, 0.0});
+    ImGui.Text("%", controller_split[0]);
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x200) != 0 then on else off, "%", controller_split[1]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[2]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x100) != 0 then on else off, "%", controller_split[3]);
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x200) != 0 then on else off, "%", controller_split[4]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[5]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x100) != 0 then on else off, "%", controller_split[6]);
+    ImGui.Text("%", controller_split[7]);
+    ImGui.Text("%", controller_split[8]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x40) != 0 then on else off, "%", controller_split[9]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[10]);
+    ImGui.Text("%", controller_split[11]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x20) != 0 then on else off, "%", controller_split[12]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x10) != 0 then on else off, "%", controller_split[13]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[14]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x1) != 0 then on else off, "%", controller_split[15]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[16]);
+    ImGui.Text("%", controller_split[17]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x80) != 0 then on else off, "%", controller_split[18]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[19]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x8) != 0 then on else off, "%", controller_split[20]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[21]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x2) != 0 then on else off, "%", controller_split[22]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[23]);
+    ImGui.Text("%", controller_split[24]);
+    ImGui.SameLine();
+    ImGui.TextColored(ifx (ppu.keypad_state & 0x4) != 0 then on else off, "%", controller_split[25]);
+    ImGui.SameLine();
+    ImGui.Text("%", controller_split[26]);
+    ImGui.Text("%", controller_split[27]);
+    ImGui.Text("%", controller_split[28]);
+    ImGui.PopStyleVar();
     ImGui.End();
 }
 

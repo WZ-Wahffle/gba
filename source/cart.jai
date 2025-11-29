@@ -6,11 +6,14 @@ rom_read :: (addr: u32) -> u8 {
         }
         case .EEPROM;
             if addr >= 0x0d000000 && addr < 0x0e000000 {
-                if cpu.ee_read_idx < 4 || cpu.ee_read_idx > 67 then return 1;
-                else {
-                    ret := cpu.ee[cpu.ee_block_idx] >> (cpu.ee_read_idx - 4);
-                    cpu.ee_read_idx += 1;
-                    return xx ret & 1;
+                if addr % 2 == 1 then return 0;
+                cpu.ee_read_idx += 1;
+                if cpu.ee_read_idx > 4 && cpu.ee_read_idx <= 68 {
+                    ret : u8 = xx (cpu.ee_read >> 63);
+                    cpu.ee_read <<= 1;
+                    return ret;
+                } else {
+                    return 1;
                 }
             } else if addr < 0x0e000000 {
                 return cpu.memory.rom[addr % cpu.memory.rom.count];
@@ -37,21 +40,46 @@ rom_write :: (addr: u32, val: u8) {
                     log_error("FIXME: Could not determine size of EEPROM!");
                 }
             }
-            cpu.ee_buffer[cpu.ee_buffer_idx] = (val & 1) != 0;
-            cpu.ee_buffer_idx += 1;
+            to_write := (val & 1) != 0;
             if cpu.eeprom_size == .EEPROM_512B {
-                first_idx : u8 = cpu.ee_buffer_idx - 9;
-                second_idx : u8 = cpu.ee_buffer_idx - 8;
-                last_idx : u8 = cpu.ee_buffer_idx - 1;
-                if cpu.ee_buffer[first_idx] && cpu.ee_buffer[second_idx] && !cpu.ee_buffer[last_idx] {
-                    // read
-                    ee_addr: u32 = 0;
-                    for 0..5 {
-                        ee_addr |= xx ifx cpu.ee_buffer[(second_idx + 1 + it) & 0xff] then 1 << (5 - it) else 0;
-                    }
-                    cpu.ee_block_idx = ee_addr;
-                    cpu.ee_read_idx = 0;
-                    for 0..9 cpu.ee_buffer[(first_idx + it) & 0xff] = false;
+                log("write % 0x%\n", ifx to_write then 1 else 0, formatInt(cpu.reg[15], 16));
+                if cpu.ee_state == {
+                    case .NONE;
+                        if to_write cpu.ee_state = .FIRST_BIT_READ;
+                    case .FIRST_BIT_READ;
+                        cpu.ee_state = ifx to_write then .READING else .WRITING;
+                        cpu.ee_block_idx = 0;
+                        cpu.ee_block = 0;
+                    case .READING;
+                        cpu.ee_block <<= 1;
+                        cpu.ee_block |= xx to_write;
+                        cpu.ee_block_idx += 1;
+                        if cpu.ee_block_idx == 6 {
+                            cpu.ee_state = .FINISHED;
+                            cpu.ee_read = cpu.ee[cpu.ee_block];
+                            cpu.ee_read_idx = 0;
+                            log("Reading 0x% from 0x%\n", formatInt(cpu.ee_read, 16), formatInt(cpu.ee_block, 16));
+                        }
+                    case .WRITING;
+                        cpu.ee_block <<= 1;
+                        cpu.ee_block |= xx to_write;
+                        cpu.ee_block_idx += 1;
+                        if cpu.ee_block_idx == 6 {
+                            cpu.ee_state = .WRITING_DATA;
+                            cpu.ee_write = 0;
+                            cpu.ee_write_idx = 0;
+                        }
+                    case .WRITING_DATA;
+                        cpu.ee_write <<= 1;
+                        cpu.ee_write |= xx to_write;
+                        cpu.ee_write_idx += 1;
+                        if cpu.ee_write_idx == 64 {
+                            cpu.ee_state = .FINISHED;
+                            cpu.ee[cpu.ee_block] = cpu.ee_write;
+                            log("Writing 0x% to 0x%\n", formatInt(cpu.ee_write, 16), formatInt(cpu.ee_block, 16));
+                        }
+                    case .FINISHED;
+                        cpu.ee_state = .NONE;
                 }
             }
         }

@@ -9,11 +9,16 @@ Cpu :: struct {
     mode := Cpu_Mode.SVC;
     backup_type := Backup_Type.NONE;
     eeprom_size := Eeprom_Size.UNDECIDED;
+    ee: [0x400]u64;
     ee_buffer: [256]bool;
     ee_buffer_idx : u8 = 0;
-    ee_read_idx := 0;
-    ee: [0x400]u64;
+    ee_block : u32 = 0;
     ee_block_idx := 0;
+    ee_read : u64 = 0;
+    ee_read_idx := 0;
+    ee_write : u64 = 0;
+    ee_write_idx := 0;
+    ee_state := Eeprom_State.NONE;
     privileged := true;
     dma: [4]Dma;
     timer: [4]Timer;
@@ -297,6 +302,15 @@ Eeprom_Size :: enum {
     UNDECIDED;
     EEPROM_512B;
     EEPROM_8K;
+}
+
+Eeprom_State :: enum {
+    NONE;
+    FIRST_BIT_READ;
+    READING;
+    WRITING;
+    WRITING_DATA;
+    FINISHED;
 }
 
 Status_Bit :: enum {

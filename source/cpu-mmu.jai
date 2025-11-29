@@ -1,5 +1,14 @@
 mmio_read :: (addr: u32) -> u8 {
     if addr - 0x04000000 == {
+        case 0x004;
+            return xx (ifx ppu.draw_y >= 160 && ppu.draw_y <= 226 then 1 else 0) |
+            (ifx ppu.draw_x < 228 then 2 else 0) |
+            (ifx ppu.vcounter == ppu.draw_y then 4 else 0) |
+            (ifx ppu.vblank_irq_enable then 8 else 0) |
+            (ifx ppu.hblank_irq_enable then 16 else 0) |
+            (ifx ppu.vcounter_irq_enable then 32 else 0);
+        case 0x005;
+            return xx ppu.vcounter;
         case 0x006;
             return xx ppu.draw_y;
         case 0x0dc;
@@ -17,6 +26,10 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x98a;
             return 0;
         case 0x98b;
+            return 0;
+        case 0x128;
+            return 0;
+        case 0x129;
             return 0;
         case 0x130;
             return xx ppu.keypad_state & 0xff;

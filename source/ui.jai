@@ -75,8 +75,77 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
             }
         }
     } else {
-        // TODO
-        assert(false);
+        line_size_px := 256 * ifx ppu.bg[bg].wide then 2 else 1;
+        y_pos : int = xx ppu.bg[bg].y_off + y;
+        y_pos %= 256 * ifx ppu.bg[bg].tall then 2 else 1;
+        line_size_tiles := line_size_px / 8;
+        base_addr := ppu.bg[bg].screen_base_block * 2048;
+        base_addr += (y_pos / 8) * (line_size_tiles) * 2;
+        Text_Tile_Attr :: struct {
+            idx := 0;
+            flip_h := false;
+            flip_v := false;
+            palette := 0;
+        }
+        tile_address_buffer: [64]Text_Tile_Attr;
+        for 0..line_size_tiles-1 {
+            val := ppu.memory.vram._16[(base_addr >> 1) + it];
+            tile_address_buffer[it].idx = val & 0x3ff;
+            tile_address_buffer[it].flip_h = val & 0x400 != 0;
+            tile_address_buffer[it].flip_v = val & 0x800 != 0;
+            tile_address_buffer[it].palette = val >> 12;
+        }
+        pixel_buffer: [512]int;
+        if ppu.bg[bg].single_palette {
+            // TODO
+            assert(false);
+        } else {
+            for tile_idx: 0..line_size_tiles-1 {
+                tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx].idx * 32;
+                y_pos_src := ifx tile_address_buffer[tile_idx].flip_v then (7 - (y_pos % 8)) else y_pos % 8;
+                tile_base_addr += 4 * y_pos_src;
+                for pixel_idx: 0..7 {
+                    pixel_idx_src := ifx tile_address_buffer[tile_idx].flip_h then (7 - pixel_idx) else pixel_idx;
+                    palette_idx := ppu.memory.vram._8[tile_base_addr + (pixel_idx_src >> 1)];
+                    palette_idx = ifx (pixel_idx_src & 1) == 0 then palette_idx & 0xf else palette_idx >> 4;
+                    if tile_address_buffer[tile_idx].palette == 0 && palette_idx == 0 {
+                        pixel_buffer[8 * tile_idx + pixel_idx] = -1;
+                    } else {
+                        pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[16 * tile_address_buffer[tile_idx].palette + palette_idx];
+                    }
+                }
+            }
+
+            win_1_in_y := ppu.win[0].min_y <= y && ppu.win[0].max_y >= y;
+            win_2_in_y := ppu.win[1].min_y <= y && ppu.win[1].max_y >= y;
+            for 0..239 {
+                if ppu.bg[bg].prio * 2 >= line_priority_buffer[it] continue;
+                win_1_in := win_1_in_y && ppu.win[0].min_x <= it && ppu.win[0].max_x >= it;
+                win_2_in := win_2_in_y && ppu.win[1].min_x <= it && ppu.win[1].max_x >= it;
+
+                if ppu.win[0].enable && win_1_in && !ppu.win[0].bg_enable[bg] {
+                    continue;
+                }
+                if ppu.win[1].enable && win_2_in && !ppu.win[1].bg_enable[bg] {
+                    continue;
+                }
+                // TODO probably not right? I'm guessing it should be checking every
+                // window/inside combination individually
+                if ((ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[it])) && !ppu.outside_win_bg_enable[bg] {
+                    continue;
+                }
+                if ppu.obj_win.enable && obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
+                    continue;
+                }
+
+                x_pos : int = xx (it + ppu.bg[bg].x_off);
+                x_pos %= 256 * ifx ppu.bg[bg].wide then 2 else 1;
+                if pixel_buffer[x_pos] != -1 {
+                    framebuffer[y * SCREEN_WIDTH + it] = xx pixel_buffer[x_pos];
+                    line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
+                }
+            }
+        }
     }
 }
 
@@ -246,6 +315,11 @@ step_ppu :: () {
 
             if ppu.bg_mode == {
                 case 0;
+                    draw_obj(ppu.draw_y);
+                    draw_bg(ppu.draw_y, 0, false);
+                    draw_bg(ppu.draw_y, 1, false);
+                    draw_bg(ppu.draw_y, 2, false);
+                    draw_bg(ppu.draw_y, 3, false);
                 case 1;
                 case 2;
                     draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
@@ -367,6 +441,8 @@ ui :: () {
                         show_ppu = !show_ppu;
                     case .SDLK_i;
                         show_iwram = !show_iwram;
+                    case .SDLK_k;
+                        show_keypad = !show_keypad;
                     case .SDLK_m;
                         show_dma = !show_dma;
                     case .SDLK_o;
@@ -395,16 +471,16 @@ ui :: () {
 
         // inputs
         ppu.keypad_state =
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A) << 0) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B) << 1) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK) << 2) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START) << 3) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) << 4) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) << 5) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP) << 6) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) << 7) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) << 8) |
-            (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) << 9);
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B)) << 0) | // perhaps swap B and A on a less messed up controller
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A)) << 1) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK)) << 2) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START)) << 3) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) << 4) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) << 5) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP)) << 6) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN)) << 7) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) << 8) |
+            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) << 9);
 
         // processing
         if cpu.emu_state == {
