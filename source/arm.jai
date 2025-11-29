@@ -1,11 +1,13 @@
 arm_bx :: inline (ins: u32) {
     if (ins & 0xfff00) != 0xfff00 assert(false);
-    rm := reg_src(cast(u8) ins & 0xf);
-    set_status_bit(.T, (rm & 1) != 0);
-    cpu.reg[15] = rm & 0xfffffffe;
-    // cpu.reg[15] += post_inc;
-    cpu.psr &= ~cast(u32)0x10;
-    cpu.psr |= (rm & 1) << 4;
+    rm := reg_src(xx ins & 0xf);
+    if (rm & 1) == 0 {
+        set_status_bit(.T, false);
+        cpu.reg[15] = rm & 0xfffffffc;
+    } else {
+        set_status_bit(.T, true);
+        cpu.reg[15] = rm & 0xfffffffe;
+    }
 }
 
 arm_mul_mla :: inline (ins: u32) {
@@ -198,7 +200,6 @@ arm_msr :: inline (ins: u32) {
         if c && cpu.mode != 0 {
             cpu.spsr[cpu.mode] &= 0xffffff00;
             cpu.spsr[cpu.mode] |= to_write & 0x000000ff;
-            set_mode(to_write & 0x1f);
         }
     } else {
         // cpsr
@@ -209,7 +210,7 @@ arm_msr :: inline (ins: u32) {
         if c && cpu.privileged {
             cpu.psr &= 0xffffff00;
             cpu.psr |= to_write & 0x000000ff;
-            set_mode(to_write & 0x1f);
+            set_mode(cpu.psr);
         }
     }
 }

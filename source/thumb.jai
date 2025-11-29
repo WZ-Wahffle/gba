@@ -226,8 +226,6 @@ thumb_bx_blx_2 :: inline (ins: u16) {
     addr := reg_src(xx (ins >> 3) & 0xf);
     if (ins & 0x80) != 0 then cpu.reg[14] = (cpu.reg[15]) | 1;
     set_status_bit(.T, (addr & 1) != 0);
-    cpu.psr &= ~cast(u32)0x10;
-    cpu.psr |= (addr & 1) << 4;
     cpu.reg[15] = addr & 0xfffffffe;
 }
 
@@ -250,7 +248,18 @@ thumb_eor :: inline (ins: u16) {
 }
 
 thumb_lsl_2 :: inline (ins: u16) {
-    assert(false);
+    rs := reg_src(xx ((ins >> 3) & 0b111)) & 0xff;
+    rd_idx : u8 = xx ins & 0b111;
+    result := reg_src(rd_idx) << rs;
+    if rs == 0 {
+        // this page intentionally left blank
+    } else if rs == 32 {
+        set_status_bit(.C, (reg_src(rd_idx) & 1) != 0);
+    } else if rs > 32 {
+        set_status_bit(.C, false);
+    } else {
+        set_status_bit(.C, (reg_src(rd_idx) & (1 << (32 - rs))) != 0);
+    }
 }
 
 thumb_lsr_2 :: inline (ins: u16) {
@@ -502,7 +511,7 @@ thumb_add_5_add_6 :: inline (ins: u16) {
 thumb_swi_b_1 :: inline (ins: u16) {
     cond_idx : u8 = xx (ins >> 8) & 0xf;
     if cond_idx == 0xf {
-        assert(false);
+        interrupt(.SVC);
     } else {
         if cond(cond_idx) {
             immed := (ins & 0xff) << 1;

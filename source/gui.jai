@@ -660,7 +660,7 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     opcode = "BL";
                 }
                 addr : s32 = (cast(s32)(inst & 0x7fffff) << 2) - (cast(s32)(inst & 0x800000) << 2);
-                append(*suffix, tprint("0x%", addr));
+                append(*suffix, tprint("0x%", formatInt(addr, 16)));
             }
         case 0b11;
             if (inst & 0x2000000) == 0 {
@@ -677,7 +677,8 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     }
                 } else {
                     // software interrupt
-                    // assert(false);
+                    opcode = "SWI";
+                    append(*suffix, tprint("0x%", formatInt(inst & 0xffffff, 16)));
                 }
             }
     }
@@ -1100,11 +1101,16 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
         case 0b110;
         if (ins & 0x1000) != 0 {
             // B (1)
-            opcode = tprint("b%", cond_lut_lower[xx (ins >> 8) & 0xf]);
-            immed : s32 = xx (ins & 0xff) << 1;
-            if immed > 255 then immed -= 512;
-            append(*suffix, "0x");
-            append(*suffix, tprint("%", formatInt(immed, 16, 1)));
+            cond_idx := (ins >> 8) & 0xf;
+            if cond_idx == 0xf {
+                opcode = "swi";
+                append(*suffix, tprint("0x%", formatInt(ins & 0xff, 16, 1)));
+            } else {
+                opcode = tprint("b%", cond_lut_lower[cond_idx]);
+                immed : s32 = xx (ins & 0xff) << 1;
+                if immed > 255 then immed -= 512;
+                append(*suffix, tprint("0x%", formatInt(immed, 16, 1)));
+            }
         } else {
             // Load/store multiple
             regs := ins & 0xff;

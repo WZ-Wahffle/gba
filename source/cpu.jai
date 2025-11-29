@@ -27,8 +27,8 @@ read_8 :: (addr: u32) -> u8 {
     if addr >= 0x07000000 && addr < 0x08000000 {
         return ppu.memory.oam._8[addr % 0x400];
     }
-    if addr >= 0x08000000 && addr < 0x0e000000 {
-        return cpu.memory.rom[addr % cpu.memory.rom.count];
+    if addr >= 0x08000000 {
+        return rom_read(addr);
     }
 
     log_warn("Unmapped read: 0x%", formatInt(addr, 16));
@@ -63,9 +63,9 @@ read_16 :: (addr: u32) -> u16 {
     if addr >= 0x07000000 && addr < 0x08000000 {
         return ppu.memory.oam._16[(addr >> 1) % 0x200];
     }
-    if addr >= 0x08000000 && addr < 0x0e000000 {
-        first : u16 = cpu.memory.rom[addr % cpu.memory.rom.count];
-        second : u16 = cpu.memory.rom[(addr + 1) % cpu.memory.rom.count];
+    if addr >= 0x08000000 {
+        first : u16 = rom_read(addr);
+        second : u16 = rom_read(addr + 1);
         return first | (second << 8);
     }
 
@@ -104,10 +104,10 @@ read_32 :: (addr: u32) -> u32 {
         return ppu.memory.oam._32[(addr >> 2) % 0x100];
     }
     if addr >= 0x08000000 && addr < 0x0e000000 {
-        first : u32 = cpu.memory.rom[addr % cpu.memory.rom.count];
-        second : u32 = cpu.memory.rom[(addr + 1) % cpu.memory.rom.count];
-        third : u32 = cpu.memory.rom[(addr + 2) % cpu.memory.rom.count];
-        fourth : u32 = cpu.memory.rom[(addr + 3) % cpu.memory.rom.count];
+        first : u32 = rom_read(addr);
+        second : u32 = rom_read(addr + 1);
+        third : u32 = rom_read(addr + 2);
+        fourth : u32 = rom_read(addr + 3);
         return first | (second << 8) | (third << 16) | (fourth << 24);
     }
 
@@ -139,7 +139,7 @@ write_8 :: (addr: u32, val: u8) {
         ppu.memory.oam._8[addr % 0x400] = val;
         oam_update(addr);
     } else {
-        log_warn("Unmapped write: 0x%", formatInt(addr, 16));
+        rom_write(addr, val);
     }
 }
 
@@ -174,7 +174,8 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
         cpu.memory.rom[addr % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
         cpu.memory.rom[(addr + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
     } else {
-        log_warn("Unmapped write: 0x%", formatInt(addr, 16));
+        rom_write(addr, xx val & 0xff);
+        rom_write(addr + 1, xx val >> 8);
     }
 }
 
@@ -215,7 +216,10 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
         cpu.memory.rom[(addr + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
         cpu.memory.rom[(addr + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
     } else {
-        log_warn("Unmapped write: 0x%", formatInt(addr, 16));
+        rom_write(addr, xx (val >> 0) & 0xff);
+        rom_write(addr + 1, xx (val >> 8) & 0xff);
+        rom_write(addr + 2, xx (val >> 16) & 0xff);
+        rom_write(addr + 3, xx (val >> 24) & 0xff);
     }
 }
 
@@ -224,21 +228,22 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
 // and thus will mostly be reading from the ROM or BIOS
 next_16 :: () -> u16 {
     ret: u16;
-    if cpu.reg[15] >= 0x08000000 && cpu.reg[15] < 0x0e000000 {
-        first : u16 = cpu.memory.rom[cpu.reg[15] % cpu.memory.rom.count];
-        second : u16 = cpu.memory.rom[(cpu.reg[15] + 1) % cpu.memory.rom.count];
+    idx := cpu.reg[15] & 0xfffffffe;
+    if idx >= 0x08000000 && idx < 0x0e000000 {
+        first : u16 = cpu.memory.rom[idx % cpu.memory.rom.count];
+        second : u16 = cpu.memory.rom[(idx + 1) % cpu.memory.rom.count];
         ret = first | (second << 8);
     }
-    else if cpu.reg[15] < 0x4000 {
-        ret = cpu.memory.bios._16[cpu.reg[15] >> 1];
+    else if idx < 0x4000 {
+        ret = cpu.memory.bios._16[idx >> 1];
     }
-    else if cpu.reg[15] >= 0x02000000 && cpu.reg[15] < 0x02040000 {
-        ret = cpu.memory.ewram._16[(cpu.reg[15] >> 1) % 0x20000];
+    else if idx >= 0x02000000 && idx < 0x02040000 {
+        ret = cpu.memory.ewram._16[(idx >> 1) % 0x20000];
     }
-    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x04000000 {
-        ret = cpu.memory.iwram._16[(cpu.reg[15] >> 1) % 0x4000];
+    else if idx >= 0x03000000 && idx < 0x04000000 {
+        ret = cpu.memory.iwram._16[(idx >> 1) % 0x4000];
     } else {
-        log_warn("Unmapped execution read: 0x%", formatInt(cpu.reg[15], 16));
+        log_warn("Unmapped execution read: 0x%", formatInt(idx, 16));
     }
     cpu.reg[15] += 2;
     return ret;
@@ -246,23 +251,24 @@ next_16 :: () -> u16 {
 
 next_32 :: () -> u32 {
     ret: u32;
-    if cpu.reg[15] >= 0x08000000 && cpu.reg[15] < 0x0e000000 {
-        first : u32 = cpu.memory.rom[cpu.reg[15] % cpu.memory.rom.count];
-        second : u32 = cpu.memory.rom[(cpu.reg[15] + 1) % cpu.memory.rom.count];
-        third : u32 = cpu.memory.rom[(cpu.reg[15] + 2) % cpu.memory.rom.count];
-        fourth : u32 = cpu.memory.rom[(cpu.reg[15] + 3) % cpu.memory.rom.count];
+    idx := cpu.reg[15] & 0xfffffffc;
+    if idx >= 0x08000000 && idx < 0x0e000000 {
+        first : u32 = cpu.memory.rom[idx % cpu.memory.rom.count];
+        second : u32 = cpu.memory.rom[(idx + 1) % cpu.memory.rom.count];
+        third : u32 = cpu.memory.rom[(idx + 2) % cpu.memory.rom.count];
+        fourth : u32 = cpu.memory.rom[(idx + 3) % cpu.memory.rom.count];
         ret = first | (second << 8) | (third << 16) | (fourth << 24);
     }
-    else if cpu.reg[15] < 0x4000 {
-        ret = cpu.memory.bios._32[cpu.reg[15] >> 2];
+    else if idx < 0x4000 {
+        ret = cpu.memory.bios._32[idx >> 2];
     }
-    else if cpu.reg[15] >= 0x02000000 && cpu.reg[15] < 0x02040000 {
-        ret = cpu.memory.ewram._32[(cpu.reg[15] >> 2) % 0x10000];
+    else if idx >= 0x02000000 && idx < 0x02040000 {
+        ret = cpu.memory.ewram._32[(idx >> 2) % 0x10000];
     }
-    else if cpu.reg[15] >= 0x03000000 && cpu.reg[15] < 0x04000000 {
-        ret = cpu.memory.iwram._32[(cpu.reg[15] >> 2) % 0x2000];
+    else if idx >= 0x03000000 && idx < 0x04000000 {
+        ret = cpu.memory.iwram._32[(idx >> 2) % 0x2000];
     } else {
-        log_warn("Unmapped execution read: 0x%", formatInt(cpu.reg[15], 16));
+        log_error("Unmapped execution read: 0x%", formatInt(idx, 16));
     }
     cpu.reg[15] += 4;
     return ret;
@@ -312,15 +318,16 @@ set_mode :: (mode: u32) {
     }
     cpu.sp[cpu.mode] = cpu.reg[13];
     cpu.lr[cpu.mode] = cpu.reg[14];
-    if new_mode != .USER then cpu.spsr[new_mode] = cpu.psr;
-    if cpu.mode != .USER then cpu.psr = cpu.spsr[cpu.mode];
     cpu.reg[13] = cpu.sp[new_mode];
     cpu.reg[14] = cpu.lr[new_mode];
     cpu.mode = new_mode;
+    cpu.psr &= ~cast(u32)0x1f;
+    cpu.psr |= mode & 0x1f;
 }
 
 interrupt :: (mode: Cpu_Mode) {
     assert(mode == Cpu_Mode.IRQ || mode == Cpu_Mode.FIQ || mode == Cpu_Mode.SVC);
+    cpu.spsr[mode] = cpu.psr;
     if mode == {
         case .SVC;
         set_mode(0b10011);
@@ -330,13 +337,13 @@ interrupt :: (mode: Cpu_Mode) {
         set_mode(0b10010);
         cpu.reg[14] = cpu.reg[15] + 4;
         cpu.reg[15] = 0x18;
-        set_status_bit(.I, true);
         case .FIQ;
         set_mode(0b10001);
         cpu.reg[14] = cpu.reg[15] + 4;
         cpu.reg[15] = 0x1c;
         set_status_bit(.F, true);
     }
+    set_status_bit(.I, true);
     set_status_bit(.T, false);
     cpu.halted = false;
     cpu.stopped = false;

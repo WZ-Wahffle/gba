@@ -7,6 +7,13 @@ Cpu :: struct {
     psr: u32 = 0xd3;
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     mode := Cpu_Mode.SVC;
+    backup_type := Backup_Type.NONE;
+    eeprom_size := Eeprom_Size.UNDECIDED;
+    ee_buffer: [256]bool;
+    ee_buffer_idx : u8 = 0;
+    ee_read_idx := 0;
+    ee: [0x400]u64;
+    ee_block_idx := 0;
     privileged := true;
     dma: [4]Dma;
     timer: [4]Timer;
@@ -276,6 +283,20 @@ Apu :: struct {
         w : u8 = 0;
         cnt := 0;
     }
+}
+
+Backup_Type :: enum {
+    NONE;
+    EEPROM;
+    SRAM;
+    FLASH_64K;
+    FLASH_128K;
+}
+
+Eeprom_Size :: enum {
+    UNDECIDED;
+    EEPROM_512B;
+    EEPROM_8K;
 }
 
 Status_Bit :: enum {

@@ -4,3 +4,5 @@ build/
 gba_bios.bin
 imgui.ini
 jails.json
+*.log
+in/
