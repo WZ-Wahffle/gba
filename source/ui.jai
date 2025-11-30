@@ -80,7 +80,7 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         y_pos %= 256 * ifx ppu.bg[bg].tall then 2 else 1;
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
-        base_addr += (y_pos / 8) * (line_size_tiles) * 2;
+        base_addr += (y_pos / 8) * 64;
         Text_Tile_Attr :: struct {
             idx := 0;
             flip_h := false;
@@ -97,8 +97,20 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         }
         pixel_buffer: [512]int;
         if ppu.bg[bg].single_palette {
-            // TODO
-            assert(false);
+            for tile_idx: 0..line_size_tiles-1 {
+                tile_base_addr := ppu.bg[bg].char_base_block * 16384 + ((tile_idx / 32) * 2048) + tile_address_buffer[tile_idx].idx * 64;
+                y_pos_src := ifx tile_address_buffer[tile_idx].flip_v then (7 - (y_pos % 8)) else y_pos % 8;
+                tile_base_addr += 8 * y_pos_src;
+                for pixel_idx: 0..7 {
+                    pixel_idx_src := ifx tile_address_buffer[tile_idx].flip_h then (7 - pixel_idx) else pixel_idx;
+                    palette_idx := ppu.memory.vram._8[tile_base_addr + pixel_idx_src];
+                    if palette_idx == 0 {
+                        pixel_buffer[8 * tile_idx + pixel_idx] = -1;
+                    } else {
+                        pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[palette_idx];
+                    }
+                }
+            }
         } else {
             for tile_idx: 0..line_size_tiles-1 {
                 tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx].idx * 32;
@@ -108,42 +120,42 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
                     pixel_idx_src := ifx tile_address_buffer[tile_idx].flip_h then (7 - pixel_idx) else pixel_idx;
                     palette_idx := ppu.memory.vram._8[tile_base_addr + (pixel_idx_src >> 1)];
                     palette_idx = ifx (pixel_idx_src & 1) == 0 then palette_idx & 0xf else palette_idx >> 4;
-                    if tile_address_buffer[tile_idx].palette == 0 && palette_idx == 0 {
+                    if palette_idx == 0 {
                         pixel_buffer[8 * tile_idx + pixel_idx] = -1;
                     } else {
                         pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[16 * tile_address_buffer[tile_idx].palette + palette_idx];
                     }
                 }
             }
+        }
 
-            win_1_in_y := ppu.win[0].min_y <= y && ppu.win[0].max_y >= y;
-            win_2_in_y := ppu.win[1].min_y <= y && ppu.win[1].max_y >= y;
-            for 0..239 {
-                if ppu.bg[bg].prio * 2 >= line_priority_buffer[it] continue;
-                win_1_in := win_1_in_y && ppu.win[0].min_x <= it && ppu.win[0].max_x >= it;
-                win_2_in := win_2_in_y && ppu.win[1].min_x <= it && ppu.win[1].max_x >= it;
+        win_1_in_y := ppu.win[0].min_y <= y && ppu.win[0].max_y >= y;
+        win_2_in_y := ppu.win[1].min_y <= y && ppu.win[1].max_y >= y;
+        for 0..239 {
+            if ppu.bg[bg].prio * 2 >= line_priority_buffer[it] continue;
+            win_1_in := win_1_in_y && ppu.win[0].min_x <= it && ppu.win[0].max_x >= it;
+            win_2_in := win_2_in_y && ppu.win[1].min_x <= it && ppu.win[1].max_x >= it;
 
-                if ppu.win[0].enable && win_1_in && !ppu.win[0].bg_enable[bg] {
-                    continue;
-                }
-                if ppu.win[1].enable && win_2_in && !ppu.win[1].bg_enable[bg] {
-                    continue;
-                }
-                // TODO probably not right? I'm guessing it should be checking every
-                // window/inside combination individually
-                if ((ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[it])) && !ppu.outside_win_bg_enable[bg] {
-                    continue;
-                }
-                if ppu.obj_win.enable && obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
-                    continue;
-                }
+            if ppu.win[0].enable && win_1_in && !ppu.win[0].bg_enable[bg] {
+                continue;
+            }
+            if ppu.win[1].enable && win_2_in && !ppu.win[1].bg_enable[bg] {
+                continue;
+            }
+            // TODO probably not right? I'm guessing it should be checking every
+            // window/inside combination individually
+            if ((ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[it])) && !ppu.outside_win_bg_enable[bg] {
+                continue;
+            }
+            if ppu.obj_win.enable && obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
+                continue;
+            }
 
-                x_pos : int = xx (it + ppu.bg[bg].x_off);
-                x_pos %= 256 * ifx ppu.bg[bg].wide then 2 else 1;
-                if pixel_buffer[x_pos] != -1 {
-                    framebuffer[y * SCREEN_WIDTH + it] = xx pixel_buffer[x_pos];
-                    line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
-                }
+            x_pos : int = xx (it + ppu.bg[bg].x_off);
+            x_pos %= 256 * ifx ppu.bg[bg].wide then 2 else 1;
+            if pixel_buffer[x_pos] != -1 {
+                framebuffer[y * SCREEN_WIDTH + it] = xx pixel_buffer[x_pos];
+                line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
             }
         }
     }
@@ -151,12 +163,12 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
 
 draw_obj :: (y: u32) {
     if ppu.obj_enable {
-        pixel_buffer: [240]u16;
         base_addr := 0x10000;
         packed := ppu.obj_character_vram_mapping_one_dimensional;
         for ppu.oam {
             if it.bounding_box_min_y <= y && it.bounding_box_max_y > y {
                 if it.rotate_scale {
+                    pixel_buffer: [240]u16;
                     if it.single_palette {
                         a := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pa;
                         b := -ppu.oam_param[it.rotate_scale_param_idx].pb;
@@ -225,36 +237,61 @@ draw_obj :: (y: u32) {
                 } else {
                     if it.rotate_scale_double_size then continue;
                     obj_base := base_addr + it.tile_idx * 32;
+                    w := it.max_x - it.min_x;
+                    h := it.max_y - it.min_y;
+                    y_obj := y - it.min_y;
+                    if it.flip_v then y_obj = h - y_obj - 1;
+                    obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
+                    vertical_offset_into_tile := (y_obj % 8);
+                    x := it.min_x;
+                    if x < 0 continue;
+                    prio := it.prio;
+                    objwin := it.mode == 0b10;
+                    objalpha := it.mode == 0b01;
                     if it.single_palette {
-                        w := it.max_x - it.min_x;
                         // single palette, so tiles are 64 bytes each
                         // thus, a single line sliver of a tile is 8 bytes, or one u64
-                        y_obj := y - it.min_y;
-                        obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
-                        vertical_offset_into_tile := (y_obj % 8);
-                        x := it.min_x;
-                        prio := it.prio;
-                        objwin := it.mode == 0b10;
-                        objalpha := it.mode == 0b01;
-                        for coarse_x: 0..(w / 8)-1 { // 8 pixels equates to 16 bytes of info
-                            pixel_line : u64 = ppu.memory.vram._64[(obj_base >> 3) + vertical_offset_into_tile];
-                            for finer_x: 0..7 {
-                                if ((pixel_line >> (8 * xx finer_x)) & 0xff) != 0 {
-                                    if objwin {
-                                        obj_win_buffer[x + coarse_x * 8 + finer_x] = true;
-                                    } else {
-                                        if obj_prio_buffer[x + coarse_x * 8 + finer_x] > prio * 2 + 1 {
-                                            obj_line_buffer[x + coarse_x * 8 + finer_x] = ppu.memory.palette_ram._16[0x100 + ((pixel_line >> (8 * xx finer_x)) & 0xff)];
-                                            obj_prio_buffer[x + coarse_x * 8 + finer_x] = xx (prio * 2 + 1);
-                                            obj_use_alpha_buffer[x + coarse_x * 8 + finer_x] = objalpha;
-                                        }
+                        pixel_buffer: [8]u64;
+                        for coarse_x: 0..(w / 8)-1 {
+                            pixel_buffer[coarse_x] = ppu.memory.vram._64[(obj_base >> 3) + 8 * coarse_x + vertical_offset_into_tile];
+                        }
+                        for obj_x: 0..w-1 {
+                            obj_x_adj := obj_x;
+                            if it.flip_h then obj_x_adj = w - obj_x_adj - 1;
+                            pixel_color := (pixel_buffer[obj_x_adj / 8] >> (8 * (obj_x_adj % 8))) & 0xff;
+                            if pixel_color != 0 {
+                                if objwin {
+                                    obj_win_buffer[x + obj_x] = true;
+                                } else {
+                                    if obj_prio_buffer[x + obj_x] > prio * 2 + 1 {
+                                        obj_line_buffer[x + obj_x] = ppu.memory.palette_ram._16[0x100 + pixel_color];
+                                        obj_prio_buffer[x + obj_x] = xx (prio * 2 + 1);
+                                        obj_use_alpha_buffer[x + obj_x] = objalpha;
                                     }
                                 }
                             }
-                            obj_base += 64;
                         }
                     } else {
-                        // TODO
+                        pixel_buffer: [8]u32;
+                        for coarse_x: 0..(w / 8)-1 {
+                            pixel_buffer[coarse_x] = ppu.memory.vram._32[(obj_base >> 2) + 8 * coarse_x + vertical_offset_into_tile];
+                        }
+                        for obj_x: 0..w-1 {
+                            obj_x_adj := obj_x;
+                            if it.flip_h then obj_x_adj = w - obj_x_adj - 1;
+                            pixel_color := (pixel_buffer[obj_x_adj / 8] >> (4 * (obj_x_adj % 8))) & 0xf;
+                            if pixel_color != 0 {
+                                if objwin {
+                                    obj_win_buffer[x + obj_x] = true;
+                                } else {
+                                    if obj_prio_buffer[x + obj_x] > prio * 2 + 1 {
+                                        obj_line_buffer[x + obj_x] = ppu.memory.palette_ram._16[0x100 + it.palette * 16 + pixel_color];
+                                        obj_prio_buffer[x + obj_x] = xx (prio * 2 + 1);
+                                        obj_use_alpha_buffer[x + obj_x] = objalpha;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -308,8 +345,6 @@ step_ppu :: () {
                 obj_prio_buffer[it] = 8;
                 obj_win_buffer[it] = false;
                 obj_use_alpha_buffer[it] = false;
-                // black and grey checkerboard to more easily gauge pixel distances
-                // framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = xx ((((it + ppu.draw_y) & 1)) * 0x421);
                 framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = ppu.memory.palette_ram._16[0];
             }
 
@@ -320,6 +355,40 @@ step_ppu :: () {
                     draw_bg(ppu.draw_y, 1, false);
                     draw_bg(ppu.draw_y, 2, false);
                     draw_bg(ppu.draw_y, 3, false);
+                    win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y >= ppu.draw_y;
+                    win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y >= ppu.draw_y;
+                    for x: 0..239 {
+                        if obj_prio_buffer[x] >= line_priority_buffer[x] continue;
+                        win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x >= x;
+                        win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x >= x;
+                        if ppu.win[0].enable && win_1_in && !ppu.win[0].obj_enable {
+                            continue;
+                        }
+                        if ppu.win[1].enable && win_2_in && !ppu.win[1].obj_enable {
+                            continue;
+                        }
+                        // TODO probably not right? I'm guessing it should be checking every
+                        // window/inside combination individually
+                        if (ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[x]) && !ppu.outside_win_obj_enable {
+                            continue;
+                        }
+                        if ppu.obj_win.enable && obj_win_buffer[x] && !ppu.obj_win.obj_enable {
+                            continue;
+                        }
+                        if obj_line_buffer[x] != 0 {
+                            if obj_use_alpha_buffer[x] && line_priority_buffer[x] == obj_prio_buffer[x]+1 {
+                                bottom := framebuffer[ppu.draw_y * SCREEN_WIDTH + x];
+                                top := obj_line_buffer[x];
+                                r : u16 = xx (((bottom >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                                g : u16 = xx (((bottom >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                                b : u16 = xx (((bottom >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
+                            } else {
+                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = obj_line_buffer[x];
+                            }
+                            line_priority_buffer[x] = obj_prio_buffer[x];
+                        }
+                    }
                 case 1;
                 case 2;
                     draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
@@ -494,7 +563,7 @@ ui :: () {
             #through;
             case .RUNNING;
             for 0..228-1 {
-                scanline_start := seconds_since_init();
+                // scanline_start := seconds_since_init();
                 for 0..308-1 {
                     if cpu.emu_state == .STOPPED break;
                     cpu.remaining_cycles += 4;
@@ -503,9 +572,9 @@ ui :: () {
                     while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
                 }
                 if cpu.emu_state == .STOPPED break;
-                scanline_end := seconds_since_init();
-                #import "POSIX";
-                usleep(xx ((scanline_end - scanline_start) / 1000000));
+                // scanline_end := seconds_since_init();
+                // #import "POSIX";
+                // usleep(xx (73.43 - ((scanline_end - scanline_start) * 1000000)));
                 // advance_timers(4);
             }
             disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
@@ -522,21 +591,6 @@ ui :: () {
             disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
             disasm_mode = get_status_bit(.T);
         }
-        // for ppu.oam {
-        //     if !it.rotate_scale && it.rotate_scale_double_size then continue;
-        //     min_x := it.min_x % 512;
-        //     max_x := it.max_x % 512;
-        //     min_y := it.min_y % 256;
-        //     max_y := it.max_y % 256;
-        //     for min_x..max_x {
-        //         if min_y * SCREEN_WIDTH + it < 38400 then framebuffer[min_y * SCREEN_WIDTH + it] = 0xf800;
-        //         if max_y * SCREEN_WIDTH + it < 38400 then framebuffer[max_y * SCREEN_WIDTH + it] = 0xf800;
-        //     }
-        //     for min_y..max_y {
-        //         if it * SCREEN_WIDTH + min_x < 38400 then framebuffer[it * SCREEN_WIDTH + min_x] = 0xf800;
-        //         if it * SCREEN_WIDTH + max_x < 38400 then framebuffer[it * SCREEN_WIDTH + max_x] = 0xf800;
-        //     }
-        // }
         SDL_RenderClear(renderer);
         surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
         defer SDL_FreeSurface(surface);
@@ -558,6 +612,6 @@ ui :: () {
         }
         end_time := seconds_since_init();
         // TODO: should probably make this refresh rate dependent
-        // sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
+        sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
 }

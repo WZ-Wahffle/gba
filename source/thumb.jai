@@ -192,7 +192,12 @@ thumb_ldrb_2 :: inline (ins: u16) {
 }
 
 thumb_ldrsh :: inline (ins: u16) {
-    assert(false);
+    rm := reg_src(xx ((ins >> 6) & 0b111));
+    rn := reg_src(xx ((ins >> 3) & 0b111));
+    rd_idx : u8 = xx ins & 0b111;
+    to_write : u32 = read_16(rm + rn);
+    if (to_write & 0x8000) != 0 then to_write |= 0xffff0000;
+    reg_dst(rd_idx, to_write);
 }
 
 thumb_ldr_3 :: inline (ins: u16) {

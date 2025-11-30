@@ -878,6 +878,13 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
                 append(*suffix, "]");
                 case 0b111;
                 // ldrsh
+                opcode = "ldrsh";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", [");
+                append(*suffix, disassemble_register(rn_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
+                append(*suffix, "]");
             }
         } else if (ins & 0x800) != 0 {
             // ldr (3)
