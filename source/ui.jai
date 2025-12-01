@@ -128,59 +128,78 @@ draw_obj :: (y: u32) {
             if it.bounding_box_min_y <= y && it.bounding_box_max_y > y {
                 if it.rotate_scale {
                     pixel_buffer: [240]u16;
-                    if it.single_palette {
-                        a := ppu.oam_param[it.rotate_scale_param_idx].pa;
-                        b := ppu.oam_param[it.rotate_scale_param_idx].pb;
-                        c := ppu.oam_param[it.rotate_scale_param_idx].pc;
-                        d := ppu.oam_param[it.rotate_scale_param_idx].pd;
-                        w := it.max_x - it.min_x;
-                        h := it.max_y - it.min_y;
-                        x_0 := (it.min_x + it.max_x) / 2;
-                        y_0 := (it.min_y + it.max_y) / 2;
-                        sprite_x : float = xx x_0;
-                        sprite_y : float = xx y_0;
-                        sprite_x -= x_0 * a;
-                        sprite_x += (y - y_0) * b;
-                        sprite_y -= x_0 * c;
-                        sprite_y += (y - y_0) * d;
-                        if it.rotate_scale_double_size {
-                            sprite_x -= a * (w / 2);
-                            sprite_x -= b * (h / 2);
-                            sprite_y -= c * (w / 2);
-                            sprite_y -= d * (h / 2);
-                        }
-                        obj_base := base_addr + it.tile_idx * 32;
-                        for x: 0..239 {
-                            x_1: int = xx sprite_x;
-                            y_1: int = xx sprite_y;
+                    a := ppu.oam_param[it.rotate_scale_param_idx].pa;
+                    b := ppu.oam_param[it.rotate_scale_param_idx].pb;
+                    c := ppu.oam_param[it.rotate_scale_param_idx].pc;
+                    d := ppu.oam_param[it.rotate_scale_param_idx].pd;
+                    w := it.max_x - it.min_x;
+                    h := it.max_y - it.min_y;
+                    x_0 := (it.min_x + it.max_x) / 2;
+                    y_0 := (it.min_y + it.max_y) / 2;
+                    sprite_x : float = xx x_0;
+                    sprite_y : float = xx y_0;
+                    sprite_x -= x_0 * a;
+                    sprite_x += (y - y_0) * b;
+                    sprite_y -= x_0 * c;
+                    sprite_y += (y - y_0) * d;
+                    if it.rotate_scale_double_size {
+                        sprite_x -= a * (w / 2);
+                        sprite_x -= b * (h / 2);
+                        sprite_y -= c * (w / 2);
+                        sprite_y -= d * (h / 2);
+                    }
+                    obj_base := base_addr + it.tile_idx * 32;
+                    for x: 0..239 {
+                        x_1: int = xx sprite_x;
+                        y_1: int = xx sprite_y;
+                        pixel_buffer[x] = BLANK_COLOR;
 
-                            sprite_x += a;
-                            sprite_y += c;
-                            if x_1 < it.min_x || x_1 >= it.max_x || y_1 < it.min_y || y_1 >= it.max_y then continue;
-                            if x < it.bounding_box_min_x || x >= it.bounding_box_max_x || y < it.bounding_box_min_y || y >= it.bounding_box_max_y then continue;
+                        sprite_x += a;
+                        sprite_y += c;
+                        if x_1 < it.min_x || x_1 >= it.max_x || y_1 < it.min_y || y_1 >= it.max_y then continue;
+                        if x < it.bounding_box_min_x || x >= it.bounding_box_max_x || y < it.bounding_box_min_y || y >= it.bounding_box_max_y then continue;
+
+                        if it.single_palette {
                             tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
                             tile_base := tile_line_base + ((x_1 - it.min_x) / 8) * 64;
                             line_base := tile_base + ((y_1 - it.min_y) % 8) * 8;
                             color_idx := ppu.memory.vram._8[line_base + ((x_1 - it.min_x) % 8)];
-                            pixel_buffer[x] = ppu.memory.palette_ram._16[0x100 + color_idx];
+                            if color_idx == 0 {
+                                pixel_buffer[x] = BLANK_COLOR;
+                            } else {
+                                pixel_buffer[x] = ppu.memory.palette_ram._16[0x100 + color_idx] & 0x7fff;
+                            }
+                        } else {
+                            tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
+                            tile_base := tile_line_base + ((x_1 - it.min_x) / 8) * 32;
+                            line_base := tile_base + ((y_1 - it.min_y) % 8) * 4;
+                            color_idx := ppu.memory.vram._8[line_base + ((x_1 - it.min_x) % 8) / 2];
+                            if ((x_1 - it.min_x) % 2) == 0 {
+                                color_idx &= 0xf;
+                            } else {
+                                color_idx >>= 4;
+                            }
+                            if color_idx == 0 {
+                                pixel_buffer[x] = BLANK_COLOR;
+                            } else {
+                                pixel_buffer[x] = ppu.memory.palette_ram._16[0x100 + it.palette * 0x10 + color_idx] & 0x7fff;
+                            }
                         }
-                        objwin := it.mode == 0b10;
-                        objalpha := it.mode == 0b01;
-                        for x_dst: 0..239 {
-                            if pixel_buffer[x_dst] != 0 {
-                                if objwin {
-                                    obj_win_buffer[x_dst] = true;
-                                } else {
-                                    if obj_prio_buffer[x_dst] > it.prio * 2 {
-                                        obj_prio_buffer[x_dst] = xx (it.prio * 2);
-                                        obj_line_buffer[x_dst] = pixel_buffer[x_dst];
-                                        obj_use_alpha_buffer[x_dst] = objalpha;
-                                    }
+                    }
+                    objwin := it.mode == 0b10;
+                    objalpha := it.mode == 0b01;
+                    for x_dst: 0..239 {
+                        if pixel_buffer[x_dst] != BLANK_COLOR {
+                            if objwin {
+                                obj_win_buffer[x_dst] = true;
+                            } else {
+                                if obj_prio_buffer[x_dst] > it.prio * 2 {
+                                    obj_prio_buffer[x_dst] = xx (it.prio * 2);
+                                    obj_line_buffer[x_dst] = pixel_buffer[x_dst];
+                                    obj_use_alpha_buffer[x_dst] = objalpha;
                                 }
                             }
                         }
-                    } else {
-                        // TODO
                     }
                 } else {
                     if it.rotate_scale_double_size then continue;
