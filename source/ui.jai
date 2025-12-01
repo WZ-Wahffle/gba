@@ -129,44 +129,33 @@ draw_obj :: (y: u32) {
                 if it.rotate_scale {
                     pixel_buffer: [240]u16;
                     if it.single_palette {
-                        a := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pa;
-                        b := -ppu.oam_param[it.rotate_scale_param_idx].pb;
-                        c := -ppu.oam_param[it.rotate_scale_param_idx].pc;
-                        d := 1.0 / ppu.oam_param[it.rotate_scale_param_idx].pd;
-                        if isinf(a) then a = 0;
-                        if isinf(b) then b = 0;
-                        if isinf(c) then c = 0;
-                        if isinf(d) then d = 0;
-                        if a == 0 && b == 0 && c == 0 && d == 0 then continue;
+                        a := ppu.oam_param[it.rotate_scale_param_idx].pa;
+                        b := ppu.oam_param[it.rotate_scale_param_idx].pb;
+                        c := ppu.oam_param[it.rotate_scale_param_idx].pc;
+                        d := ppu.oam_param[it.rotate_scale_param_idx].pd;
                         w := it.max_x - it.min_x;
                         h := it.max_y - it.min_y;
                         x_0 := (it.min_x + it.max_x) / 2;
                         y_0 := (it.min_y + it.max_y) / 2;
-                        y_2 : int = y;
+                        sprite_x : float = xx x_0;
+                        sprite_y : float = xx y_0;
+                        sprite_x -= x_0 * a;
+                        sprite_x += (y - y_0) * b;
+                        sprite_y -= x_0 * c;
+                        sprite_y += (y - y_0) * d;
                         if it.rotate_scale_double_size {
-                            y_2 -= xx (h / 2);
+                            sprite_x -= a * (w / 2);
+                            sprite_x -= b * (h / 2);
+                            sprite_y -= c * (w / 2);
+                            sprite_y -= d * (h / 2);
                         }
                         obj_base := base_addr + it.tile_idx * 32;
                         for x: 0..239 {
-                            x_2 := x;
-                            if it.rotate_scale_double_size {
-                                x_2 -= xx (w / 2);
-                            }
-                            x_1: int;
-                            y_1: int;
-                            if a == 0 && b == 0 {
-                                x_1 = x_2;
-                                y_1 = xx (((y_2 + c * x_0 + d * y_0 - y_0 - c * x_1) / d) + 0.5);
-                                x_1 = x_0;
-                                assert(false); // maybe find something other than the awful workaround below
-                            } else if c == 0 && d == 0 {
-                                y_1 = y_2 - 2;
-                                x_1 = xx (((x_2 + a * x_0 + b * y_0 - x_0 - b * y_1) / a) + 0.5);
-                                y_1 = y_0;
-                            } else {
-                                x_1 = xx (((d * (x_2 + a * x_0 + b * y_0 - x_0) - b * (y_2 + c * x_0 + d * y_0 - y_0)) / (a * d - b * c)) + 0.5);
-                                y_1 = xx (((y_2 + c * x_0 + d * y_0 - y_0 - c * x_1) / d) + 0.5);
-                            }
+                            x_1: int = xx sprite_x;
+                            y_1: int = xx sprite_y;
+
+                            sprite_x += a;
+                            sprite_y += c;
                             if x_1 < it.min_x || x_1 >= it.max_x || y_1 < it.min_y || y_1 >= it.max_y then continue;
                             if x < it.bounding_box_min_x || x >= it.bounding_box_max_x || y < it.bounding_box_min_y || y >= it.bounding_box_max_y then continue;
                             tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
