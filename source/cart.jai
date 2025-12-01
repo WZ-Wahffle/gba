@@ -42,7 +42,6 @@ rom_write :: (addr: u32, val: u8) {
             }
             to_write := (val & 1) != 0;
             if cpu.eeprom_size == .EEPROM_512B {
-                log("write % 0x%\n", ifx to_write then 1 else 0, formatInt(cpu.reg[15], 16));
                 if cpu.ee_state == {
                     case .NONE;
                         if to_write cpu.ee_state = .FIRST_BIT_READ;
@@ -58,7 +57,6 @@ rom_write :: (addr: u32, val: u8) {
                             cpu.ee_state = .FINISHED;
                             cpu.ee_read = cpu.ee[cpu.ee_block];
                             cpu.ee_read_idx = 0;
-                            log("Reading 0x% from 0x%\n", formatInt(cpu.ee_read, 16), formatInt(cpu.ee_block, 16));
                         }
                     case .WRITING;
                         cpu.ee_block <<= 1;
@@ -76,7 +74,6 @@ rom_write :: (addr: u32, val: u8) {
                         if cpu.ee_write_idx == 64 {
                             cpu.ee_state = .FINISHED;
                             cpu.ee[cpu.ee_block] = cpu.ee_write;
-                            log("Writing 0x% to 0x%\n", formatInt(cpu.ee_write, 16), formatInt(cpu.ee_block, 16));
                         }
                     case .FINISHED;
                         cpu.ee_state = .NONE;

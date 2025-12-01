@@ -170,6 +170,7 @@ cpu_window :: () {
 background_selected : s32 = 0;
 ppu_window :: () {
     ImGui.Begin("ppu");
+    ImGui.Text("Force Blank: %", ppu.forced_blank);
     ImGui.Text("X: %", formatInt(ppu.draw_x, 10, 1));
     ImGui.Text("Y: %", formatInt(ppu.draw_y, 10, 1));
     ImGui.Text("Character Format: %-dimensional", ifx ppu.obj_character_vram_mapping_one_dimensional then "1" else "2");
@@ -1668,6 +1669,22 @@ blend_window :: () {
     ImGui.Begin("blend");
     ImGui.Text_CFormat("Coefficient A: %d", ppu.eva);
     ImGui.Text_CFormat("Coefficient B: %d", ppu.evb);
+    ImGui.Text("First: %1%2%3%4%5%6",
+        ifx ppu.bg_first_target_pixel[0] then "1" else "-",
+        ifx ppu.bg_first_target_pixel[1] then "2" else "-",
+        ifx ppu.bg_first_target_pixel[2] then "3" else "-",
+        ifx ppu.bg_first_target_pixel[3] then "4" else "-",
+        ifx ppu.obj_first_target_pixel then "O" else "-",
+        ifx ppu.bd_first_target_pixel then "B" else "-"
+    );
+    ImGui.Text("Second: %1%2%3%4%5%6",
+        ifx ppu.bg_second_target_pixel[0] then "1" else "-",
+        ifx ppu.bg_second_target_pixel[1] then "2" else "-",
+        ifx ppu.bg_second_target_pixel[2] then "3" else "-",
+        ifx ppu.bg_second_target_pixel[3] then "4" else "-",
+        ifx ppu.obj_second_target_pixel then "O" else "-",
+        ifx ppu.bd_second_target_pixel then "B" else "-"
+    );
     ImGui.End();
 }
 

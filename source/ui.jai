@@ -1,10 +1,13 @@
 SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;
 FONT_SIZE :: 26;
+BLANK_COLOR :: 0x8000;
 window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
 framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
-line_priority_buffer: [SCREEN_WIDTH]u8;
+
+bg_line_buffer: [4][SCREEN_WIDTH]u16;
+
 obj_line_buffer: [SCREEN_WIDTH]u16;
 obj_prio_buffer: [SCREEN_WIDTH]u8;
 obj_win_buffer: [SCREEN_WIDTH]bool;
@@ -30,48 +33,26 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         for 0..line_size_tiles-1 {
             tile_address_buffer[it] = ppu.memory.vram._8[base_addr + it];
         }
-        pixel_buffer: [1024]int;
+        pixel_buffer: [1024]u16;
         for tile_idx: 0..line_size_tiles-1 {
             tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx] * 64;
             tile_base_addr += 8 * (y_pos % 8);
             for pixel_idx: 0..7 {
                 if ppu.memory.vram._8[tile_base_addr + pixel_idx] == 0 {
-                    pixel_buffer[8 * tile_idx + pixel_idx] = -1;
+                    pixel_buffer[8 * tile_idx + pixel_idx] = BLANK_COLOR;
                 } else {
-                    pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[ppu.memory.vram._8[tile_base_addr + pixel_idx]];
+                    pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[ppu.memory.vram._8[tile_base_addr + pixel_idx]] & 0x7fff;
                 }
             }
         }
 
-        win_1_in_y := ppu.win[0].min_y <= y && ppu.win[0].max_y >= y;
-        win_2_in_y := ppu.win[1].min_y <= y && ppu.win[1].max_y >= y;
         for 0..239 {
-            if ppu.bg[bg].prio * 2 >= line_priority_buffer[it] continue;
-            win_1_in := win_1_in_y && ppu.win[0].min_x <= it && ppu.win[0].max_x >= it;
-            win_2_in := win_2_in_y && ppu.win[1].min_x <= it && ppu.win[1].max_x >= it;
-
-            if ppu.win[0].enable && win_1_in && !ppu.win[0].bg_enable[bg] {
-                continue;
-            }
-            if ppu.win[1].enable && win_2_in && !ppu.win[1].bg_enable[bg] {
-                continue;
-            }
-            // TODO probably not right? I'm guessing it should be checking every
-            // window/inside combination individually
-            if ((ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[it])) && !ppu.outside_win_bg_enable[bg] {
-                continue;
-            }
-            if ppu.obj_win.enable && obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
-                continue;
-            }
-
             x_pos : int = xx (it + ppu.bg[bg].anchor_x);
             while x_pos < 0 {
                 x_pos += line_size_px;
             }
-            if pixel_buffer[x_pos] != -1 {
-                framebuffer[y * SCREEN_WIDTH + it] = xx pixel_buffer[x_pos];
-                line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
+            if pixel_buffer[x_pos] != BLANK_COLOR {
+                bg_line_buffer[bg][it] = pixel_buffer[x_pos] & 0x7fff;
             }
         }
     } else {
@@ -95,7 +76,7 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
             tile_address_buffer[it].flip_v = val & 0x800 != 0;
             tile_address_buffer[it].palette = val >> 12;
         }
-        pixel_buffer: [512]int;
+        pixel_buffer: [512]u16;
         if ppu.bg[bg].single_palette {
             for tile_idx: 0..line_size_tiles-1 {
                 tile_base_addr := ppu.bg[bg].char_base_block * 16384 + ((tile_idx / 32) * 2048) + tile_address_buffer[tile_idx].idx * 64;
@@ -105,9 +86,9 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
                     pixel_idx_src := ifx tile_address_buffer[tile_idx].flip_h then (7 - pixel_idx) else pixel_idx;
                     palette_idx := ppu.memory.vram._8[tile_base_addr + pixel_idx_src];
                     if palette_idx == 0 {
-                        pixel_buffer[8 * tile_idx + pixel_idx] = -1;
+                        pixel_buffer[8 * tile_idx + pixel_idx] = BLANK_COLOR;
                     } else {
-                        pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[palette_idx];
+                        pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[palette_idx] & 0x7fff;
                     }
                 }
             }
@@ -121,41 +102,19 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
                     palette_idx := ppu.memory.vram._8[tile_base_addr + (pixel_idx_src >> 1)];
                     palette_idx = ifx (pixel_idx_src & 1) == 0 then palette_idx & 0xf else palette_idx >> 4;
                     if palette_idx == 0 {
-                        pixel_buffer[8 * tile_idx + pixel_idx] = -1;
+                        pixel_buffer[8 * tile_idx + pixel_idx] = BLANK_COLOR;
                     } else {
-                        pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[16 * tile_address_buffer[tile_idx].palette + palette_idx];
+                        pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[16 * tile_address_buffer[tile_idx].palette + palette_idx] & 0x7fff;
                     }
                 }
             }
         }
 
-        win_1_in_y := ppu.win[0].min_y <= y && ppu.win[0].max_y >= y;
-        win_2_in_y := ppu.win[1].min_y <= y && ppu.win[1].max_y >= y;
         for 0..239 {
-            if ppu.bg[bg].prio * 2 >= line_priority_buffer[it] continue;
-            win_1_in := win_1_in_y && ppu.win[0].min_x <= it && ppu.win[0].max_x >= it;
-            win_2_in := win_2_in_y && ppu.win[1].min_x <= it && ppu.win[1].max_x >= it;
-
-            if ppu.win[0].enable && win_1_in && !ppu.win[0].bg_enable[bg] {
-                continue;
-            }
-            if ppu.win[1].enable && win_2_in && !ppu.win[1].bg_enable[bg] {
-                continue;
-            }
-            // TODO probably not right? I'm guessing it should be checking every
-            // window/inside combination individually
-            if ((ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[it])) && !ppu.outside_win_bg_enable[bg] {
-                continue;
-            }
-            if ppu.obj_win.enable && obj_win_buffer[it] && !ppu.obj_win.bg_enable[bg] {
-                continue;
-            }
-
             x_pos : int = xx (it + ppu.bg[bg].x_off);
             x_pos %= 256 * ifx ppu.bg[bg].wide then 2 else 1;
-            if pixel_buffer[x_pos] != -1 {
-                framebuffer[y * SCREEN_WIDTH + it] = xx pixel_buffer[x_pos];
-                line_priority_buffer[it] = xx (ppu.bg[bg].prio * 2);
+            if pixel_buffer[x_pos] != BLANK_COLOR {
+                bg_line_buffer[bg][it] = pixel_buffer[x_pos];
             }
         }
     }
@@ -263,9 +222,9 @@ draw_obj :: (y: u32) {
                                 if objwin {
                                     obj_win_buffer[x + obj_x] = true;
                                 } else {
-                                    if obj_prio_buffer[x + obj_x] > prio * 2 + 1 {
-                                        obj_line_buffer[x + obj_x] = ppu.memory.palette_ram._16[0x100 + pixel_color];
-                                        obj_prio_buffer[x + obj_x] = xx (prio * 2 + 1);
+                                    if obj_prio_buffer[x + obj_x] > prio * 2 {
+                                        obj_line_buffer[x + obj_x] = ppu.memory.palette_ram._16[0x100 + pixel_color] & 0x7fff;
+                                        obj_prio_buffer[x + obj_x] = xx (prio * 2);
                                         obj_use_alpha_buffer[x + obj_x] = objalpha;
                                     }
                                 }
@@ -284,9 +243,9 @@ draw_obj :: (y: u32) {
                                 if objwin {
                                     obj_win_buffer[x + obj_x] = true;
                                 } else {
-                                    if obj_prio_buffer[x + obj_x] > prio * 2 + 1 {
-                                        obj_line_buffer[x + obj_x] = ppu.memory.palette_ram._16[0x100 + it.palette * 16 + pixel_color];
-                                        obj_prio_buffer[x + obj_x] = xx (prio * 2 + 1);
+                                    if obj_prio_buffer[x + obj_x] > prio * 2 {
+                                        obj_line_buffer[x + obj_x] = ppu.memory.palette_ram._16[0x100 + it.palette * 16 + pixel_color] & 0x7fff;
+                                        obj_prio_buffer[x + obj_x] = xx (prio * 2);
                                         obj_use_alpha_buffer[x + obj_x] = objalpha;
                                     }
                                 }
@@ -295,6 +254,160 @@ draw_obj :: (y: u32) {
                     }
                 }
             }
+        }
+    }
+}
+
+merge_and_blend :: () {
+    win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y >= ppu.draw_y;
+    win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y >= ppu.draw_y;
+    for x: 0..239 {
+        win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x >= x;
+        win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x >= x;
+        win_obj_in := obj_win_buffer[x];
+        out_pixels := u16.[BLANK_COLOR, BLANK_COLOR];
+        out_pixel_prios := int.[9, 9];
+        out_indices := int.[-1, -1];
+        backdrop := ppu.memory.palette_ram._16[0];
+        for out_pixel_idx: 0..1 {
+            for bg_idx : 0..3 {
+                if ppu.bg[bg_idx].enable && ppu.bg[bg_idx].prio * 2 + 1 < out_pixel_prios[out_pixel_idx] && bg_line_buffer[bg_idx][x] != BLANK_COLOR {
+                    if ppu.win[0].enable && win_1_in {
+                        if ppu.win[0].bg_enable[bg_idx] {
+                            out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
+                            out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
+                            out_indices[out_pixel_idx] = bg_idx;
+                        }
+                    } else if ppu.win[1].enable && win_2_in {
+                        if ppu.win[1].bg_enable[bg_idx] {
+                            out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
+                            out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
+                            out_indices[out_pixel_idx] = bg_idx;
+                        }
+                    } else if ppu.obj_win.enable && win_obj_in {
+                        if ppu.obj_win.bg_enable[bg_idx] {
+                            out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
+                            out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
+                            out_indices[out_pixel_idx] = bg_idx;
+                        }
+                    } else if ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable {
+                        if ppu.outside_win_bg_enable[bg_idx] {
+                            out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
+                            out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
+                            out_indices[out_pixel_idx] = bg_idx;
+                        }
+                    } else {
+                        out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
+                        out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
+                        out_indices[out_pixel_idx] = bg_idx;
+                    }
+                }
+            }
+
+            if ppu.obj_enable && obj_prio_buffer[x] < out_pixel_prios[out_pixel_idx] && obj_line_buffer[x] != BLANK_COLOR {
+                if ppu.win[0].enable && win_1_in {
+                    if ppu.win[0].obj_enable {
+                        out_pixels[out_pixel_idx] = obj_line_buffer[x];
+                        out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
+                        out_indices[out_pixel_idx] = 4;
+                    }
+                } else if ppu.win[1].enable && win_2_in {
+                    if ppu.win[1].obj_enable {
+                        out_pixels[out_pixel_idx] = obj_line_buffer[x];
+                        out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
+                        out_indices[out_pixel_idx] = 4;
+                    }
+                } else if ppu.obj_win.enable && win_obj_in {
+                    if ppu.obj_win.obj_enable {
+                        out_pixels[out_pixel_idx] = obj_line_buffer[x];
+                        out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
+                        out_indices[out_pixel_idx] = 4;
+                    }
+                } else if ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable {
+                    if ppu.outside_win_obj_enable {
+                        out_pixels[out_pixel_idx] = obj_line_buffer[x];
+                        out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
+                        out_indices[out_pixel_idx] = 4;
+                    }
+                } else {
+                    out_pixels[out_pixel_idx] = obj_line_buffer[x];
+                    out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
+                    out_indices[out_pixel_idx] = 4;
+                }
+            }
+
+            if out_pixel_prios[out_pixel_idx] > 8 {
+                out_pixels[out_pixel_idx] = backdrop;
+                out_pixel_prios[out_pixel_idx] = 8;
+                out_indices[out_pixel_idx] = 5;
+            }
+
+            if out_indices[0] == {
+                case 0;
+                bg_line_buffer[0][x] = BLANK_COLOR;
+                case 1;
+                bg_line_buffer[1][x] = BLANK_COLOR;
+                case 2;
+                bg_line_buffer[2][x] = BLANK_COLOR;
+                case 3;
+                bg_line_buffer[3][x] = BLANK_COLOR;
+                case 4;
+                obj_line_buffer[x] = BLANK_COLOR;
+            }
+        }
+
+        use_alpha := false;
+        use_special := true;
+        if out_indices[0] == {
+            case 0;
+            use_special &= ppu.bg_first_target_pixel[0];
+            case 1;
+            use_special &= ppu.bg_first_target_pixel[1];
+            case 2;
+            use_special &= ppu.bg_first_target_pixel[2];
+            case 3;
+            use_special &= ppu.bg_first_target_pixel[3];
+            case 4;
+            use_special &= ppu.obj_first_target_pixel || obj_use_alpha_buffer[x];
+            use_alpha = obj_use_alpha_buffer[x];
+            case 5;
+            use_special &= ppu.bd_first_target_pixel;
+        }
+
+        if out_indices[1] == {
+            case 0;
+            use_special &= ppu.bg_second_target_pixel[0];
+            case 1;
+            use_special &= ppu.bg_second_target_pixel[1];
+            case 2;
+            use_special &= ppu.bg_second_target_pixel[2];
+            case 3;
+            use_special &= ppu.bg_second_target_pixel[3];
+            case 4;
+            use_special &= ppu.obj_second_target_pixel;
+            case 5;
+            use_special &= ppu.bd_second_target_pixel;
+        }
+
+        if use_special {
+            if use_alpha || ppu.special_effect == 1 {
+                r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
+            } else if ppu.special_effect == 2 {
+                r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) + (31 - ((out_pixels[0] >> 0) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
+                g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) + (31 - ((out_pixels[0] >> 5) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
+                b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) + (31 - ((out_pixels[0] >> 10) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
+                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
+            } else if ppu.special_effect == 3 {
+                r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) - ((out_pixels[0] >> 0) & 0x1f) * (min(ppu.evy, 16) / 16.0));
+                g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) - ((out_pixels[0] >> 5) & 0x1f) * (min(ppu.evy, 16) / 16.0));
+                b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) - ((out_pixels[0] >> 10) & 0x1f) * (min(ppu.evy, 16) / 16.0));
+                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
+            }
+        } else {
+            framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = out_pixels[0];
         }
     }
 }
@@ -340,13 +453,18 @@ step_ppu :: () {
 
         if ppu.draw_x == 240 && ppu.draw_y < 160 {
             for 0..SCREEN_WIDTH-1 {
-                line_priority_buffer[it] = 8;
-                obj_line_buffer[it] = 0;
+                bg_line_buffer[0][it] = BLANK_COLOR;
+                bg_line_buffer[1][it] = BLANK_COLOR;
+                bg_line_buffer[2][it] = BLANK_COLOR;
+                bg_line_buffer[3][it] = BLANK_COLOR;
+                obj_line_buffer[it] = BLANK_COLOR;
                 obj_prio_buffer[it] = 8;
                 obj_win_buffer[it] = false;
                 obj_use_alpha_buffer[it] = false;
                 framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = ppu.memory.palette_ram._16[0];
             }
+
+            if ppu.forced_blank then for 0..SCREEN_WIDTH-1 framebuffer[ppu.draw_y * SCREEN_WIDTH + it] = 0;
 
             if ppu.bg_mode == {
                 case 0;
@@ -355,79 +473,13 @@ step_ppu :: () {
                     draw_bg(ppu.draw_y, 1, false);
                     draw_bg(ppu.draw_y, 2, false);
                     draw_bg(ppu.draw_y, 3, false);
-                    win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y >= ppu.draw_y;
-                    win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y >= ppu.draw_y;
-                    for x: 0..239 {
-                        if obj_prio_buffer[x] >= line_priority_buffer[x] continue;
-                        win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x >= x;
-                        win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x >= x;
-                        if ppu.win[0].enable && win_1_in && !ppu.win[0].obj_enable {
-                            continue;
-                        }
-                        if ppu.win[1].enable && win_2_in && !ppu.win[1].obj_enable {
-                            continue;
-                        }
-                        // TODO probably not right? I'm guessing it should be checking every
-                        // window/inside combination individually
-                        if (ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[x]) && !ppu.outside_win_obj_enable {
-                            continue;
-                        }
-                        if ppu.obj_win.enable && obj_win_buffer[x] && !ppu.obj_win.obj_enable {
-                            continue;
-                        }
-                        if obj_line_buffer[x] != 0 {
-                            if obj_use_alpha_buffer[x] && line_priority_buffer[x] == obj_prio_buffer[x]+1 {
-                                bottom := framebuffer[ppu.draw_y * SCREEN_WIDTH + x];
-                                top := obj_line_buffer[x];
-                                r : u16 = xx (((bottom >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
-                                g : u16 = xx (((bottom >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
-                                b : u16 = xx (((bottom >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
-                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
-                            } else {
-                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = obj_line_buffer[x];
-                            }
-                            line_priority_buffer[x] = obj_prio_buffer[x];
-                        }
-                    }
+                    merge_and_blend();
                 case 1;
                 case 2;
                     draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
                     draw_bg(ppu.draw_y, 2, true);
                     draw_bg(ppu.draw_y, 3, true);
-                    win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y >= ppu.draw_y;
-                    win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y >= ppu.draw_y;
-                    for x: 0..239 {
-                        if obj_prio_buffer[x] >= line_priority_buffer[x] continue;
-                        win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x >= x;
-                        win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x >= x;
-                        if ppu.win[0].enable && win_1_in && !ppu.win[0].obj_enable {
-                            continue;
-                        }
-                        if ppu.win[1].enable && win_2_in && !ppu.win[1].obj_enable {
-                            continue;
-                        }
-                        // TODO probably not right? I'm guessing it should be checking every
-                        // window/inside combination individually
-                        if (ppu.win[0].enable && !win_1_in) || (ppu.win[1].enable && !win_2_in) || (ppu.obj_win.enable && !obj_win_buffer[x]) && !ppu.outside_win_obj_enable {
-                            continue;
-                        }
-                        if ppu.obj_win.enable && obj_win_buffer[x] && !ppu.obj_win.obj_enable {
-                            continue;
-                        }
-                        if obj_line_buffer[x] != 0 {
-                            if obj_use_alpha_buffer[x] && line_priority_buffer[x] == obj_prio_buffer[x]+1 {
-                                bottom := framebuffer[ppu.draw_y * SCREEN_WIDTH + x];
-                                top := obj_line_buffer[x];
-                                r : u16 = xx (((bottom >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
-                                g : u16 = xx (((bottom >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
-                                b : u16 = xx (((bottom >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((top >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
-                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
-                            } else {
-                                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = obj_line_buffer[x];
-                            }
-                            line_priority_buffer[x] = obj_prio_buffer[x];
-                        }
-                    }
+                    merge_and_blend();
                 case 3;
                 case 4;
                 case 5;

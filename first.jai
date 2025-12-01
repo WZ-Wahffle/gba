@@ -15,7 +15,7 @@ build :: () {
     options := get_build_options();
     options.output_executable_name = "gba";
     options.output_path = "build";
-    set_optimization(*options, .VERY_OPTIMIZED);
+    // set_optimization(*options, .VERY_OPTIMIZED);
     set_build_options(options, w);
     i_flags: Intercept_Flags;
     for plugins if it.before_intercept then it.before_intercept(it, *i_flags);
