@@ -632,7 +632,6 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
                 reg_rotate === c;
                 ror.32 ret, reg_rotate;
             }
-            assert(false); // verify this shit works sometime
             return ret, should_carry, carry;
     }
     assert(false);

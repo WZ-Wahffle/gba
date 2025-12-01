@@ -15,8 +15,8 @@ obj_use_alpha_buffer: [SCREEN_WIDTH]bool;
 
 // priorities: (the lower, the higher)
 // backdrop: 8
-// OBJ: priority * 2 + 1
-// BG: priority * 2
+// OBJ: priority * 2
+// BG: priority * 2 + 1
 
 draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
     if !ppu.bg[bg].enable then return;
@@ -70,7 +70,7 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         }
         tile_address_buffer: [64]Text_Tile_Attr;
         for 0..line_size_tiles-1 {
-            val := ppu.memory.vram._16[(base_addr >> 1) + it];
+            val := ppu.memory.vram._16[(base_addr >> 1) + (it / 32) * 0x400 + (it % 32)];
             tile_address_buffer[it].idx = val & 0x3ff;
             tile_address_buffer[it].flip_h = val & 0x400 != 0;
             tile_address_buffer[it].flip_v = val & 0x800 != 0;
@@ -182,8 +182,8 @@ draw_obj :: (y: u32) {
                                 if objwin {
                                     obj_win_buffer[x_dst] = true;
                                 } else {
-                                    if obj_prio_buffer[x_dst] > it.prio * 2 + 1 {
-                                        obj_prio_buffer[x_dst] = xx (it.prio * 2 + 1);
+                                    if obj_prio_buffer[x_dst] > it.prio * 2 {
+                                        obj_prio_buffer[x_dst] = xx (it.prio * 2);
                                         obj_line_buffer[x_dst] = pixel_buffer[x_dst];
                                         obj_use_alpha_buffer[x_dst] = objalpha;
                                     }
@@ -203,7 +203,6 @@ draw_obj :: (y: u32) {
                     obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
                     vertical_offset_into_tile := (y_obj % 8);
                     x := it.min_x;
-                    if x < 0 continue;
                     prio := it.prio;
                     objwin := it.mode == 0b10;
                     objalpha := it.mode == 0b01;
@@ -236,6 +235,8 @@ draw_obj :: (y: u32) {
                             pixel_buffer[coarse_x] = ppu.memory.vram._32[(obj_base >> 2) + 8 * coarse_x + vertical_offset_into_tile];
                         }
                         for obj_x: 0..w-1 {
+                            if x + obj_x < 0 then continue;
+                            if x + obj_x > SCREEN_WIDTH-1 then break;
                             obj_x_adj := obj_x;
                             if it.flip_h then obj_x_adj = w - obj_x_adj - 1;
                             pixel_color := (pixel_buffer[obj_x_adj / 8] >> (4 * (obj_x_adj % 8))) & 0xf;
@@ -607,7 +608,6 @@ ui :: () {
         if cpu.emu_state == {
             case .STARTED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            // advance_timers(-cpu.remaining_cycles + 1);
             cpu.remaining_cycles = 1;
             step_cpu();
             cpu.emu_state = .RUNNING;
@@ -615,7 +615,6 @@ ui :: () {
             #through;
             case .RUNNING;
             for 0..228-1 {
-                // scanline_start := seconds_since_init();
                 for 0..308-1 {
                     if cpu.emu_state == .STOPPED break;
                     cpu.remaining_cycles += 4;
@@ -624,10 +623,6 @@ ui :: () {
                     while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
                 }
                 if cpu.emu_state == .STOPPED break;
-                // scanline_end := seconds_since_init();
-                // #import "POSIX";
-                // usleep(xx (73.43 - ((scanline_end - scanline_start) * 1000000)));
-                // advance_timers(4);
             }
             disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
             disasm_mode = get_status_bit(.T);
@@ -636,7 +631,6 @@ ui :: () {
             case .STEPPED;
             cpu.emu_state = .STOPPED;
             ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            // advance_timers(-cpu.remaining_cycles + 1);
             cpu.remaining_cycles += -cpu.remaining_cycles + 1;
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();
