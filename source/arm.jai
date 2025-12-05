@@ -106,7 +106,7 @@ arm_ldrh_strh :: inline (ins: u32) {
     if l {
         // load
         cpu.remaining_cycles -= 2;
-        reg_dst(rd_idx, read_16(address));
+        reg_dst(rd_idx, read_16(address, cpu.reg[15] < 0x4000));
     } else {
         // store
         cpu.remaining_cycles -= 1;
@@ -158,12 +158,12 @@ arm_ldrsb_ldrsh :: inline (ins: u32) {
     cpu.remaining_cycles -= 2;
     if (ins & 0x20) != 0 {
         // ldrsh
-        to_write : u32 = xx read_16(address);
+        to_write : u32 = xx read_16(address, cpu.reg[15] < 0x4000);
         if (to_write & 0x8000) != 0 then to_write |= 0xffff0000;
         reg_dst(rd_idx, to_write);
     } else {
         // ldrsb
-        to_write : u32 = xx read_8(address);
+        to_write : u32 = xx read_8(address, cpu.reg[15] < 0x4000);
         if (to_write & 0x80) != 0 then to_write |= 0xffffff00;
         reg_dst(rd_idx, to_write);
     }
@@ -474,7 +474,6 @@ arm_mov :: inline (ins: u32) {
     }
     rd_idx : u8 = xx (ins >> 12) & 0xf;
     flags := (ins & 0x100000) != 0;
-    reg_dst(rd_idx, operand);
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
@@ -485,6 +484,7 @@ arm_mov :: inline (ins: u32) {
             if should_carry set_status_bit(.C, carry_out);
         }
     }
+    reg_dst(rd_idx, operand);
 }
 
 arm_bic :: inline (ins: u32) {
@@ -563,9 +563,9 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
         // load
         cpu.remaining_cycles -= 2;
         if b {
-            reg_dst(rd_idx, read_8(address));
+            reg_dst(rd_idx, read_8(address, cpu.reg[15] < 0x4000));
         } else {
-            reg_dst(rd_idx, read_32(address));
+            reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
         }
     } else {
         // store
@@ -603,7 +603,7 @@ arm_ldm_stm :: inline (ins: u32) {
                 if p ^ (!u) {
                     pointer += 4;
                 }
-                to_store := read_32(pointer);
+                to_store := read_32(pointer, cpu.reg[15] < 0x4000);
                 if s && cpu.mode != .USER {
                     if it < 13 {
                         cpu.reg[it] = to_store;

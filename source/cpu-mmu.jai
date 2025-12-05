@@ -11,6 +11,51 @@ mmio_read :: (addr: u32) -> u8 {
             return xx ppu.vcounter;
         case 0x006;
             return xx ppu.draw_y;
+        case 0x008;
+            return ppu.bg[0].config_int[0];
+        case 0x009;
+            return ppu.bg[0].config_int[1];
+        case 0x00a;
+            return ppu.bg[1].config_int[0];
+        case 0x00b;
+            return ppu.bg[1].config_int[1];
+        case 0x00c;
+            return ppu.bg[2].config_int[0];
+        case 0x00d;
+            return ppu.bg[2].config_int[1];
+        case 0x00e;
+            return ppu.bg[3].config_int[0];
+        case 0x00f;
+            return ppu.bg[3].config_int[1];
+        case 0x060;
+            return xx apu.chan_1.sweep_shift_cnt |
+            (ifx apu.chan_1.sweep_freq_decrease then 0x8 else 0) |
+            (apu.chan_1.sweep_time << 4);
+        case 0x078;
+            return xx apu.chan_4.sound_length;
+        case 0x079;
+            return xx apu.chan_4.envelope_speed |
+            (apu.chan_4.envelope_increase << 3) |
+            (apu.chan_4.envelope_initial_volume << 4);
+        case 0x07a;
+            return 0;
+        case 0x07b;
+            return 0;
+        case 0x07c;
+            return xx apu.chan_4.ratio |
+            (apu.chan_4.wide << 3) |
+            (apu.chan_4.frequency << 4);
+        case 0x07d;
+            return xx (apu.chan_4.use_length << 6) |
+            (apu.chan_4.trigger << 7);
+        case 0x07e;
+            return 0;
+        case 0x07f;
+            return 0;
+        case 0x080;
+            return apu.cgb_enable_int;
+        case 0x081;
+            return apu.cgb_vol_int;
         case 0x0dc;
             return xx (cpu.dma[3].count_int >> 0) & 0xff;
         case 0x0dd;
@@ -32,9 +77,9 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x129;
             return 0;
         case 0x130;
-            return xx ppu.keypad_state & 0xff;
+            return xx (~ppu.keypad_state) & 0xff;
         case 0x131;
-            return xx ppu.keypad_state >> 8;
+            return xx (~(ppu.keypad_state >> 8)) & 0xff;
         // communication with gamecube not implemented
         case 0x150;
             return 0;
@@ -124,41 +169,49 @@ mmio_write :: (addr: u32, val: u8) {
             ppu.bg[0].char_base_block = (val >> 2) & 0b11;
             ppu.bg[0].mosaic = (val & 0x40) != 0;
             ppu.bg[0].single_palette = (val & 0x80) != 0;
+            ppu.bg[0].config_int[0] = val;
         case 0x009;
             ppu.bg[0].screen_base_block = val & 0x1f;
             ppu.bg[0].wraparound = (val & 0x20) != 0;
             ppu.bg[0].wide = (val & 0x40) != 0;
             ppu.bg[0].tall = (val & 0x80) != 0;
+            ppu.bg[0].config_int[1] = val;
         case 0x00a;
             ppu.bg[1].prio = val & 0b11;
             ppu.bg[1].char_base_block = (val >> 2) & 0b11;
             ppu.bg[1].mosaic = (val & 0x40) != 0;
             ppu.bg[1].single_palette = (val & 0x80) != 0;
+            ppu.bg[1].config_int[0] = val;
         case 0x00b;
             ppu.bg[1].screen_base_block = val & 0x1f;
             ppu.bg[1].wraparound = (val & 0x20) != 0;
             ppu.bg[1].wide = (val & 0x40) != 0;
             ppu.bg[1].tall = (val & 0x80) != 0;
+            ppu.bg[1].config_int[1] = val;
         case 0x00c;
             ppu.bg[2].prio = val & 0b11;
             ppu.bg[2].char_base_block = (val >> 2) & 0b11;
             ppu.bg[2].mosaic = (val & 0x40) != 0;
             ppu.bg[2].single_palette = (val & 0x80) != 0;
+            ppu.bg[2].config_int[0] = val;
         case 0x00d;
             ppu.bg[2].screen_base_block = val & 0x1f;
             ppu.bg[2].wraparound = (val & 0x20) != 0;
             ppu.bg[2].wide = (val & 0x40) != 0;
             ppu.bg[2].tall = (val & 0x80) != 0;
+            ppu.bg[2].config_int[1] = val;
         case 0x00e;
             ppu.bg[3].prio = val & 0b11;
             ppu.bg[3].char_base_block = (val >> 2) & 0b11;
             ppu.bg[3].mosaic = (val & 0x40) != 0;
             ppu.bg[3].single_palette = (val & 0x80) != 0;
+            ppu.bg[3].config_int[0] = val;
         case 0x00f;
             ppu.bg[3].screen_base_block = val & 0x1f;
             ppu.bg[3].wraparound = (val & 0x20) != 0;
             ppu.bg[3].wide = (val & 0x40) != 0;
             ppu.bg[3].tall = (val & 0x80) != 0;
+            ppu.bg[3].config_int[1] = val;
         case 0x010;
             ppu.bg[0].x_off &= 0x100;
             ppu.bg[0].x_off |= val;
@@ -447,6 +500,20 @@ mmio_write :: (addr: u32, val: u8) {
             apu.chan_3.frequency |= (cast(u16)val & 0b111) << 8;
             apu.chan_3.use_length = (val & 0x40) != 0;
             apu.chan_3.trigger = (val & 0x80) != 0;
+        case 0x080;
+            apu.cgb_enable_r[0] = (val & 0x1) != 0;
+            apu.cgb_enable_r[1] = (val & 0x2) != 0;
+            apu.cgb_enable_r[2] = (val & 0x4) != 0;
+            apu.cgb_enable_r[3] = (val & 0x8) != 0;
+            apu.cgb_enable_l[0] = (val & 0x10) != 0;
+            apu.cgb_enable_l[1] = (val & 0x20) != 0;
+            apu.cgb_enable_l[2] = (val & 0x40) != 0;
+            apu.cgb_enable_l[3] = (val & 0x80) != 0;
+            apu.cgb_enable_int = val;
+        case 0x081;
+            apu.cgb_vol_r = val & 0b111;
+            apu.cgb_vol_l = (val >> 4) & 0b111;
+            apu.cgb_vol_int = val;
         case 0x0a0; #through;
         case 0x0a1; #through;
         case 0x0a2; #through;
@@ -736,6 +803,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[3].control_int |= (cast(u16)val) << 8;
 
             if cpu.dma[3].enable && cpu.dma[3].start_timing == .IMMED {
+                // print("DMA 3 transfer from 0x% to 0x%, 0x% bytes\n", formatInt(cpu.dma[3].src, 16, 1), formatInt(cpu.dma[3].dst, 16, 1), formatInt(cpu.dma[3].count, 16, 1));
                 while cpu.dma[3].enable transfer(3);
                 cpu.dma[3].control_int &= 0x7fff;
             }

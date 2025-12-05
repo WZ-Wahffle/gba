@@ -182,6 +182,7 @@ Ppu :: struct {
         dmx := 0; // BG2/BG3 only
         dy := 0; // BG2/BG3 only
         dmy := 0; // BG2/BG3 only
+        config_int: [2]u8;
     }
 
     Window_Config :: struct {
@@ -241,10 +242,18 @@ Apu :: struct {
     chan_1: Pulse_Channel;
     chan_2: Pulse_Channel;
     chan_3: Wave_Channel;
+    chan_4: Noise_Channel;
     chan_a: Direct_Channel;
     chan_b: Direct_Channel;
     fifo_a: Fifo;
     fifo_b: Fifo;
+
+    cgb_enable_l: [4]bool;
+    cgb_enable_r: [4]bool;
+    cgb_enable_int: u8;
+    cgb_vol_l := 0;
+    cgb_vol_r := 0;
+    cgb_vol_int: u8;
 
     Pulse_Channel :: struct {
         sweep_shift_cnt := 0;
@@ -275,6 +284,21 @@ Apu :: struct {
         volume := 0;
         frequency := 0;
         trigger := false;
+    }
+
+    Noise_Channel :: struct {
+        ratio := 0;
+        wide := 0;
+        frequency := 0;
+
+        envelope_speed := 0;
+        envelope_increase := 0;
+        envelope_initial_volume := 0;
+
+        use_length := 0;
+        sound_length := 0;
+
+        trigger := 0;
     }
 
     Direct_Channel :: struct {

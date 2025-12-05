@@ -165,7 +165,7 @@ thumb_ldrsb :: inline (ins: u16) {
     rm := reg_src(xx ((ins >> 6) & 0b111));
     rn := reg_src(xx ((ins >> 3) & 0b111));
     rd_idx : u8 = xx ins & 0b111;
-    to_write : u32 = read_8(rm + rn);
+    to_write : u32 = read_8(rm + rn, cpu.reg[15] < 0x4000);
     if (to_write & 0x80) != 0 then to_write |= 0xffffff00;
     reg_dst(rd_idx, to_write);
 }
@@ -174,28 +174,28 @@ thumb_ldr_2 :: inline (ins: u16) {
     rm := reg_src(xx ((ins >> 6) & 0b111));
     rn := reg_src(xx ((ins >> 3) & 0b111));
     rd_idx : u8 = xx ins & 0b111;
-    reg_dst(rd_idx, read_32(rm + rn));
+    reg_dst(rd_idx, read_32(rm + rn, cpu.reg[15] < 0x4000));
 }
 
 thumb_ldrh_2 :: inline (ins: u16) {
     rd_idx : u8 = xx ins & 0b111;
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
-    reg_dst(rd_idx, read_16(rn + rm));
+    reg_dst(rd_idx, read_16(rn + rm, cpu.reg[15] < 0x4000));
 }
 
 thumb_ldrb_2 :: inline (ins: u16) {
     rd_idx : u8 = xx ins & 0b111;
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
-    reg_dst(rd_idx, read_8(rn + rm));
+    reg_dst(rd_idx, read_8(rn + rm, cpu.reg[15] < 0x4000));
 }
 
 thumb_ldrsh :: inline (ins: u16) {
     rm := reg_src(xx ((ins >> 6) & 0b111));
     rn := reg_src(xx ((ins >> 3) & 0b111));
     rd_idx : u8 = xx ins & 0b111;
-    to_write : u32 = read_16(rm + rn);
+    to_write : u32 = read_16(rm + rn, cpu.reg[15] < 0x4000);
     if (to_write & 0x8000) != 0 then to_write |= 0xffff0000;
     reg_dst(rd_idx, to_write);
 }
@@ -204,7 +204,7 @@ thumb_ldr_3 :: inline (ins: u16) {
     cpu.remaining_cycles -= 2;
     immed := ins & 0xff;
     reg_idx : u8 = xx (ins >> 8) & 0b111;
-    reg_dst(reg_idx, read_32(((cpu.reg[15] + 2) & 0xfffffffc) + immed * 4));
+    reg_dst(reg_idx, read_32(((cpu.reg[15] + 2) & 0xfffffffc) + immed * 4, cpu.reg[15] < 0x4000));
 }
 
 thumb_add_4 :: inline (ins: u16) {
@@ -230,8 +230,16 @@ thumb_mov_3 :: inline (ins: u16) {
 thumb_bx_blx_2 :: inline (ins: u16) {
     addr := reg_src(xx (ins >> 3) & 0xf);
     if (ins & 0x80) != 0 then cpu.reg[14] = (cpu.reg[15]) | 1;
-    set_status_bit(.T, (addr & 1) != 0);
-    cpu.reg[15] = addr & 0xfffffffe;
+
+    if (addr & 1) == 0 {
+        set_status_bit(.T, false);
+        cpu.reg[15] = addr & 0xfffffffc;
+    } else {
+        set_status_bit(.T, true);
+        cpu.reg[15] = addr & 0xfffffffe;
+    }
+    // set_status_bit(.T, (addr & 1) != 0);
+    // cpu.reg[15] = addr & 0xfffffffe;
 }
 
 thumb_and :: inline (ins: u16) {
@@ -286,7 +294,29 @@ thumb_lsr_2 :: inline (ins: u16) {
 }
 
 thumb_asr_2 :: inline (ins: u16) {
-    assert(false);
+    rs := reg_src(xx ((ins >> 3) & 0b111)) & 0xff;
+    rd_idx : u8 = xx ins & 0b111;
+    rd := reg_src(rd_idx);
+    result := rd;
+    #asm {
+        rs === c;
+        sar.32 result, rs;
+    }
+    if rs == 0 {
+        // this page intentionally left blank
+    } else if rs < 32 {
+        set_status_bit(.C, (rd & (1 << (rs - 1))) != 0);
+    } else {
+        set_status_bit(.C, (rd & 0x80000000) != 0);
+        if (rd & 0x80000000) != 0 {
+            result = 0xffffffff;
+        } else {
+            result = 0;
+        }
+    }
+    reg_dst(rd_idx, result);
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
 }
 
 thumb_adc :: inline (ins: u16) {
@@ -404,9 +434,9 @@ thumb_ldr_str_ldrb_strb_1 :: inline (ins: u16) {
     if l {
         cpu.remaining_cycles -= 2;
         if s {
-            reg_dst(rd_idx, xx read_8(rn + imm));
+            reg_dst(rd_idx, xx read_8(rn + imm, cpu.reg[15] < 0x4000));
         } else {
-            reg_dst(rd_idx, read_32(rn + imm * 4));
+            reg_dst(rd_idx, read_32(rn + imm * 4, cpu.reg[15] < 0x4000));
         }
     } else {
         cpu.remaining_cycles -= 1;
@@ -423,7 +453,7 @@ thumb_ldr_4 :: inline (ins: u16) {
     reg_idx : u8 = xx (ins >> 8) & 0b111;
     addr := cpu.reg[13] + 4 * imm;
     cpu.remaining_cycles -= 2;
-    reg_dst(reg_idx, read_32(addr));
+    reg_dst(reg_idx, read_32(addr, cpu.reg[15] < 0x4000));
 }
 
 thumb_str_3 :: inline (ins: u16) {
@@ -439,7 +469,7 @@ thumb_ldrh_1 :: inline (ins: u16) {
     rn_idx : u8 = xx (ins >> 3) & 0b111;
     immed := (ins >> 6) & 0x1f;
     cpu.remaining_cycles -= 2;
-    reg_dst(rd_idx, read_16(reg_src(rn_idx) + immed * 2));
+    reg_dst(rd_idx, read_16(reg_src(rn_idx) + immed * 2, cpu.reg[15] < 0x4000));
 }
 
 thumb_strh_1 :: inline (ins: u16) {
@@ -468,13 +498,13 @@ thumb_pop :: inline (ins: u16) {
     for 0..7 {
         if (ins & (1 << it)) != 0 {
             cpu.remaining_cycles -= 1;
-            cpu.reg[it] = read_32(cpu.reg[13]);
+            cpu.reg[it] = read_32(cpu.reg[13], cpu.reg[15] < 0x4000);
             cpu.reg[13] += 4;
         }
     }
     if (ins & 0x100) != 0 {
         cpu.remaining_cycles -= 1;
-        cpu.reg[15] = read_32(cpu.reg[13]);
+        cpu.reg[15] = read_32(cpu.reg[13], cpu.reg[15] < 0x4000);
         set_status_bit(.T, (cpu.reg[15] & 1) != 0);
         cpu.psr &= ~cast(u32)0x10;
         cpu.psr |= (cpu.reg[15] & 1) << 4;
@@ -537,7 +567,7 @@ thumb_ldmia_stmia :: inline (ins: u16) {
         for 0..7 {
             if regs & (1 << it) != 0 {
                 cpu.remaining_cycles -= 1;
-                reg_dst(xx it, read_32(pointer));
+                reg_dst(xx it, read_32(pointer, cpu.reg[15] < 0x4000));
                 pointer += 4;
             }
         }

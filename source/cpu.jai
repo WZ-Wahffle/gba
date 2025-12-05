@@ -1,9 +1,10 @@
 // the read and write functions are all very similar in composition,
 // however have been split up in order to increase performance
 
-read_8 :: (addr: u32) -> u8 {
+read_8 :: (addr: u32, bios_bypass := false) -> u8 {
     if addr < 0x4000 {
-        return cpu.memory.bios._8[addr];
+        if bios_bypass return cpu.memory.bios._8[addr];
+        return 0;
     }
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._8[addr % 0x40000];
@@ -35,9 +36,10 @@ read_8 :: (addr: u32) -> u8 {
     return 0;
 }
 
-read_16 :: (addr: u32) -> u16 {
+read_16 :: (addr: u32, bios_bypass := false) -> u16 {
     if addr < 0x4000 {
-        return cpu.memory.bios._16[addr >> 1];
+        if bios_bypass return cpu.memory.bios._16[addr >> 1];
+        return 0;
     }
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._16[(addr >> 1) % 0x20000];
@@ -73,9 +75,10 @@ read_16 :: (addr: u32) -> u16 {
     return 0;
 }
 
-read_32 :: (addr: u32) -> u32 {
+read_32 :: (addr: u32, bios_bypass := false) -> u32 {
     if addr < 0x4000 {
-        return cpu.memory.bios._32[addr >> 2];
+        if bios_bypass return cpu.memory.bios._32[addr >> 2];
+        return 0;
     }
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._32[(addr >> 2) % 0x10000];
@@ -438,7 +441,7 @@ timer_overflow :: (idx: int) {
 transfer :: (idx: int) {
     if cpu.dma[idx].enable {
         if cpu.dma[idx].large_transfer {
-            write_32(cpu.dma[idx].dst_int, read_32(cpu.dma[idx].src_int));
+            write_32(cpu.dma[idx].dst_int & 0xfffffffc, read_32(cpu.dma[idx].src_int & 0xfffffffc));
             if cpu.dma[idx].src_addr_control == {
                 case .INC;
                     cpu.dma[idx].src_int += 4;
@@ -452,7 +455,7 @@ transfer :: (idx: int) {
                     cpu.dma[idx].dst_int -= 4;
             }
         } else {
-            write_16(cpu.dma[idx].dst_int, read_16(cpu.dma[idx].src_int));
+            write_16(cpu.dma[idx].dst_int & 0xfffffffe, read_16(cpu.dma[idx].src_int & 0xfffffffe));
             if cpu.dma[idx].src_addr_control == {
                 case .INC;
                     cpu.dma[idx].src_int += 2;
@@ -529,7 +532,15 @@ reg_src :: inline (val: u8) -> u32 {
 }
 
 reg_dst :: inline (val: u8, to_write: u32) {
-    cpu.reg[val] = to_write;
+    if val == 15 {
+        if get_status_bit(.T) {
+            cpu.reg[15] = to_write & 0xfffffffe;
+        } else {
+            cpu.reg[15] = to_write & 0xfffffffc;
+        }
+    } else {
+        cpu.reg[val] = to_write;
+    }
 }
 
 shifter_operand :: (val: u16) -> (u32, bool, bool) {
@@ -781,6 +792,8 @@ populate_thumb_lut :: () {
 execute_next :: () {
     if !get_status_bit(.T) {
         ins := next_32();
+        ins_c := ins;
+        // print("0x% PC: 0x% LR: 0x% PSR: 0x%\n", formatInt(ins_c, 16, 8), formatInt(cpu.reg[15], 16, 8), formatInt(cpu.reg[14], 16, 8), formatInt(cpu.psr, 16, 8));
         if !cond(ins >> 28) {
             return;
         }
@@ -792,6 +805,7 @@ execute_next :: () {
         arm_reduced_lut[ins_masked](ins);
     } else {
         ins := next_16();
+        // print("0x% PC: 0x% LR: 0x% PSR: 0x%\n", formatInt(ins, 16, 4), formatInt(cpu.reg[15], 16, 8), formatInt(cpu.reg[14], 16, 8), formatInt(cpu.psr, 16, 8));
         thumb_reduced_lut[ins >> 6](ins);
     }
 }

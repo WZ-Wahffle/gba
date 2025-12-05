@@ -61,7 +61,8 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         y_pos %= 256 * ifx ppu.bg[bg].tall then 2 else 1;
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
-        base_addr += (y_pos / 8) * 64;
+        if ppu.bg[bg].wide then base_addr += ((y_pos / 8) / 32) * 0x800;
+        base_addr += ((y_pos / 8)) * 64;
         Text_Tile_Attr :: struct {
             idx := 0;
             flip_h := false;
@@ -450,6 +451,10 @@ step_ppu :: () {
                 cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
                 interrupt(.IRQ);
             }
+            if ppu.vcounter_irq_enable && cpu.ie[Interrupt_Source.LCD_VCOUNTER] != 0 && ppu.draw_y == ppu.vcounter {
+                cpu.ifl[Interrupt_Source.LCD_VCOUNTER] = 0x04;
+                interrupt(.IRQ);
+            }
         }
 
         if ppu.draw_x == 0 {
@@ -484,6 +489,11 @@ step_ppu :: () {
                     draw_bg(ppu.draw_y, 3, false);
                     merge_and_blend();
                 case 1;
+                    draw_obj(ppu.draw_y);
+                    draw_bg(ppu.draw_y, 0, false);
+                    draw_bg(ppu.draw_y, 1, false);
+                    draw_bg(ppu.draw_y, 2, true);
+                    merge_and_blend();
                 case 2;
                     draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
                     draw_bg(ppu.draw_y, 2, true);
@@ -530,6 +540,7 @@ ui :: () {
     ImGui.GetIO().Fonts.AddFontFromMemoryTTF(ImGui.GetIO().Fonts, font.data, font.count, FONT_SIZE);
 
     time := seconds_since_init();
+    keystate := SDL_GetKeyboardState(null);
     while !quit {
         new_time := seconds_since_init();
         dt = new_time - time;
@@ -611,6 +622,19 @@ ui :: () {
             ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN)) << 7) |
             ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) << 8) |
             ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) << 9);
+
+        SDL_PumpEvents();
+        ppu.keypad_state |=
+            (keystate[SDL_SCANCODE_A] << 0) |
+            (keystate[SDL_SCANCODE_B] << 1) |
+            (keystate[SDL_SCANCODE_TAB] << 2) |
+            (keystate[SDL_SCANCODE_RETURN] << 3) |
+            (keystate[SDL_SCANCODE_RIGHT] << 4) |
+            (keystate[SDL_SCANCODE_LEFT] << 5) |
+            (keystate[SDL_SCANCODE_UP] << 6) |
+            (keystate[SDL_SCANCODE_DOWN] << 7) |
+            (keystate[SDL_SCANCODE_R] << 8) |
+            (keystate[SDL_SCANCODE_L] << 9);
 
         // processing
         if cpu.emu_state == {
