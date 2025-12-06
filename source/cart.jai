@@ -41,43 +41,41 @@ rom_write :: (addr: u32, val: u8) {
                 }
             }
             to_write := (val & 1) != 0;
-            if cpu.eeprom_size == .EEPROM_512B {
-                if cpu.ee_state == {
-                    case .NONE;
-                        if to_write cpu.ee_state = .FIRST_BIT_READ;
-                    case .FIRST_BIT_READ;
-                        cpu.ee_state = ifx to_write then .READING else .WRITING;
-                        cpu.ee_block_idx = 0;
-                        cpu.ee_block = 0;
-                    case .READING;
-                        cpu.ee_block <<= 1;
-                        cpu.ee_block |= xx to_write;
-                        cpu.ee_block_idx += 1;
-                        if cpu.ee_block_idx == 6 {
-                            cpu.ee_state = .FINISHED;
-                            cpu.ee_read = cpu.ee[cpu.ee_block];
-                            cpu.ee_read_idx = 0;
-                        }
-                    case .WRITING;
-                        cpu.ee_block <<= 1;
-                        cpu.ee_block |= xx to_write;
-                        cpu.ee_block_idx += 1;
-                        if cpu.ee_block_idx == 6 {
-                            cpu.ee_state = .WRITING_DATA;
-                            cpu.ee_write = 0;
-                            cpu.ee_write_idx = 0;
-                        }
-                    case .WRITING_DATA;
-                        cpu.ee_write <<= 1;
-                        cpu.ee_write |= xx to_write;
-                        cpu.ee_write_idx += 1;
-                        if cpu.ee_write_idx == 64 {
-                            cpu.ee_state = .FINISHED;
-                            cpu.ee[cpu.ee_block] = cpu.ee_write;
-                        }
-                    case .FINISHED;
-                        cpu.ee_state = .NONE;
-                }
+            if cpu.ee_state == {
+                case .NONE;
+                    if to_write cpu.ee_state = .FIRST_BIT_READ;
+                case .FIRST_BIT_READ;
+                    cpu.ee_state = ifx to_write then .READING else .WRITING;
+                    cpu.ee_block_idx = 0;
+                    cpu.ee_block = 0;
+                case .READING;
+                    cpu.ee_block <<= 1;
+                    cpu.ee_block |= xx to_write;
+                    cpu.ee_block_idx += 1;
+                    if cpu.ee_block_idx == ifx cpu.eeprom_size == .EEPROM_512B then 6 else 14 {
+                        cpu.ee_state = .FINISHED;
+                        cpu.ee_read = cpu.ee[cpu.ee_block];
+                        cpu.ee_read_idx = 0;
+                    }
+                case .WRITING;
+                    cpu.ee_block <<= 1;
+                    cpu.ee_block |= xx to_write;
+                    cpu.ee_block_idx += 1;
+                    if cpu.ee_block_idx == ifx cpu.eeprom_size == .EEPROM_512B then 6 else 14 {
+                        cpu.ee_state = .WRITING_DATA;
+                        cpu.ee_write = 0;
+                        cpu.ee_write_idx = 0;
+                    }
+                case .WRITING_DATA;
+                    cpu.ee_write <<= 1;
+                    cpu.ee_write |= xx to_write;
+                    cpu.ee_write_idx += 1;
+                    if cpu.ee_write_idx == 64 {
+                        cpu.ee_state = .FINISHED;
+                        cpu.ee[cpu.ee_block] = cpu.ee_write;
+                    }
+                case .FINISHED;
+                    cpu.ee_state = .NONE;
             }
         }
     }

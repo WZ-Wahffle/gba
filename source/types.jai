@@ -279,12 +279,12 @@ Apu :: struct {
         play_all := false;
         force_volume_to_75_percent := false;
 
-        use_length := false;
+        use_length := 0;
         sound_length := 0;
 
         volume := 0;
         frequency := 0;
-        trigger := false;
+        trigger := 0;
     }
 
     Noise_Channel :: struct {

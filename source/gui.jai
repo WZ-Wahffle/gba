@@ -1668,8 +1668,10 @@ window_window :: ()  {
 
 blend_window :: () {
     ImGui.Begin("blend");
+    ImGui.Text("Mode: %", ppu.special_effect);
     ImGui.Text_CFormat("Coefficient A: %d", ppu.eva);
     ImGui.Text_CFormat("Coefficient B: %d", ppu.evb);
+    ImGui.Text_CFormat("Coefficient Y: %d", ppu.evy);
     ImGui.Text("First: %1%2%3%4%5%6",
         ifx ppu.bg_first_target_pixel[0] then "1" else "-",
         ifx ppu.bg_first_target_pixel[1] then "2" else "-",

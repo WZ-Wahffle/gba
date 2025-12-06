@@ -278,6 +278,7 @@ merge_and_blend :: () {
         out_pixels := u16.[BLANK_COLOR, BLANK_COLOR];
         out_pixel_prios := int.[9, 9];
         out_indices := int.[-1, -1];
+        out_use_special := bool.[false, false];
         backdrop := ppu.memory.palette_ram._16[0];
         for out_pixel_idx: 0..1 {
             for bg_idx : 0..3 {
@@ -287,29 +288,34 @@ merge_and_blend :: () {
                             out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
                             out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
                             out_indices[out_pixel_idx] = bg_idx;
+                            out_use_special[out_pixel_idx] = ppu.win[0].special_effect;
                         }
                     } else if ppu.win[1].enable && win_2_in {
                         if ppu.win[1].bg_enable[bg_idx] {
                             out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
                             out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
                             out_indices[out_pixel_idx] = bg_idx;
+                            out_use_special[out_pixel_idx] = ppu.win[1].special_effect;
                         }
                     } else if ppu.obj_win.enable && win_obj_in {
                         if ppu.obj_win.bg_enable[bg_idx] {
                             out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
                             out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
                             out_indices[out_pixel_idx] = bg_idx;
+                            out_use_special[out_pixel_idx] = ppu.obj_win.special_effect;
                         }
                     } else if ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable {
                         if ppu.outside_win_bg_enable[bg_idx] {
                             out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
                             out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
                             out_indices[out_pixel_idx] = bg_idx;
+                            out_use_special[out_pixel_idx] = ppu.outside_win_special_effect;
                         }
                     } else {
                         out_pixels[out_pixel_idx] = bg_line_buffer[bg_idx][x];
                         out_pixel_prios[out_pixel_idx] = ppu.bg[bg_idx].prio * 2 + 1;
                         out_indices[out_pixel_idx] = bg_idx;
+                        out_use_special[out_pixel_idx] = ppu.special_effect != 0;
                     }
                 }
             }
@@ -320,29 +326,34 @@ merge_and_blend :: () {
                         out_pixels[out_pixel_idx] = obj_line_buffer[x];
                         out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
                         out_indices[out_pixel_idx] = 4;
+                        out_use_special[out_pixel_idx] = ppu.win[0].special_effect;
                     }
                 } else if ppu.win[1].enable && win_2_in {
                     if ppu.win[1].obj_enable {
                         out_pixels[out_pixel_idx] = obj_line_buffer[x];
                         out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
                         out_indices[out_pixel_idx] = 4;
+                        out_use_special[out_pixel_idx] = ppu.win[1].special_effect;
                     }
                 } else if ppu.obj_win.enable && win_obj_in {
                     if ppu.obj_win.obj_enable {
                         out_pixels[out_pixel_idx] = obj_line_buffer[x];
                         out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
                         out_indices[out_pixel_idx] = 4;
+                        out_use_special[out_pixel_idx] = ppu.obj_win.special_effect;
                     }
                 } else if ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable {
                     if ppu.outside_win_obj_enable {
                         out_pixels[out_pixel_idx] = obj_line_buffer[x];
                         out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
                         out_indices[out_pixel_idx] = 4;
+                        out_use_special[out_pixel_idx] = ppu.outside_win_special_effect;
                     }
                 } else {
                     out_pixels[out_pixel_idx] = obj_line_buffer[x];
                     out_pixel_prios[out_pixel_idx] = obj_prio_buffer[x];
                     out_indices[out_pixel_idx] = 4;
+                    out_use_special[out_pixel_idx] = ppu.special_effect != 0 || obj_use_alpha_buffer[x];
                 }
             }
 
@@ -350,6 +361,16 @@ merge_and_blend :: () {
                 out_pixels[out_pixel_idx] = backdrop;
                 out_pixel_prios[out_pixel_idx] = 8;
                 out_indices[out_pixel_idx] = 5;
+                // assumption: backdrop is always enabled for both windows
+                if ppu.win[0].enable && win_1_in {
+                    out_use_special[out_pixel_idx] = ppu.win[0].special_effect;
+                } else if ppu.win[1].enable && win_2_in {
+                    out_use_special[out_pixel_idx] = ppu.win[1].special_effect;
+                } else if ppu.obj_win.enable && obj_win_buffer[x] {
+                    out_use_special[out_pixel_idx] = ppu.obj_win.special_effect;
+                } else if ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable {
+                    out_use_special[out_pixel_idx] = ppu.outside_win_special_effect;
+                }
             }
 
             if out_indices[0] == {
@@ -367,40 +388,39 @@ merge_and_blend :: () {
         }
 
         use_alpha := false;
-        use_special := true;
         if out_indices[0] == {
             case 0;
-            use_special &= ppu.bg_first_target_pixel[0];
+            out_use_special[0] &= ppu.bg_first_target_pixel[0];
             case 1;
-            use_special &= ppu.bg_first_target_pixel[1];
+            out_use_special[0] &= ppu.bg_first_target_pixel[1];
             case 2;
-            use_special &= ppu.bg_first_target_pixel[2];
+            out_use_special[0] &= ppu.bg_first_target_pixel[2];
             case 3;
-            use_special &= ppu.bg_first_target_pixel[3];
+            out_use_special[0] &= ppu.bg_first_target_pixel[3];
             case 4;
-            use_special &= ppu.obj_first_target_pixel || obj_use_alpha_buffer[x];
+            out_use_special[0] &= ppu.obj_first_target_pixel || obj_use_alpha_buffer[x];
             use_alpha = obj_use_alpha_buffer[x];
             case 5;
-            use_special &= ppu.bd_first_target_pixel;
+            out_use_special[0] &= ppu.bd_first_target_pixel;
         }
 
         if out_indices[1] == {
             case 0;
-            use_special &= ppu.bg_second_target_pixel[0];
+            out_use_special[1] &= ppu.bg_second_target_pixel[0];
             case 1;
-            use_special &= ppu.bg_second_target_pixel[1];
+            out_use_special[1] &= ppu.bg_second_target_pixel[1];
             case 2;
-            use_special &= ppu.bg_second_target_pixel[2];
+            out_use_special[1] &= ppu.bg_second_target_pixel[2];
             case 3;
-            use_special &= ppu.bg_second_target_pixel[3];
+            out_use_special[1] &= ppu.bg_second_target_pixel[3];
             case 4;
-            use_special &= ppu.obj_second_target_pixel;
+            out_use_special[1] &= ppu.obj_second_target_pixel;
             case 5;
-            use_special &= ppu.bd_second_target_pixel;
+            if out_indices[0] != 5 then out_use_special[1] &= ppu.bd_second_target_pixel;
         }
 
-        if use_special {
-            if use_alpha || ppu.special_effect == 1 {
+        if out_use_special[0] {
+            if (use_alpha || ppu.special_effect == 1) && out_use_special[1] {
                 r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
                 g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
                 b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
@@ -415,6 +435,8 @@ merge_and_blend :: () {
                 g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) - ((out_pixels[0] >> 5) & 0x1f) * (min(ppu.evy, 16) / 16.0));
                 b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) - ((out_pixels[0] >> 10) & 0x1f) * (min(ppu.evy, 16) / 16.0));
                 framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
+            } else {
+                framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = out_pixels[0];
             }
         } else {
             framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = out_pixels[0];

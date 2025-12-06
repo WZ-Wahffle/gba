@@ -11,6 +11,8 @@ mmio_read :: (addr: u32) -> u8 {
             return xx ppu.vcounter;
         case 0x006;
             return xx ppu.draw_y;
+        case 0x007;
+            return 0;
         case 0x008;
             return ppu.bg[0].config_int[0];
         case 0x009;
@@ -31,6 +33,20 @@ mmio_read :: (addr: u32) -> u8 {
             return xx apu.chan_1.sweep_shift_cnt |
             (ifx apu.chan_1.sweep_freq_decrease then 0x8 else 0) |
             (apu.chan_1.sweep_time << 4);
+        case 0x061;
+            return 0;
+        case 0x062;
+            return xx apu.chan_1.sound_length | (apu.chan_1.duty_cycle << 6);
+        case 0x068;
+            return xx apu.chan_2.sweep_shift_cnt |
+            (ifx apu.chan_2.sweep_freq_decrease then 0x8 else 0) |
+            (apu.chan_2.sweep_time << 4);
+        case 0x069;
+            return 0;
+        case 0x074;
+            return xx apu.chan_3.frequency & 0xff;
+        case 0x075;
+            return xx (apu.chan_3.frequency >> 8) | (apu.chan_3.use_length << 6) | (apu.chan_3.trigger << 7);
         case 0x078;
             return xx apu.chan_4.sound_length;
         case 0x079;
@@ -84,10 +100,14 @@ mmio_read :: (addr: u32) -> u8 {
             return 0;
         case 0x089;
             return 2;
-        case 0x98a;
+        case 0x08a;
             return 0;
-        case 0x98b;
+        case 0x08b;
             return 0;
+        case 0x100;
+            return xx cpu.timer[0].reload & 0xff;
+        case 0x101;
+            return xx (cpu.timer[0].reload >> 8) & 0xff;
         case 0x128;
             return 0;
         case 0x129;
@@ -514,8 +534,8 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x075;
             apu.chan_3.frequency &= 0xff;
             apu.chan_3.frequency |= (cast(u16)val & 0b111) << 8;
-            apu.chan_3.use_length = (val & 0x40) != 0;
-            apu.chan_3.trigger = (val & 0x80) != 0;
+            apu.chan_3.use_length = (val >> 6) & 1;
+            apu.chan_3.trigger = (val >> 7) & 1;
         case 0x080;
             apu.cgb_enable_r[0] = (val & 0x1) != 0;
             apu.cgb_enable_r[1] = (val & 0x2) != 0;
