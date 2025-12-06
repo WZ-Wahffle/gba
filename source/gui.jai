@@ -121,6 +121,7 @@ cpu_window :: () {
     if ImGui.Button("Print History") {
         print("%\n", cpu.pc_history);
     }
+    ImGui.Checkbox("Logging", *cpu.logging);
     if cpu.mode == .USER && cpu.privileged {
         ImGui.Text("Mode: SYSTEM, %", ifx get_status_bit(.T) then "THUMB" else "ARM");
     } else {

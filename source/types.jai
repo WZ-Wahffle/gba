@@ -91,6 +91,7 @@ Cpu :: struct {
     breakpoints_thumb: [0x100]u16;
     pc_history: [64]u32;
     pc_history_idx : u32 = 0;
+    logging := false;
 }
 
 Ppu :: struct {

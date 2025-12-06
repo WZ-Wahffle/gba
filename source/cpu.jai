@@ -319,6 +319,7 @@ set_mode :: (mode: u32) {
         case 0b11111;
             new_mode = .SYSTEM;
     }
+    if cpu.logging print("Set Mode %\n", new_mode);
     cpu.sp[cpu.mode] = cpu.reg[13];
     cpu.lr[cpu.mode] = cpu.reg[14];
     cpu.reg[13] = cpu.sp[new_mode];
@@ -346,6 +347,7 @@ interrupt :: (mode: Cpu_Mode) {
         cpu.reg[15] = 0x1c;
         set_status_bit(.F, true);
     }
+    if cpu.logging print("Interrupt %\n", mode);
     set_status_bit(.I, true);
     set_status_bit(.T, false);
     cpu.halted = false;
@@ -793,7 +795,7 @@ execute_next :: () {
     if !get_status_bit(.T) {
         ins := next_32();
         ins_c := ins;
-        // print("0x% PC: 0x% LR: 0x% PSR: 0x%\n", formatInt(ins_c, 16, 8), formatInt(cpu.reg[15], 16, 8), formatInt(cpu.reg[14], 16, 8), formatInt(cpu.psr, 16, 8));
+        if cpu.logging print("0x% PC: 0x% LR: 0x% SP: 0x% PSR: 0x%\n", formatInt(ins_c, 16, 8), formatInt(cpu.reg[15], 16, 8), formatInt(cpu.reg[14], 16, 8), formatInt(cpu.reg[13], 16, 8), formatInt(cpu.psr, 16, 8));
         if !cond(ins >> 28) {
             return;
         }
@@ -805,7 +807,7 @@ execute_next :: () {
         arm_reduced_lut[ins_masked](ins);
     } else {
         ins := next_16();
-        // print("0x% PC: 0x% LR: 0x% PSR: 0x%\n", formatInt(ins, 16, 4), formatInt(cpu.reg[15], 16, 8), formatInt(cpu.reg[14], 16, 8), formatInt(cpu.psr, 16, 8));
+        if cpu.logging print("0x% PC: 0x% LR: 0x% SP: 0x% PSR: 0x%\n", formatInt(ins, 16, 4), formatInt(cpu.reg[15], 16, 8), formatInt(cpu.reg[14], 16, 8), formatInt(cpu.reg[13], 16, 8), formatInt(cpu.psr, 16, 8));
         thumb_reduced_lut[ins >> 6](ins);
     }
 }

@@ -281,7 +281,6 @@ arm_sub :: inline (ins: u32) {
     rd_idx : u8 = xx (ins >> 12) & 0xf;
     flags := (ins & 0x100000) != 0;
     result := rn - operand;
-    reg_dst(rd_idx, result);
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
@@ -293,6 +292,7 @@ arm_sub :: inline (ins: u32) {
             set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
         }
     }
+    reg_dst(rd_idx, result);
 }
 
 arm_rsb :: inline (ins: u32) {

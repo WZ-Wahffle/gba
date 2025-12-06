@@ -623,6 +623,18 @@ ui :: () {
             ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) << 8) |
             ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) << 9);
 
+        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX) < -16384 {
+            ppu.keypad_state |= 0x20;
+        }
+        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX) > 16384 {
+            ppu.keypad_state |= 0x10;
+        }
+        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY) < -16384 {
+            ppu.keypad_state |= 0x40;
+        }
+        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY) > 16384 {
+            ppu.keypad_state |= 0x80;
+        }
         SDL_PumpEvents();
         ppu.keypad_state |=
             (keystate[SDL_SCANCODE_A] << 0) |

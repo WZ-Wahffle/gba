@@ -208,7 +208,9 @@ thumb_ldr_3 :: inline (ins: u16) {
 }
 
 thumb_add_4 :: inline (ins: u16) {
-    assert(false);
+    rd_idx : u8 = xx (ins & 0b111) | ((ins >> 4) & 0b1000);
+    rm := reg_src(xx (ins >> 3) & 0xf);
+    reg_dst(rd_idx, rm + reg_src(rd_idx));
 }
 
 thumb_cmp_3 :: inline (ins: u16) {
