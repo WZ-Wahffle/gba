@@ -85,6 +85,7 @@ Cpu :: struct {
         enable := false;
     }
 
+    cart_name: string;
     emu_state := Emulation_State.STOPPED;
     remaining_cycles := 0;
     breakpoints_arm: [0x10000]u32;

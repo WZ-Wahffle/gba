@@ -11,6 +11,7 @@ show_timer := false;
 show_rom := false;
 show_disasm := false;
 show_keypad := false;
+show_save := false;
 show_cpu := false;
 show_ppu := false;
 show_apu := false;
@@ -66,6 +67,9 @@ draw_gui :: () {
                 if ImGui.MenuItem("oam", "shift+o") {
                     show_oam = !show_oam;
                 }
+                if ImGui.MenuItem("save data", "shift+s") {
+                    show_save = !show_save;
+                }
                 ImGui.EndMenu();
             }
             if ImGui.BeginMenu("Disassembly") {
@@ -92,6 +96,7 @@ draw_gui :: () {
     if show_apu apu_window();
     if show_disasm disasm_window();
     if show_keypad keypad_window();
+    if show_save save_window();
     #if #exists(__Iprof) {
         profiler_window();
     }
@@ -1341,6 +1346,53 @@ DONE
     ImGui.Text("%", controller_split[27]);
     ImGui.Text("%", controller_split[28]);
     ImGui.PopStyleVar();
+    ImGui.End();
+}
+
+confirm_save := false;
+confirm_load := false;
+save_window :: () {
+    ImGui.Begin("save data", null);
+    ImGui.Text("Save Data Type: %", cpu.backup_type);
+    if cpu.backup_type == {
+        case .EEPROM;
+        ImGui.Text("Size: %", cpu.eeprom_size);
+    }
+
+    if ImGui.Button(ifx confirm_save then "Confirm Save##save".data else "Save##save".data) {
+        if confirm_save {
+            file_name := tprint("%.gbasav", cpu.cart_name);
+            f := file_open(file_name, true, false);
+            file_write(*f, *cpu.backup_type, size_of(Backup_Type));
+            if cpu.backup_type == {
+                case .EEPROM;
+                file_write(*f, *cpu.eeprom_size, size_of(Eeprom_Size));
+                file_write(*f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
+            }
+            file_close(*f);
+            confirm_save = false;
+        } else {
+            confirm_save = true;
+        }
+    }
+    ImGui.SameLine();
+    if ImGui.Button(ifx confirm_load then "Confirm Load##load".data else "Load##load".data) {
+        if confirm_load {
+            file_name := tprint("%.gbasav", cpu.cart_name);
+            f := file_open(file_name, false);
+            file_read(*f, *cpu.backup_type, size_of(Backup_Type));
+            if cpu.backup_type == {
+                case .EEPROM;
+                file_read(*f, *cpu.eeprom_size, size_of(Eeprom_Size));
+                file_read(*f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
+            }
+            file_close(*f);
+            confirm_load = false;
+        } else {
+            confirm_load = true;
+        }
+    }
+
     ImGui.End();
 }
 

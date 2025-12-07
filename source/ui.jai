@@ -467,13 +467,11 @@ step_ppu :: () {
                 vblank_happened = true;
                 cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0x01;
                 interrupt(.IRQ);
-            }
-            if ppu.hblank_irq_enable && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 && ppu.draw_x >= 240 && !hblank_happened {
+            } else if ppu.hblank_irq_enable && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 && ppu.draw_x >= 240 && !hblank_happened {
                 hblank_happened = true;
                 cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
                 interrupt(.IRQ);
-            }
-            if ppu.vcounter_irq_enable && cpu.ie[Interrupt_Source.LCD_VCOUNTER] != 0 && ppu.draw_y == ppu.vcounter {
+            } else if ppu.vcounter_irq_enable && cpu.ie[Interrupt_Source.LCD_VCOUNTER] != 0 && ppu.draw_y == ppu.vcounter {
                 cpu.ifl[Interrupt_Source.LCD_VCOUNTER] = 0x04;
                 interrupt(.IRQ);
             }
@@ -614,6 +612,8 @@ ui :: () {
                         show_palette_ram = !show_palette_ram;
                     case .SDLK_r;
                         show_rom = !show_rom;
+                    case .SDLK_s;
+                        show_save = !show_save;
                     case .SDLK_t;
                         show_timer = !show_timer;
                     case .SDLK_v;

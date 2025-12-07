@@ -18,6 +18,7 @@ main :: () {
     if args.count != 2 {
         exit(1);
     }
+    cpu.cart_name = args[1];
     for * cpu.breakpoints_arm it.* = 0xffffffff;
     for * cpu.breakpoints_thumb it.* = 0xffff;
     for * cpu.ee it.* = 0xffffffffffffffff;
