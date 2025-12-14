@@ -48,8 +48,8 @@ read_16 :: (addr: u32, bios_bypass := false) -> u16 {
         return cpu.memory.iwram._16[(addr >> 1) % 0x4000];
     }
     if addr >= 0x04000000 && addr < 0x04000400 {
-        first : u16 = mmio_read(addr);
-        second : u16 = mmio_read(addr + 1);
+        first : u16 = mmio_read((addr & 0xfffffffe));
+        second : u16 = mmio_read((addr & 0xfffffffe) + 1);
         return first | (second << 8);
     }
     if addr >= 0x05000000 && addr < 0x06000000 {
@@ -66,8 +66,8 @@ read_16 :: (addr: u32, bios_bypass := false) -> u16 {
         return ppu.memory.oam._16[(addr >> 1) % 0x200];
     }
     if addr >= 0x08000000 {
-        first : u16 = rom_read(addr);
-        second : u16 = rom_read(addr + 1);
+        first : u16 = rom_read((addr & 0xfffffffe));
+        second : u16 = rom_read((addr & 0xfffffffe) + 1);
         return first | (second << 8);
     }
 
@@ -87,10 +87,10 @@ read_32 :: (addr: u32, bios_bypass := false) -> u32 {
         return cpu.memory.iwram._32[(addr >> 2) % 0x2000];
     }
     if addr >= 0x04000000 && addr < 0x04000400 {
-        first : u32 = mmio_read(addr);
-        second : u32 = mmio_read(addr + 1);
-        third : u32 = mmio_read(addr + 2);
-        fourth : u32 = mmio_read(addr + 3);
+        first : u32 = mmio_read((addr & 0xfffffffc));
+        second : u32 = mmio_read((addr & 0xfffffffc) + 1);
+        third : u32 = mmio_read((addr & 0xfffffffc) + 2);
+        fourth : u32 = mmio_read((addr & 0xfffffffc) + 3);
         return first | (second << 8) | (third << 16) | (fourth << 24);
     }
     if addr >= 0x05000000 && addr < 0x06000000 {
@@ -107,10 +107,10 @@ read_32 :: (addr: u32, bios_bypass := false) -> u32 {
         return ppu.memory.oam._32[(addr >> 2) % 0x100];
     }
     if addr >= 0x08000000 && addr < 0x0e000000 {
-        first : u32 = rom_read(addr);
-        second : u32 = rom_read(addr + 1);
-        third : u32 = rom_read(addr + 2);
-        fourth : u32 = rom_read(addr + 3);
+        first : u32 = rom_read((addr & 0xfffffffc));
+        second : u32 = rom_read((addr & 0xfffffffc) + 1);
+        third : u32 = rom_read((addr & 0xfffffffc) + 2);
+        fourth : u32 = rom_read((addr & 0xfffffffc) + 3);
         return first | (second << 8) | (third << 16) | (fourth << 24);
     }
 
@@ -154,8 +154,8 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
         cpu.memory.iwram._16[(addr >> 1) % 0x4000] = val;
     }
     else if addr >= 0x04000000 && addr < 0x04000400 {
-        mmio_write(addr, xx (val >> 0) & 0xff);
-        mmio_write(addr + 1, xx (val >> 8) & 0xff);
+        mmio_write((addr & 0xfffffffe), xx (val >> 0) & 0xff);
+        mmio_write((addr & 0xfffffffe) + 1, xx (val >> 8) & 0xff);
     }
     else if addr >= 0x05000000 && addr < 0x06000000 {
         ppu.memory.palette_ram._16[(addr >> 1) % 0x200] = val;
@@ -174,11 +174,11 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._16[addr >> 1] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
-        cpu.memory.rom[addr % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
-        cpu.memory.rom[(addr + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[(addr & 0xfffffffe) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[((addr & 0xfffffffe) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
     } else {
-        rom_write(addr, xx val & 0xff);
-        rom_write(addr + 1, xx val >> 8);
+        rom_write((addr & 0xfffffffe), xx val & 0xff);
+        rom_write((addr & 0xfffffffe) + 1, xx val >> 8);
     }
 }
 
@@ -190,10 +190,10 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
         cpu.memory.iwram._32[(addr >> 2) % 0x2000] = val;
     }
     else if addr >= 0x04000000 && addr < 0x04000400 {
-        mmio_write(addr, xx (val >> 0) & 0xff);
-        mmio_write(addr + 1, xx (val >> 8) & 0xff);
-        mmio_write(addr + 2, xx (val >> 16) & 0xff);
-        mmio_write(addr + 3, xx (val >> 24) & 0xff);
+        mmio_write((addr & 0xfffffffc), xx (val >> 0) & 0xff);
+        mmio_write((addr & 0xfffffffc) + 1, xx (val >> 8) & 0xff);
+        mmio_write((addr & 0xfffffffc) + 2, xx (val >> 16) & 0xff);
+        mmio_write((addr & 0xfffffffc) + 3, xx (val >> 24) & 0xff);
     }
     else if addr >= 0x05000000 && addr < 0x06000000 {
         ppu.memory.palette_ram._32[(addr >> 2) % 0x100] = val;
@@ -214,15 +214,15 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._32[addr >> 2] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
-        cpu.memory.rom[addr % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
-        cpu.memory.rom[(addr + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
-        cpu.memory.rom[(addr + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
-        cpu.memory.rom[(addr + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
+        cpu.memory.rom[(addr & 0xfffffffc) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[((addr & 0xfffffffc) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[((addr & 0xfffffffc) + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
+        cpu.memory.rom[((addr & 0xfffffffc) + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
     } else {
-        rom_write(addr, xx (val >> 0) & 0xff);
-        rom_write(addr + 1, xx (val >> 8) & 0xff);
-        rom_write(addr + 2, xx (val >> 16) & 0xff);
-        rom_write(addr + 3, xx (val >> 24) & 0xff);
+        rom_write((addr & 0xfffffffc), xx (val >> 0) & 0xff);
+        rom_write((addr & 0xfffffffc) + 1, xx (val >> 8) & 0xff);
+        rom_write((addr & 0xfffffffc) + 2, xx (val >> 16) & 0xff);
+        rom_write((addr & 0xfffffffc) + 3, xx (val >> 24) & 0xff);
     }
 }
 
@@ -451,6 +451,7 @@ transfer :: (idx: int) {
                     cpu.dma[idx].src_int -= 4;
             }
             if cpu.dma[idx].dst_addr_control == {
+                case .INC_RELOAD; #through;
                 case .INC;
                     cpu.dma[idx].dst_int += 4;
                 case .DEC;
@@ -465,6 +466,7 @@ transfer :: (idx: int) {
                     cpu.dma[idx].src_int -= 2;
             }
             if cpu.dma[idx].dst_addr_control == {
+                case .INC_RELOAD; #through;
                 case .INC;
                     cpu.dma[idx].dst_int += 2;
                 case .DEC;
@@ -480,8 +482,9 @@ transfer :: (idx: int) {
             }
             if cpu.dma[idx].repeat {
                 cpu.dma[idx].count_int = ifx cpu.dma[idx].count == 0 then 0x4000 else cpu.dma[idx].count;
-                cpu.dma[idx].src_int = cpu.dma[idx].src;
-                cpu.dma[idx].dst_int = cpu.dma[idx].dst;
+                if cpu.dma[idx].dst_addr_control == .INC_RELOAD {
+                    cpu.dma[idx].dst_int = cpu.dma[idx].dst;
+                }
             } else {
                 cpu.dma[idx].enable = false;
             }

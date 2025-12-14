@@ -158,7 +158,10 @@ thumb_strh_2 :: inline (ins: u16) {
 }
 
 thumb_strb_2 :: inline (ins: u16) {
-    assert(false);
+    rd_idx : u8 = xx ins & 0b111;
+    rn := reg_src(xx (ins >> 3) & 0b111);
+    rm := reg_src(xx (ins >> 6) & 0b111);
+    write_8(rn + rm, xx reg_src(rd_idx));
 }
 
 thumb_ldrsb :: inline (ins: u16) {
@@ -240,8 +243,6 @@ thumb_bx_blx_2 :: inline (ins: u16) {
         set_status_bit(.T, true);
         cpu.reg[15] = addr & 0xfffffffe;
     }
-    // set_status_bit(.T, (addr & 1) != 0);
-    // cpu.reg[15] = addr & 0xfffffffe;
 }
 
 thumb_and :: inline (ins: u16) {
@@ -275,6 +276,9 @@ thumb_lsl_2 :: inline (ins: u16) {
     } else {
         set_status_bit(.C, (reg_src(rd_idx) & (1 << (32 - rs))) != 0);
     }
+    reg_dst(rd_idx, result);
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
 }
 
 thumb_lsr_2 :: inline (ins: u16) {
@@ -521,7 +525,7 @@ thumb_push :: inline (ins: u16) {
         cpu.reg[13] -= 4;
         write_32(cpu.reg[13], cpu.reg[14]);
     }
-    for #v2 < 0..7 {
+    for < 0..7 {
         if (ins & (1 << it)) != 0 {
             cpu.remaining_cycles -= 1;
             cpu.reg[13] -= 4;

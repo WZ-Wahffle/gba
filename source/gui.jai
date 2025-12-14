@@ -123,8 +123,12 @@ cpu_window :: () {
         cpu.emu_state = .STEPPED;
     }
     ImGui.SameLine();
-    if ImGui.Button("Print History") {
-        print("%\n", cpu.pc_history);
+    if ImGui.Button("Step Scanline") {
+        cpu.emu_state = .STEPPED_SCANLINE;
+    }
+    ImGui.SameLine();
+    if ImGui.Button("Step Frame") {
+        cpu.emu_state = .STEPPED_FRAME;
     }
     ImGui.Checkbox("Logging", *cpu.logging);
     if cpu.mode == .USER && cpu.privileged {
@@ -173,6 +177,17 @@ cpu_window :: () {
     ImGui.End();
 }
 
+Bg_Control_Lut_Entry :: struct {
+    bg_min : s32 = 0;
+    bg_max : s32 = 0;
+    bg_rs_mode: [4]bool;
+}
+
+mode_lut := Bg_Control_Lut_Entry.[
+    .{0, 3, .[false, false, false, false]},
+    .{0, 2, .[false, false, true, false]},
+    .{2, 3, .[false, false, true, true]}
+];
 background_selected : s32 = 0;
 ppu_window :: () {
     ImGui.Begin("ppu");
@@ -182,18 +197,31 @@ ppu_window :: () {
     ImGui.Text("Character Format: %-dimensional", ifx ppu.obj_character_vram_mapping_one_dimensional then "1" else "2");
     ImGui.Text("BG Mode: %", formatInt(ppu.bg_mode, 10, 1));
     ImGui.InputInt("Background", *background_selected, 1, 1, .CharsDecimal);
-    if background_selected < 0 then background_selected = 0;
-    if background_selected > 3 then background_selected = 3;
+    if background_selected < mode_lut[ppu.bg_mode].bg_min then background_selected = mode_lut[ppu.bg_mode].bg_min;
+    if background_selected > mode_lut[ppu.bg_mode].bg_max then background_selected = mode_lut[ppu.bg_mode].bg_max;
 
     ImGui.Text("%abled", ifx ppu.bg[background_selected].enable then "en" else "dis");
     ImGui.Text("%", ifx ppu.bg[background_selected].single_palette then "256 colors, 1 palette" else "16 colors, 16 palettes");
     ImGui.Text("Priority: %", ppu.bg[background_selected].prio);
     ImGui.Text("Size: %1%2", ifx ppu.bg[background_selected].tall then "1" else "0", ifx ppu.bg[background_selected].wide then "1" else "0");
-    ImGui.Text("X: %", formatInt(ppu.bg[background_selected].x_off, 10, 1));
-    ImGui.Text("Y: %", formatInt(ppu.bg[background_selected].y_off, 10, 1));
     ImGui.Text("Mosaic %abled", ifx ppu.bg[background_selected].mosaic then "en" else "dis");
     ImGui.Text("Screen Offset: 0x%", formatInt(ppu.bg[background_selected].screen_base_block * 2048, 16));
     ImGui.Text("Char Offset: 0x%", formatInt(ppu.bg[background_selected].char_base_block * 16384, 16));
+
+    ImGui.NewLine();
+    if mode_lut[ppu.bg_mode].bg_rs_mode[background_selected] {
+        ImGui.Text("Scale/Rotate Mode");
+        ImGui.Text("X: % (raw: 0x%)", ppu.bg[background_selected].anchor_x, formatInt(ppu.bg[background_selected].anchor_x_raw, 16, 1));
+        ImGui.Text("Y: % (raw: 0x%)", ppu.bg[background_selected].anchor_y, formatInt(ppu.bg[background_selected].anchor_y_raw, 16, 1));
+        ImGui.Text("Wraparound: %", ppu.bg[background_selected].wraparound);
+        ImGui.Text("Transform: % | % | % | %", ppu.bg[background_selected].pa, ppu.bg[background_selected].pb, ppu.bg[background_selected].pc, ppu.bg[background_selected].pd);
+        ImGui.Text("Transform (Raw): 0x% | 0x% | 0x% | 0x%", formatInt(ppu.bg[background_selected].dx, 16, 8), formatInt(ppu.bg[background_selected].dmx, 16, 8), formatInt(ppu.bg[background_selected].dy, 16, 8), formatInt(ppu.bg[background_selected].dmy, 16, 8));
+    } else {
+        ImGui.Text("Text Mode");
+        ImGui.Text("X: %", formatInt(ppu.bg[background_selected].x_off, 10, 1));
+        ImGui.Text("Y: %", formatInt(ppu.bg[background_selected].y_off, 10, 1));
+    }
+
     ImGui.End();
 }
 
@@ -1380,11 +1408,11 @@ save_window :: () {
         if confirm_load {
             file_name := tprint("%.gbasav", cpu.cart_name);
             f := file_open(file_name, false);
-            file_read(*f, *cpu.backup_type, size_of(Backup_Type));
+            file_read(f, *cpu.backup_type, size_of(Backup_Type));
             if cpu.backup_type == {
                 case .EEPROM;
-                file_read(*f, *cpu.eeprom_size, size_of(Eeprom_Size));
-                file_read(*f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
+                file_read(f, *cpu.eeprom_size, size_of(Eeprom_Size));
+                file_read(f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
             }
             file_close(*f);
             confirm_load = false;

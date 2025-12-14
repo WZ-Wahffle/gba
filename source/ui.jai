@@ -18,47 +18,83 @@ obj_use_alpha_buffer: [SCREEN_WIDTH]bool;
 // OBJ: priority * 2
 // BG: priority * 2 + 1
 
-draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
+draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
     if !ppu.bg[bg].enable then return;
     if rotation_mode {
         line_size_px := 128 * (ifx ppu.bg[bg].wide then 2 else 1) * (ifx ppu.bg[bg].tall then 4 else 1);
-        y_pos : int = xx (y + ppu.bg[bg].anchor_y);
-        while y_pos < 0 {
-            y_pos += line_size_px;
-        }
+
+        pixel_buffer: [240]u16;
+        a := ppu.bg[bg].pa;
+        b := ppu.bg[bg].pb;
+        c := ppu.bg[bg].pc;
+        d := ppu.bg[bg].pd;
+        // xy_0 := line_size_px / 2.0;
+        x_0 := line_size_px / 2.0;
+        y_0 := line_size_px / 2.0;
+        bg_x : float = x_0;
+        bg_y : float = y_0;
+        bg_x -= x_0 * a;
+        bg_x += (y - y_0) * b;
+        bg_y -= x_0 * c;
+        bg_y += (y - y_0) * d;
+
+        a_x : float = x_0;
+        a_y : float = y_0;
+        a_x -= x_0 * a;
+        a_x -= y_0 * b;
+        a_y -= x_0 * c;
+        a_y -= y_0 * d;
+
+        bg_x += ppu.bg[bg].anchor_x - a_x;
+        bg_y += ppu.bg[bg].anchor_y - a_y;
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
-        base_addr += (y_pos / 8) * (line_size_tiles);
-        tile_address_buffer: [128]u16;
-        for 0..line_size_tiles-1 {
-            tile_address_buffer[it] = ppu.memory.vram._8[base_addr + it];
-        }
-        pixel_buffer: [1024]u16;
-        for tile_idx: 0..line_size_tiles-1 {
-            tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx] * 64;
-            tile_base_addr += 8 * (y_pos % 8);
-            for pixel_idx: 0..7 {
-                if ppu.memory.vram._8[tile_base_addr + pixel_idx] == 0 {
-                    pixel_buffer[8 * tile_idx + pixel_idx] = BLANK_COLOR;
-                } else {
-                    pixel_buffer[8 * tile_idx + pixel_idx] = ppu.memory.palette_ram._16[ppu.memory.vram._8[tile_base_addr + pixel_idx]] & 0x7fff;
-                }
+
+        for x: 0..239 {
+            x_1: int = xx bg_x;
+            y_1: int = xx bg_y;
+            pixel_buffer[x] = BLANK_COLOR;
+
+            bg_x += a;
+            bg_y += c;
+
+            if ppu.bg[bg].wraparound {
+                while x_1 < 0 x_1 += line_size_px;
+                while y_1 < 0 y_1 += line_size_px;
+                while x_1 >= line_size_px x_1 -= line_size_px;
+                while y_1 >= line_size_px y_1 -= line_size_px;
+            } else if x_1 < 0 || x_1 >= line_size_px || y_1 < 0 || y_1 >= line_size_px {
+                continue;
+            }
+
+            if ppu.bg[bg].mosaic {
+                x_1 -= x_1 % (ppu.bg_mosaic_h + 1);
+                y_1 -= y_1 % (ppu.bg_mosaic_v + 1);
+            }
+            tile_idx_idx := base_addr + (y_1 / 8) * line_size_tiles + (x_1 / 8);
+
+            tile_idx : int = ppu.memory.vram._8[tile_idx_idx];
+            pixel_idx := (y_1 % 8) * 8 + (x_1 % 8);
+            pixel_palette_idx := ppu.memory.vram._8[ppu.bg[bg].char_base_block * 16384 + tile_idx * 64 + pixel_idx];
+            if pixel_palette_idx != 0 {
+                pixel_buffer[x] = ppu.memory.palette_ram._16[pixel_palette_idx] & 0x7fff;
+            } else {
+                pixel_buffer[x] = BLANK_COLOR;
             }
         }
 
         for 0..239 {
-            x_pos : int = xx (it + ppu.bg[bg].anchor_x);
-            while x_pos < 0 {
-                x_pos += line_size_px;
-            }
-            if pixel_buffer[x_pos] != BLANK_COLOR {
-                bg_line_buffer[bg][it] = pixel_buffer[x_pos] & 0x7fff;
+            if pixel_buffer[it] != BLANK_COLOR {
+                bg_line_buffer[bg][it] = pixel_buffer[it];
             }
         }
     } else {
         line_size_px := 256 * ifx ppu.bg[bg].wide then 2 else 1;
         y_pos : int = xx ppu.bg[bg].y_off + y;
         y_pos %= 256 * ifx ppu.bg[bg].tall then 2 else 1;
+        if ppu.bg[bg].mosaic {
+            y_pos -= y_pos % (ppu.bg_mosaic_v + 1);
+        }
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
         if ppu.bg[bg].wide then base_addr += ((y_pos / 8) / 32) * 0x800;
@@ -114,8 +150,12 @@ draw_bg :: (y: u32, bg: u32, rotation_mode: bool) {
         for 0..239 {
             x_pos : int = xx (it + ppu.bg[bg].x_off);
             x_pos %= 256 * ifx ppu.bg[bg].wide then 2 else 1;
+            x_pos_src := x_pos;
+            if ppu.bg[bg].mosaic {
+                x_pos_src -= x_pos_src % (ppu.bg_mosaic_h + 1);
+            }
             if pixel_buffer[x_pos] != BLANK_COLOR {
-                bg_line_buffer[bg][it] = pixel_buffer[x_pos];
+                bg_line_buffer[bg][it] = pixel_buffer[x_pos_src];
             }
         }
     }
@@ -154,6 +194,10 @@ draw_obj :: (y: u32) {
                         x_1: int = xx sprite_x;
                         y_1: int = xx sprite_y;
                         pixel_buffer[x] = BLANK_COLOR;
+                        if it.mosaic {
+                            x_1 -= x_1 % (ppu.obj_mosaic_h + 1);
+                            y_1 -= y_1 % (ppu.obj_mosaic_v + 1);
+                        }
 
                         sprite_x += a;
                         sprite_y += c;
@@ -209,6 +253,9 @@ draw_obj :: (y: u32) {
                     h := it.max_y - it.min_y;
                     y_obj := y - it.min_y;
                     if it.flip_v then y_obj = h - y_obj - 1;
+                    if it.mosaic {
+                        y_obj -= xx (y_obj % (ppu.obj_mosaic_v + 1));
+                    }
                     obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
                     vertical_offset_into_tile := (y_obj % 8);
                     x := it.min_x;
@@ -225,6 +272,9 @@ draw_obj :: (y: u32) {
                         for obj_x: 0..w-1 {
                             obj_x_adj := obj_x;
                             if it.flip_h then obj_x_adj = w - obj_x_adj - 1;
+                            if it.mosaic {
+                                obj_x_adj -= obj_x_adj % (ppu.obj_mosaic_h + 1);
+                            }
                             pixel_color := (pixel_buffer[obj_x_adj / 8] >> (8 * (obj_x_adj % 8))) & 0xff;
                             if pixel_color != 0 {
                                 if objwin {
@@ -248,6 +298,9 @@ draw_obj :: (y: u32) {
                             if x + obj_x > SCREEN_WIDTH-1 then break;
                             obj_x_adj := obj_x;
                             if it.flip_h then obj_x_adj = w - obj_x_adj - 1;
+                            if it.mosaic {
+                                obj_x_adj -= obj_x_adj % (ppu.obj_mosaic_h + 1);
+                            }
                             pixel_color := (pixel_buffer[obj_x_adj / 8] >> (4 * (obj_x_adj % 8))) & 0xf;
                             if pixel_color != 0 {
                                 if objwin {
@@ -424,11 +477,17 @@ merge_and_blend :: () {
                 r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 0) & 0x1f) * (min(ppu.evb, 16) / 16.0));
                 g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 5) & 0x1f) * (min(ppu.evb, 16) / 16.0));
                 b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) * (min(ppu.eva, 16) / 16.0) + ((out_pixels[1] >> 10) & 0x1f) * (min(ppu.evb, 16) / 16.0));
+                r = xx min(0x1f, r);
+                g = xx min(0x1f, g);
+                b = xx min(0x1f, b);
                 framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
             } else if ppu.special_effect == 2 {
                 r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) + (31 - ((out_pixels[0] >> 0) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
-                g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) + (31 - ((out_pixels[0] >> 5) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
+                g : u16 = xx (((out_pixels[0] >> 5) & 0x1f) + (63 - ((out_pixels[0] >> 5) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
                 b : u16 = xx (((out_pixels[0] >> 10) & 0x1f) + (31 - ((out_pixels[0] >> 10) & 0x1f)) * (min(ppu.evy, 16) / 16.0));
+                r = xx min(0x1f, r);
+                g = xx min(0x1f, g);
+                b = xx min(0x1f, b);
                 framebuffer[ppu.draw_y * SCREEN_WIDTH + x] = r | (g << 5) | (b << 10);
             } else if ppu.special_effect == 3 {
                 r : u16 = xx (((out_pixels[0] >> 0) & 0x1f) - ((out_pixels[0] >> 0) & 0x1f) * (min(ppu.evy, 16) / 16.0));
@@ -477,6 +536,25 @@ step_ppu :: () {
             }
         }
 
+        if ppu.draw_x == 240 {
+            for 0..3 {
+                if cpu.dma[it].start_timing == .HBLANK && cpu.dma[it].enable {
+                    cnt := cpu.dma[it].count;
+                    // if it == 0 print("DMA at %: src: 0x% src_int: 0x%\n", ppu.draw_y, formatInt(cpu.dma[it].src, 16, 1), formatInt(cpu.dma[it].src_int, 16, 1));
+                    for _: 0..cnt-1 transfer(it);
+                }
+            }
+        }
+
+        if ppu.draw_x == 240 && ppu.draw_y == 160 {
+            for 0..3 {
+                if cpu.dma[it].start_timing == .VBLANK && cpu.dma[it].enable {
+                    cnt := cpu.dma[it].count;
+                    for _: 0..cnt-1 transfer(it);
+                }
+            }
+        }
+
         if ppu.draw_x == 0 {
             cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0;
         }
@@ -513,6 +591,15 @@ step_ppu :: () {
                     draw_bg(ppu.draw_y, 0, false);
                     draw_bg(ppu.draw_y, 1, false);
                     draw_bg(ppu.draw_y, 2, true);
+                    if ppu.draw_y == 159 {
+                        push_context {
+                            context.print_style.default_format_int.base = 16;
+                            context.print_style.default_format_float.width = 10;
+                            context.print_style.default_format_float.zero_removal = .NO;
+                            context.print_style.default_format_float.positive_number_prefix = .SPACE;
+                            print("% % | % % % % | % % % %\n", ppu.bg[2].anchor_x, ppu.bg[2].anchor_y, ppu.bg[2].dx, ppu.bg[2].dmx, ppu.bg[2].dy, ppu.bg[2].dmy, ppu.bg[2].pa, ppu.bg[2].pb, ppu.bg[2].pc, ppu.bg[2].pd);
+                        }
+                    }
                     merge_and_blend();
                 case 2;
                     draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
@@ -700,6 +787,26 @@ ui :: () {
             cpu.remaining_cycles += -cpu.remaining_cycles + 1;
             while ppu.remaining_cycles > 0 step_ppu();
             while cpu.remaining_cycles > 0 step_cpu();
+            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+            disasm_mode = get_status_bit(.T);
+            case .STEPPED_SCANLINE;
+            cpu.emu_state = .STOPPED;
+            ppu.remaining_cycles += 308 * 4;
+            cpu.remaining_cycles += 308 * 4;
+            while ppu.remaining_cycles > 0 || cpu.remaining_cycles > 0 {
+                step_ppu();
+                step_cpu();
+            }
+            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+            disasm_mode = get_status_bit(.T);
+            case .STEPPED_FRAME;
+            cpu.emu_state = .STOPPED;
+            ppu.remaining_cycles += 308 * 228 * 4;
+            cpu.remaining_cycles += 308 * 228 * 4;
+            while ppu.remaining_cycles > 0 || cpu.remaining_cycles > 0 {
+                step_ppu();
+                step_cpu();
+            }
             disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
             disasm_mode = get_status_bit(.T);
         }

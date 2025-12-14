@@ -178,12 +178,16 @@ Ppu :: struct {
         y_off := 0;
         anchor_x_raw : u32 = 0; // BG2/BG3 only
         anchor_y_raw : u32 = 0; // BG2/BG3 only
-        anchor_x := 0.0; // BG2/BG3 only
-        anchor_y := 0.0; // BG2/BG3 only
+        anchor_x : float; // BG2/BG3 only
+        anchor_y : float; // BG2/BG3 only
         dx := 0; // BG2/BG3 only
         dmx := 0; // BG2/BG3 only
         dy := 0; // BG2/BG3 only
         dmy := 0; // BG2/BG3 only
+        pa : float; // BG2/BG3 only
+        pb : float; // BG2/BG3 only
+        pc : float; // BG2/BG3 only
+        pd : float; // BG2/BG3 only
         config_int: [2]u8;
     }
 
@@ -396,6 +400,8 @@ Emulation_State :: enum {
     RUNNING;
     STOPPED;
     STEPPED;
+    STEPPED_SCANLINE;
+    STEPPED_FRAME;
 }
 
 Decoder_Unit_Arm :: struct {

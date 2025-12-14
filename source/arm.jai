@@ -516,7 +516,29 @@ arm_bic :: inline (ins: u32) {
 
 arm_mvn :: inline (ins: u32) {
     if (ins & 0xf0000) != 0 assert(false);
-    assert(false);
+    operand: u32;
+    should_carry: bool;
+    carry_out: bool;
+    if (ins & 0x2000000) {
+        operand, should_carry, carry_out = immediate_operand(xx ins & 0xfff);
+    } else {
+        operand, should_carry, carry_out = shifter_operand(xx ins & 0xfff);
+        cpu.remaining_cycles -= 1;
+    }
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    flags := (ins & 0x100000) != 0;
+    result : u32 = ~operand;
+    if flags {
+        if rd_idx == 15 {
+            cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
+        } else {
+            set_status_bit(.N, (result & 0x80000000) != 0);
+            set_status_bit(.Z, result == 0);
+            if should_carry set_status_bit(.C, carry_out);
+        }
+    }
+    reg_dst(rd_idx, result);
 }
 
 arm_ldr_str_ldrb_strb :: inline (ins: u32) {
