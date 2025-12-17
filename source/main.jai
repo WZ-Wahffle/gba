@@ -22,6 +22,7 @@ main :: () {
     for * cpu.breakpoints_arm it.* = 0xffffffff;
     for * cpu.breakpoints_thumb it.* = 0xffff;
     for * cpu.ee it.* = 0xffffffffffffffff;
+    for * cpu.flash it.* = 0xff;
     populate_arm_lut();
     populate_thumb_lut();
     context.logger = color_log;

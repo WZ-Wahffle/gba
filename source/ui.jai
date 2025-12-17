@@ -245,13 +245,13 @@ draw_obj :: (y: u32) {
                     if it.mosaic {
                         y_obj -= xx (y_obj % (ppu.obj_mosaic_v + 1));
                     }
-                    obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
                     vertical_offset_into_tile := (y_obj % 8);
                     x := it.min_x;
                     prio := it.prio;
                     objwin := it.mode == 0b10;
                     objalpha := it.mode == 0b01;
                     if it.single_palette {
+                        obj_base += (y_obj / 8) * ifx packed then (64 * (w / 8)) else (32 * 32);
                         // single palette, so tiles are 64 bytes each
                         // thus, a single line sliver of a tile is 8 bytes, or one u64
                         pixel_buffer: [8]u64;
@@ -278,6 +278,7 @@ draw_obj :: (y: u32) {
                             }
                         }
                     } else {
+                        obj_base += (y_obj / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
                         pixel_buffer: [8]u32;
                         for coarse_x: 0..(w / 8)-1 {
                             pixel_buffer[coarse_x] = ppu.memory.vram._32[(obj_base >> 2) + 8 * coarse_x + vertical_offset_into_tile];
@@ -565,18 +566,9 @@ step_ppu :: () {
                     draw_bg(ppu.draw_y, 0, false);
                     draw_bg(ppu.draw_y, 1, false);
                     draw_bg(ppu.draw_y, 2, true);
-                    if ppu.draw_y == 159 {
-                        push_context {
-                            context.print_style.default_format_int.base = 16;
-                            context.print_style.default_format_float.width = 10;
-                            context.print_style.default_format_float.zero_removal = .NO;
-                            context.print_style.default_format_float.positive_number_prefix = .SPACE;
-                            print("% % | % % % % | % % % %\n", ppu.bg[2].anchor_x, ppu.bg[2].anchor_y, ppu.bg[2].dx, ppu.bg[2].dmx, ppu.bg[2].dy, ppu.bg[2].dmy, ppu.bg[2].pa, ppu.bg[2].pb, ppu.bg[2].pc, ppu.bg[2].pd);
-                        }
-                    }
                     merge_and_blend();
                 case 2;
-                    draw_obj(ppu.draw_y); // has to be called first to set up obj window!!!
+                    draw_obj(ppu.draw_y);
                     draw_bg(ppu.draw_y, 2, true);
                     draw_bg(ppu.draw_y, 3, true);
                     merge_and_blend();

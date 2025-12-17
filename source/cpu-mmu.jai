@@ -190,6 +190,10 @@ mmio_read :: (addr: u32) -> u8 {
             return 0;
         case 0x129;
             return 0;
+        case 0x12a;
+            return 0;
+        case 0x12b;
+            return 0;
         case 0x130;
             return xx (~ppu.keypad_state) & 0xff;
         case 0x131;

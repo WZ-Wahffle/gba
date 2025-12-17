@@ -1398,6 +1398,9 @@ save_window :: () {
                 case .EEPROM;
                 file_write(*f, *cpu.eeprom_size, size_of(Eeprom_Size));
                 file_write(*f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
+                case .FLASH_64K; #through;
+                case .FLASH_128K;
+                file_write(*f, cpu.flash.data, cpu.flash.count);
             }
             file_close(*f);
             confirm_save = false;
@@ -1415,6 +1418,9 @@ save_window :: () {
                 case .EEPROM;
                 file_read(f, *cpu.eeprom_size, size_of(Eeprom_Size));
                 file_read(f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
+                case .FLASH_64K; #through;
+                case .FLASH_128K;
+                file_read(f, cpu.flash.data, cpu.flash.count);
             }
             file_close(*f);
             confirm_load = false;

@@ -5,7 +5,11 @@ rom_read :: (addr: u32) -> u8 {
             if addr < 0x0e000000 {
                 return cpu.memory.rom[addr % cpu.memory.rom.count];
             } else {
-                return cpu.flash[cpu.flash_bank + (addr & 0xffff)];
+                if cpu.flash_op_mode == .ID {
+                    if addr == 0x0e000000 return 0x62;
+                    if addr == 0x0e000001 return 0x13;
+                } else
+                return cpu.flash[cpu.flash_bank * 0x10000 + (addr & 0xffff)];
             }
         case .NONE;
             if addr < 0x0e000000 {
@@ -35,8 +39,50 @@ rom_write :: (addr: u32, val: u8) {
     if cpu.backup_type == {
         case .NONE;
         log_warn("Unmapped ROM write: 0x%, 0x%", formatInt(addr, 16), formatInt(val, 16));
+        case .FLASH_64K;
         case .FLASH_128K;
-        // log_error("% %\n", formatInt(addr, 16), val);
+        if addr >= 0x0e000000 {
+            if cpu.flash_state == {
+                case .NONE;
+                    if cpu.flash_op_mode == .WRITE {
+                        cpu.flash[cpu.flash_bank * 0x10000 + addr & 0xffff] = val;
+                        cpu.flash_op_mode = .READ;
+                    } else if cpu.flash_op_mode == .SWITCH_BANK && addr == 0x0e000000 {
+                        cpu.flash_bank = val & 1;
+                    } else
+                    if addr == 0x0e005555 && val == 0xaa cpu.flash_state = .FIRST_CMD_BYTE_READ;
+                case .FIRST_CMD_BYTE_READ;
+                    if addr == 0x0e002aaa && val == 0x55 cpu.flash_state = .SECOND_CMD_BYTE_READ;
+                case .SECOND_CMD_BYTE_READ;
+                    if val == {
+                        case 0x10;
+                        if addr == 0x0e005555 && cpu.flash_op_mode == .ERASE {
+                            for 0..0xffff {
+                                cpu.flash[cpu.flash_bank * 0x10000 + it] = 0xff;
+                            }
+                            cpu.flash_op_mode = .READ;
+                        }
+                        case 0x30;
+                        if addr & 0xffff0fff == 0x0e000000 && cpu.flash_op_mode == .ERASE {
+                            sector := (addr >> 12) & 0xf;
+                            for 0..0xfff {
+                                cpu.flash[cpu.flash_bank * 0x10000 + sector * 0x1000 + it] = 0xff;
+                            }
+                        }
+                        case 0x80;
+                        if addr == 0x0e005555 then cpu.flash_op_mode = .ERASE;
+                        case 0x90;
+                        if addr == 0x0e005555 then cpu.flash_op_mode = .ID;
+                        case 0xa0;
+                        if addr == 0x0e005555 then cpu.flash_op_mode = .WRITE;
+                        case 0xb0;
+                        if addr == 0x0e005555 then cpu.flash_op_mode = .SWITCH_BANK;
+                        case 0xf0;
+                        if addr == 0x0e005555 && cpu.flash_op_mode == .ID then cpu.flash_op_mode = .READ;
+                    }
+                    cpu.flash_state = .NONE;
+            }
+        }
         case .EEPROM;
         // TODO: Possibly different location for very large games?
         if addr >= 0x0d000000 && addr < 0x0e000000 && addr % 2 == 0 {

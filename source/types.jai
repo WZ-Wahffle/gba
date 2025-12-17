@@ -25,6 +25,8 @@ Cpu :: struct {
     // flash
     flash: [0x20000]u8;
     flash_bank := 0;
+    flash_state := Flash_State.NONE;
+    flash_op_mode := Flash_Operation_Mode.READ;
 
     privileged := true;
     dma: [4]Dma;
@@ -355,6 +357,20 @@ Eeprom_State :: enum {
     WRITING;
     WRITING_DATA;
     FINISHED;
+}
+
+Flash_State :: enum {
+    NONE;
+    FIRST_CMD_BYTE_READ;
+    SECOND_CMD_BYTE_READ;
+}
+
+Flash_Operation_Mode :: enum {
+    READ;
+    ID;
+    ERASE;
+    WRITE;
+    SWITCH_BANK;
 }
 
 Status_Bit :: enum {
