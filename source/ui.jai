@@ -31,25 +31,8 @@ draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
         b := ppu.bg[bg].pb;
         c := ppu.bg[bg].pc;
         d := ppu.bg[bg].pd;
-        // xy_0 := line_size_px / 2.0;
-        x_0 := line_size_px / 2.0;
-        y_0 := line_size_px / 2.0;
-        bg_x : float = x_0;
-        bg_y : float = y_0;
-        bg_x -= x_0 * a;
-        bg_x += (y - y_0) * b;
-        bg_y -= x_0 * c;
-        bg_y += (y - y_0) * d;
-
-        a_x : float = x_0;
-        a_y : float = y_0;
-        a_x -= x_0 * a;
-        a_x -= y_0 * b;
-        a_y -= x_0 * c;
-        a_y -= y_0 * d;
-
-        bg_x += ppu.bg[bg].anchor_x - a_x;
-        bg_y += ppu.bg[bg].anchor_y - a_y;
+        bg_x := ppu.bg[bg].anchor_x + ppu.draw_y * b;
+        bg_y := ppu.bg[bg].anchor_y + ppu.draw_y * d;
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
 
@@ -640,6 +623,7 @@ ui :: () {
     }
     SDL_PauseAudioDevice(apu.dev, 0);
 
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
     win := SDL_CreateWindow("gba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     gl_context := SDL_GL_CreateContext(win);
     gl_load(*gl, SDL_GL_GetProcAddress);
