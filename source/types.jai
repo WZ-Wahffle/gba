@@ -187,6 +187,10 @@ Ppu :: struct {
         anchor_y_raw : u32 = 0; // BG2/BG3 only
         anchor_x : float; // BG2/BG3 only
         anchor_y : float; // BG2/BG3 only
+        anchor_x_l : float; // BG2/BG3 only
+        anchor_y_l : float; // BG2/BG3 only
+        transform_x : float; // BG2/BG3 only
+        transform_y : float; // BG2/BG3 only
         dx := 0; // BG2/BG3 only
         dmx := 0; // BG2/BG3 only
         dy := 0; // BG2/BG3 only

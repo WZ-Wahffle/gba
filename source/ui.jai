@@ -31,18 +31,21 @@ draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
         b := ppu.bg[bg].pb;
         c := ppu.bg[bg].pc;
         d := ppu.bg[bg].pd;
-        bg_x := ppu.bg[bg].anchor_x + ppu.draw_y * b;
-        bg_y := ppu.bg[bg].anchor_y + ppu.draw_y * d;
         line_size_tiles := line_size_px / 8;
         base_addr := ppu.bg[bg].screen_base_block * 2048;
 
+        ppu.bg[bg].transform_x = ppu.bg[bg].anchor_x_l;
+        ppu.bg[bg].transform_y = ppu.bg[bg].anchor_y_l;
+        ppu.bg[bg].anchor_x_l += b;
+        ppu.bg[bg].anchor_y_l += d;
+
         for x: 0..239 {
-            x_1: int = xx bg_x;
-            y_1: int = xx bg_y;
+            x_1: int = xx ppu.bg[bg].transform_x;
+            y_1: int = xx ppu.bg[bg].transform_y;
             pixel_buffer[x] = BLANK_COLOR;
 
-            bg_x += a;
-            bg_y += c;
+            ppu.bg[bg].transform_x += a;
+            ppu.bg[bg].transform_y += c;
 
             if ppu.bg[bg].wraparound {
                 while x_1 < 0 x_1 += line_size_px;
@@ -504,6 +507,10 @@ step_ppu :: () {
             if ppu.draw_y == 228 {
                 ppu.draw_y = 0;
                 vblank_happened = false;
+                ppu.bg[2].anchor_x_l = ppu.bg[2].anchor_x;
+                ppu.bg[2].anchor_y_l = ppu.bg[2].anchor_y;
+                ppu.bg[3].anchor_x_l = ppu.bg[3].anchor_x;
+                ppu.bg[3].anchor_y_l = ppu.bg[3].anchor_y;
             }
         }
 
