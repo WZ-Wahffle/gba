@@ -1,9 +1,16 @@
 rom_read :: (addr: u32) -> u8 {
     if cpu.backup_type == {
+        case .FLASH_64K; #through;
+        case .FLASH_128K;
+            if addr < 0x0e000000 {
+                return cpu.memory.rom[addr % cpu.memory.rom.count];
+            } else {
+                return cpu.flash[cpu.flash_bank + (addr & 0xffff)];
+            }
         case .NONE;
-        if addr < 0x0e000000 {
-            return cpu.memory.rom[addr % cpu.memory.rom.count];
-        }
+            if addr < 0x0e000000 {
+                return cpu.memory.rom[addr % cpu.memory.rom.count];
+            }
         case .EEPROM;
             if addr >= 0x0d000000 && addr < 0x0e000000 {
                 if addr % 2 == 1 then return 0;
@@ -28,6 +35,8 @@ rom_write :: (addr: u32, val: u8) {
     if cpu.backup_type == {
         case .NONE;
         log_warn("Unmapped ROM write: 0x%, 0x%", formatInt(addr, 16), formatInt(val, 16));
+        case .FLASH_128K;
+        // log_error("% %\n", formatInt(addr, 16), val);
         case .EEPROM;
         // TODO: Possibly different location for very large games?
         if addr >= 0x0d000000 && addr < 0x0e000000 && addr % 2 == 0 {

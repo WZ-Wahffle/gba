@@ -141,7 +141,7 @@ write_8 :: (addr: u32, val: u8) {
     else if addr >= 0x07000000 && addr < 0x08000000 {
         ppu.memory.oam._8[addr % 0x400] = val;
         oam_update(addr);
-    } else {
+    } else if addr >= 0x08000000 {
         rom_write(addr, val);
     }
 }
@@ -176,7 +176,7 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
         cpu.memory.rom[(addr & 0xfffffffe) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
         cpu.memory.rom[((addr & 0xfffffffe) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
-    } else {
+    } else if addr >= 0x08000000 {
         rom_write((addr & 0xfffffffe), xx val & 0xff);
         rom_write((addr & 0xfffffffe) + 1, xx val >> 8);
     }
@@ -218,7 +218,7 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
         cpu.memory.rom[((addr & 0xfffffffc) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
         cpu.memory.rom[((addr & 0xfffffffc) + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
         cpu.memory.rom[((addr & 0xfffffffc) + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
-    } else {
+    } else if addr >= 0x08000000 {
         rom_write((addr & 0xfffffffc), xx (val >> 0) & 0xff);
         rom_write((addr & 0xfffffffc) + 1, xx (val >> 8) & 0xff);
         rom_write((addr & 0xfffffffc) + 2, xx (val >> 16) & 0xff);
@@ -390,8 +390,11 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].dst_addr_control = .FIXED;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
+                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
+                // print("Advancing read to %\n", apu.fifo_a.r & 0x1f);
                 apu.fifo_a.cnt -= 1;
                 if apu.fifo_a.cnt < 16 {
+                    // print("Overflow, re-reading\n");
                     transfer(1);
                     transfer(1);
                     transfer(1);
@@ -402,6 +405,7 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].dst_addr_control = .FIXED;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
+                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
                 apu.fifo_a.cnt -= 1;
                 if apu.fifo_a.cnt < 16 {
                     transfer(2);

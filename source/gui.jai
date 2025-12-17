@@ -228,6 +228,8 @@ ppu_window :: () {
 channel_selected : s32 = 1;
 apu_window :: () {
     ImGui.Begin("apu");
+    ImGui.Text_CFormat("Bias: %d", apu.bias);
+    ImGui.Text_CFormat("Sampling Frequency: %d", apu.sampling_frequency);
     ImGui.InputInt("Channel", *channel_selected, 1, 1, .CharsDecimal);
     if channel_selected < 1 then channel_selected = 1;
     if channel_selected > 6 then channel_selected = 6;

@@ -8,6 +8,8 @@ Cpu :: struct {
     spsr: [#run enum_highest_value(Cpu_Mode)+1]u32;
     mode := Cpu_Mode.SVC;
     backup_type := Backup_Type.NONE;
+
+    // eeprom
     eeprom_size := Eeprom_Size.UNDECIDED;
     ee: [0x400]u64;
     ee_buffer: [256]bool;
@@ -19,6 +21,11 @@ Cpu :: struct {
     ee_write : u64 = 0;
     ee_write_idx := 0;
     ee_state := Eeprom_State.NONE;
+
+    // flash
+    flash: [0x20000]u8;
+    flash_bank := 0;
+
     privileged := true;
     dma: [4]Dma;
     timer: [4]Timer;
@@ -260,6 +267,8 @@ Apu :: struct {
     cgb_vol_l := 0;
     cgb_vol_r := 0;
     cgb_vol_int: u8;
+    bias := 0x200;
+    sampling_frequency := 0;
 
     Pulse_Channel :: struct {
         sweep_shift_cnt := 0;
@@ -317,6 +326,7 @@ Apu :: struct {
         r : u8 = 0;
         w : u8 = 0;
         cnt := 0;
+        out : s8 = 0;
     }
 }
 

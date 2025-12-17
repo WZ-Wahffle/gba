@@ -1,5 +1,20 @@
 mmio_read :: (addr: u32) -> u8 {
     if addr - 0x04000000 == {
+        case 0x000;
+            return xx ppu.bg_mode |
+            (ifx ppu.display_frame_select then 16 else 0) |
+            (ifx ppu.hblank_free then 32 else 0) |
+            (ifx ppu.obj_character_vram_mapping_one_dimensional then 64 else 0) |
+            (ifx ppu.forced_blank then 128 else 0);
+        case 0x001;
+            return xx (ifx ppu.bg[0].enable then 1 else 0) |
+            (ifx ppu.bg[1].enable then 2 else 0) |
+            (ifx ppu.bg[2].enable then 4 else 0) |
+            (ifx ppu.bg[3].enable then 8 else 0) |
+            (ifx ppu.obj_enable then 16 else 0) |
+            (ifx ppu.win[0].enable then 32 else 0) |
+            (ifx ppu.win[1].enable then 64 else 0) |
+            (ifx ppu.obj_win.enable then 128 else 0);
         case 0x004;
             return xx (ifx ppu.draw_y >= 160 && ppu.draw_y <= 226 then 1 else 0) |
             (ifx ppu.draw_x < 228 then 2 else 0) |
@@ -29,6 +44,10 @@ mmio_read :: (addr: u32) -> u8 {
             return ppu.bg[3].config_int[0];
         case 0x00f;
             return ppu.bg[3].config_int[1];
+        case 0x04c;
+            return xx ppu.bg_mosaic_h | (ppu.bg_mosaic_v << 4);
+        case 0x04d;
+            return xx ppu.obj_mosaic_h | (ppu.obj_mosaic_v << 4);
         case 0x060;
             return xx apu.chan_1.sweep_shift_cnt |
             (ifx apu.chan_1.sweep_freq_decrease then 0x8 else 0) |
@@ -37,12 +56,19 @@ mmio_read :: (addr: u32) -> u8 {
             return 0;
         case 0x062;
             return xx apu.chan_1.sound_length | (apu.chan_1.duty_cycle << 6);
+        case 0x063;
+            return xx apu.chan_1.envelope_speed |
+            (ifx apu.chan_1.envelope_increase then 8 else 0) |
+            (apu.chan_1.envelope_initial_volume << 4);
         case 0x068;
             return xx apu.chan_2.sweep_shift_cnt |
             (ifx apu.chan_2.sweep_freq_decrease then 0x8 else 0) |
             (apu.chan_2.sweep_time << 4);
         case 0x069;
             return 0;
+        case 0x073;
+            return xx (apu.chan_3.volume << 5) |
+            (ifx apu.chan_3.force_volume_to_75_percent then 128 else 0);
         case 0x074;
             return xx apu.chan_3.frequency & 0xff;
         case 0x075;
@@ -117,9 +143,9 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x08b;
             return 0;
         case 0x100;
-            return xx cpu.timer[0].reload & 0xff;
+            return xx cpu.timer[0].counter & 0xff;
         case 0x101;
-            return xx (cpu.timer[0].reload >> 8) & 0xff;
+            return xx (cpu.timer[0].counter >> 8) & 0xff;
         case 0x102;
             return xx (cpu.timer[0].prescaler_selection) |
             (ifx cpu.timer[0].ignore_prescaler then 4 else 0) |
@@ -128,9 +154,9 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x103;
             return 0;
         case 0x104;
-            return xx cpu.timer[1].reload & 0xff;
+            return xx cpu.timer[1].counter & 0xff;
         case 0x105;
-            return xx (cpu.timer[1].reload >> 8) & 0xff;
+            return xx (cpu.timer[1].counter >> 8) & 0xff;
         case 0x106;
             return xx (cpu.timer[1].prescaler_selection) |
             (ifx cpu.timer[1].ignore_prescaler then 4 else 0) |
@@ -139,9 +165,9 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x107;
             return 0;
         case 0x108;
-            return xx cpu.timer[2].reload & 0xff;
+            return xx cpu.timer[2].counter & 0xff;
         case 0x109;
-            return xx (cpu.timer[2].reload >> 8) & 0xff;
+            return xx (cpu.timer[2].counter >> 8) & 0xff;
         case 0x10a;
             return xx (cpu.timer[2].prescaler_selection) |
             (ifx cpu.timer[2].ignore_prescaler then 4 else 0) |
@@ -150,9 +176,9 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x10b;
             return 0;
         case 0x10c;
-            return xx cpu.timer[3].reload & 0xff;
+            return xx cpu.timer[3].counter & 0xff;
         case 0x10d;
-            return xx (cpu.timer[3].reload >> 8) & 0xff;
+            return xx (cpu.timer[3].counter >> 8) & 0xff;
         case 0x10e;
             return xx (cpu.timer[3].prescaler_selection) |
             (ifx cpu.timer[3].ignore_prescaler then 4 else 0) |
@@ -174,6 +200,10 @@ mmio_read :: (addr: u32) -> u8 {
             return xx (ppu.keypad_irq_mask >> 8) |
             (ifx ppu.keypad_irq then 0x40 else 0) |
             (ifx ppu.keypad_irq_require_all then 0x80 else 0);
+        case 0x134;
+            return 0;
+        case 0x135;
+            return 0;
         // communication with gamecube not implemented
         case 0x140;
             return 0;
@@ -644,6 +674,13 @@ mmio_write :: (addr: u32, val: u8) {
             apu.cgb_vol_r = val & 0b111;
             apu.cgb_vol_l = (val >> 4) & 0b111;
             apu.cgb_vol_int = val;
+        case 0x088;
+            apu.bias &= 0x300;
+            apu.bias |= val;
+        case 0x089;
+            apu.bias &= 0xff;
+            apu.bias |= (cast(u16)val & 0b11) << 8;
+            apu.sampling_frequency = val >> 6;
         case 0x0a0; #through;
         case 0x0a1; #through;
         case 0x0a2; #through;
@@ -651,6 +688,7 @@ mmio_write :: (addr: u32, val: u8) {
             apu.fifo_a.buffer[apu.fifo_a.w & 0x1f] = val;
             apu.fifo_a.w += 1;
             apu.fifo_a.w %= 32;
+            // print("Writing to %\n", apu.fifo_a.w);
             if apu.fifo_a.cnt < 32 {
                 apu.fifo_a.cnt += 1;
             }
@@ -923,7 +961,6 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[3].control_int |= (cast(u16)val) << 8;
 
             if cpu.dma[3].enable && cpu.dma[3].start_timing == .IMMED {
-                // print("DMA 3 transfer from 0x% to 0x%, 0x% bytes\n", formatInt(cpu.dma[3].src, 16, 1), formatInt(cpu.dma[3].dst, 16, 1), formatInt(cpu.dma[3].count, 16, 1));
                 while cpu.dma[3].enable transfer(3);
                 cpu.dma[3].control_int &= 0x7fff;
             }

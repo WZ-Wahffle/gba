@@ -59,6 +59,7 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
 
 arm_swp_swpb :: inline (ins: u32) {
     // verify that bits 8..11 are actually zero
+    // rotate on % 4 != 0 !!!!!!
     assert(false);
 }
 
@@ -587,7 +588,19 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
         if b {
             reg_dst(rd_idx, read_8(address, cpu.reg[15] < 0x4000));
         } else {
-            reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
+            // hacky workaround: value is rotated if address % 4 != 0
+            // which only applies to this and swp
+            if address & 0b11 != 0 {
+                val := read_32(address, cpu.reg[15] < 0x4000);
+                rotate_cnt := (address & 0b11) * 8;
+                #asm {
+                    rotate_cnt === c;
+                    ror.32 val, rotate_cnt;
+                }
+                reg_dst(rd_idx, val);
+            } else {
+                reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
+            }
         }
     } else {
         // store

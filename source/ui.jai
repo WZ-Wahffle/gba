@@ -2,6 +2,9 @@ SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;
 FONT_SIZE :: 26;
 BLANK_COLOR :: 0x8000;
+
+SAMPLE_RATE :: 32768;
+CALLBACK_SIZE :: 1;
 window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
 framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
@@ -536,25 +539,6 @@ step_ppu :: () {
             }
         }
 
-        if ppu.draw_x == 240 {
-            for 0..3 {
-                if cpu.dma[it].start_timing == .HBLANK && cpu.dma[it].enable {
-                    cnt := cpu.dma[it].count;
-                    // if it == 0 print("DMA at %: src: 0x% src_int: 0x%\n", ppu.draw_y, formatInt(cpu.dma[it].src, 16, 1), formatInt(cpu.dma[it].src_int, 16, 1));
-                    for _: 0..cnt-1 transfer(it);
-                }
-            }
-        }
-
-        if ppu.draw_x == 240 && ppu.draw_y == 160 {
-            for 0..3 {
-                if cpu.dma[it].start_timing == .VBLANK && cpu.dma[it].enable {
-                    cnt := cpu.dma[it].count;
-                    for _: 0..cnt-1 transfer(it);
-                }
-            }
-        }
-
         if ppu.draw_x == 0 {
             cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0;
         }
@@ -611,6 +595,24 @@ step_ppu :: () {
                 case 5;
             }
         }
+
+        if ppu.draw_x == 240 && ppu.draw_y < 160 {
+            for 0..3 {
+                if cpu.dma[it].start_timing == .HBLANK && cpu.dma[it].enable {
+                    cnt := cpu.dma[it].count;
+                    for _: 0..cnt-1 transfer(it);
+                }
+            }
+        }
+
+        if ppu.draw_x == 240 && ppu.draw_y == 160 {
+            for 0..3 {
+                if cpu.dma[it].start_timing == .VBLANK && cpu.dma[it].enable {
+                    cnt := cpu.dma[it].count;
+                    for _: 0..cnt-1 transfer(it);
+                }
+            }
+        }
     }
 }
 
@@ -624,9 +626,10 @@ ui :: () {
 
     spec: SDL_AudioSpec;
     spec.channels = 1;
-    spec.format = AUDIO_S8;
+    spec.format = AUDIO_S16;
     spec.callback = apu_callback;
-    spec.freq = 32768;
+    spec.freq = SAMPLE_RATE;
+    spec.samples = CALLBACK_SIZE;
     apu.dev = SDL_OpenAudioDevice(null, 0, *spec, null, 0);
     if apu.dev == 0 {
         str: string;

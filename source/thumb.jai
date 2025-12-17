@@ -154,14 +154,14 @@ thumb_strh_2 :: inline (ins: u16) {
     rd_idx : u8 = xx ins & 0b111;
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
-    write_16(rn + rm, xx reg_src(rd_idx));
+    write_16(rn + rm, xx reg_src(rd_idx) & 0xffff);
 }
 
 thumb_strb_2 :: inline (ins: u16) {
     rd_idx : u8 = xx ins & 0b111;
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
-    write_8(rn + rm, xx reg_src(rd_idx));
+    write_8(rn + rm, xx reg_src(rd_idx) & 0xff);
 }
 
 thumb_ldrsb :: inline (ins: u16) {
@@ -177,7 +177,20 @@ thumb_ldr_2 :: inline (ins: u16) {
     rm := reg_src(xx ((ins >> 6) & 0b111));
     rn := reg_src(xx ((ins >> 3) & 0b111));
     rd_idx : u8 = xx ins & 0b111;
-    reg_dst(rd_idx, read_32(rm + rn, cpu.reg[15] < 0x4000));
+    // hacky workaround: value is rotated if address % 4 != 0
+    // which only applies to this and swp
+    address := rm + rn;
+    if address & 0b11 != 0 {
+        val := read_32(address, cpu.reg[15] < 0x4000);
+        rotate_cnt := (address & 0b11) * 8;
+        #asm {
+            rotate_cnt === c;
+            ror.32 val, rotate_cnt;
+        }
+        reg_dst(rd_idx, val);
+    } else {
+        reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
+    }
 }
 
 thumb_ldrh_2 :: inline (ins: u16) {
@@ -442,7 +455,20 @@ thumb_ldr_str_ldrb_strb_1 :: inline (ins: u16) {
         if s {
             reg_dst(rd_idx, xx read_8(rn + imm, cpu.reg[15] < 0x4000));
         } else {
-            reg_dst(rd_idx, read_32(rn + imm * 4, cpu.reg[15] < 0x4000));
+            // hacky workaround: value is rotated if address % 4 != 0
+            // which only applies to this and swp
+            address := rn + imm * 4;
+            if address & 0b11 != 0 {
+                val := read_32(address, cpu.reg[15] < 0x4000);
+                rotate_cnt := (address & 0b11) * 8;
+                #asm {
+                    rotate_cnt === c;
+                    ror.32 val, rotate_cnt;
+                }
+                reg_dst(rd_idx, val);
+            } else {
+                reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
+            }
         }
     } else {
         cpu.remaining_cycles -= 1;
@@ -458,8 +484,20 @@ thumb_ldr_4 :: inline (ins: u16) {
     imm := ins & 0xff;
     reg_idx : u8 = xx (ins >> 8) & 0b111;
     addr := cpu.reg[13] + 4 * imm;
+    // hacky workaround: value is rotated if address % 4 != 0
+    // which only applies to this and swp
+    if addr & 0b11 != 0 {
+        val := read_32(addr, cpu.reg[15] < 0x4000);
+        rotate_cnt := (addr & 0b11) * 8;
+        #asm {
+            rotate_cnt === c;
+            ror.32 val, rotate_cnt;
+        }
+        reg_dst(reg_idx, val);
+    } else {
+        reg_dst(reg_idx, read_32(addr, cpu.reg[15] < 0x4000));
+    }
     cpu.remaining_cycles -= 2;
-    reg_dst(reg_idx, read_32(addr, cpu.reg[15] < 0x4000));
 }
 
 thumb_str_3 :: inline (ins: u16) {
