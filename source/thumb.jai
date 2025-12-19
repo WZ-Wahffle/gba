@@ -148,6 +148,7 @@ thumb_str_2 :: inline (ins: u16) {
     rn := reg_src(xx ((ins >> 3) & 0b111));
     rd_idx : u8 = xx ins & 0b111;
     write_32(rm + rn, reg_src(rd_idx));
+    cpu.remaining_cycles -= 1;
 }
 
 thumb_strh_2 :: inline (ins: u16) {
@@ -155,6 +156,7 @@ thumb_strh_2 :: inline (ins: u16) {
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
     write_16(rn + rm, xx reg_src(rd_idx) & 0xffff);
+    cpu.remaining_cycles -= 1;
 }
 
 thumb_strb_2 :: inline (ins: u16) {
@@ -162,6 +164,7 @@ thumb_strb_2 :: inline (ins: u16) {
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
     write_8(rn + rm, xx reg_src(rd_idx) & 0xff);
+    cpu.remaining_cycles -= 1;
 }
 
 thumb_ldrsb :: inline (ins: u16) {
@@ -171,6 +174,7 @@ thumb_ldrsb :: inline (ins: u16) {
     to_write : u32 = read_8(rm + rn, cpu.reg[15] < 0x4000);
     if (to_write & 0x80) != 0 then to_write |= 0xffffff00;
     reg_dst(rd_idx, to_write);
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_ldr_2 :: inline (ins: u16) {
@@ -191,6 +195,7 @@ thumb_ldr_2 :: inline (ins: u16) {
     } else {
         reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
     }
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_ldrh_2 :: inline (ins: u16) {
@@ -198,6 +203,7 @@ thumb_ldrh_2 :: inline (ins: u16) {
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
     reg_dst(rd_idx, read_16(rn + rm, cpu.reg[15] < 0x4000));
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_ldrb_2 :: inline (ins: u16) {
@@ -205,6 +211,7 @@ thumb_ldrb_2 :: inline (ins: u16) {
     rn := reg_src(xx (ins >> 3) & 0b111);
     rm := reg_src(xx (ins >> 6) & 0b111);
     reg_dst(rd_idx, read_8(rn + rm, cpu.reg[15] < 0x4000));
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_ldrsh :: inline (ins: u16) {
@@ -214,6 +221,7 @@ thumb_ldrsh :: inline (ins: u16) {
     to_write : u32 = read_16(rm + rn, cpu.reg[15] < 0x4000);
     if (to_write & 0x8000) != 0 then to_write |= 0xffff0000;
     reg_dst(rd_idx, to_write);
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_ldr_3 :: inline (ins: u16) {
@@ -221,6 +229,7 @@ thumb_ldr_3 :: inline (ins: u16) {
     immed := ins & 0xff;
     reg_idx : u8 = xx (ins >> 8) & 0b111;
     reg_dst(reg_idx, read_32(((cpu.reg[15] + 2) & 0xfffffffc) + immed * 4, cpu.reg[15] < 0x4000));
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_add_4 :: inline (ins: u16) {
@@ -256,6 +265,7 @@ thumb_bx_blx_2 :: inline (ins: u16) {
         set_status_bit(.T, true);
         cpu.reg[15] = addr & 0xfffffffe;
     }
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_and :: inline (ins: u16) {
@@ -339,11 +349,27 @@ thumb_asr_2 :: inline (ins: u16) {
 }
 
 thumb_adc :: inline (ins: u16) {
-    assert(false);
+    rm : u32 = reg_src(xx ((ins >> 3) & 0b111)) + xx ifx get_status_bit(.C) then 1 else 0;
+    rd_idx : u8 = xx ins & 0b111;
+    rd := reg_src(rd_idx);
+    result := rd + rm;
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
+    set_status_bit(.C, cast(u64)(rd) + cast(u64)(rm) > 0xffffffff);
+    set_status_bit(.V, (rd & 0x80000000) == (rm & 0x80000000) && (rd & 0x80000000) != (result & 0x80000000));
+    reg_dst(rd_idx, result);
 }
 
 thumb_sbc :: inline (ins: u16) {
-    assert(false);
+    rm : u32 = reg_src(xx ((ins >> 3) & 0b111)) + xx ifx !get_status_bit(.C) then 1 else 0;
+    rd_idx : u8 = xx ins & 0b111;
+    rd := reg_src(rd_idx);
+    result := rd - rm;
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
+    set_status_bit(.C, rd >= rm);
+    set_status_bit(.V, (rd & 0x80000000) != (rm & 0x80000000) && (result & 0x80000000) != (rd & 0x80000000));
+    reg_dst(rd_idx, result);
 }
 
 thumb_ror :: inline (ins: u16) {
@@ -591,6 +617,7 @@ thumb_swi_b_1 :: inline (ins: u16) {
     cond_idx : u8 = xx (ins >> 8) & 0xf;
     if cond_idx == 0xf {
         interrupt(.SVC);
+        cpu.remaining_cycles -= 2;
     } else {
         if cond(cond_idx) {
             immed := (ins & 0xff) << 1;
@@ -598,6 +625,7 @@ thumb_swi_b_1 :: inline (ins: u16) {
             cpu.reg[15] -= immed & 0x100;
             cpu.reg[15] += 2;
         }
+        cpu.remaining_cycles -= 2;
     }
 }
 
@@ -637,6 +665,7 @@ thumb_b_2 :: inline (ins: u16) {
         cpu.reg[15] -= 0x1000;
     }
     cpu.reg[15] += 2;
+    cpu.remaining_cycles -= 2;
 }
 
 thumb_bl_blx_1_blx_suffix :: inline (ins: u16) {
@@ -651,6 +680,7 @@ thumb_bl_blx_1_prefix :: inline (ins: u16) {
     } else {
         cpu.reg[14] = cpu.reg[15] + (offset_adj << 12) + 2;
     }
+    cpu.remaining_cycles -= 1;
 }
 
 thumb_bl_blx_1_bl_suffix :: inline (ins: u16) {
@@ -658,4 +688,5 @@ thumb_bl_blx_1_bl_suffix :: inline (ins: u16) {
     next := cpu.reg[15];
     cpu.reg[15] = cpu.reg[14] + (offset << 1);
     cpu.reg[14] = next | 1;
+    cpu.remaining_cycles -= 1;
 }

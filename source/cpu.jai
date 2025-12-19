@@ -236,6 +236,13 @@ next_16 :: () -> u16 {
         first : u16 = cpu.memory.rom[idx % cpu.memory.rom.count];
         second : u16 = cpu.memory.rom[(idx + 1) % cpu.memory.rom.count];
         ret = first | (second << 8);
+        if idx < 0xa000000 {
+            cpu.remaining_cycles -= cpu.waitcnt_0;
+        } else if idx < 0xc000000 {
+            cpu.remaining_cycles -= cpu.waitcnt_1;
+        } else {
+            cpu.remaining_cycles -= cpu.waitcnt_2;
+        }
     }
     else if idx < 0x4000 {
         ret = cpu.memory.bios._16[idx >> 1];
@@ -261,6 +268,13 @@ next_32 :: () -> u32 {
         third : u32 = cpu.memory.rom[(idx + 2) % cpu.memory.rom.count];
         fourth : u32 = cpu.memory.rom[(idx + 3) % cpu.memory.rom.count];
         ret = first | (second << 8) | (third << 16) | (fourth << 24);
+        if idx < 0xa000000 {
+            cpu.remaining_cycles -= cpu.waitcnt_0;
+        } else if idx < 0xc000000 {
+            cpu.remaining_cycles -= cpu.waitcnt_1;
+        } else {
+            cpu.remaining_cycles -= cpu.waitcnt_2;
+        }
     }
     else if idx < 0x4000 {
         ret = cpu.memory.bios._32[idx >> 2];
@@ -331,6 +345,7 @@ set_mode :: (mode: u32) {
 
 interrupt :: (mode: Cpu_Mode) {
     assert(mode == Cpu_Mode.IRQ || mode == Cpu_Mode.FIQ || mode == Cpu_Mode.SVC);
+    if cpu.mode == mode return;
     cpu.spsr[mode] = cpu.psr;
     if mode == {
         case .SVC;
@@ -536,7 +551,10 @@ cond :: (val: u32) -> bool {
 }
 
 reg_src :: inline (val: u8) -> u32 {
-    if val == 15 then return cpu.reg[15] + xx ifx get_status_bit(.T) then 2 else 4;
+    if val == 15 {
+        cpu.remaining_cycles -= 2;
+        return cpu.reg[15] + xx ifx get_status_bit(.T) then 2 else 4;
+    }
     return cpu.reg[val];
 }
 
@@ -554,6 +572,7 @@ reg_dst :: inline (val: u8, to_write: u32) {
 
 shifter_operand :: (val: u16) -> (u32, bool, bool) {
     assert(val <= 0xfff);
+    cpu.remaining_cycles -= 1;
     if ((val >> 4) & 0b111) == {
         case 0b000;
             // register operand + logical shift left imm

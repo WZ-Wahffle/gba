@@ -1088,14 +1088,17 @@ mmio_write :: (addr: u32, val: u8) {
             if (val & 0x08) != 0 then cpu.ifl[Interrupt_Source.DMA3] = 0;
             if (val & 0x10) != 0 then cpu.ifl[Interrupt_Source.KEYPAD] = 0;
             if (val & 0x20) != 0 then cpu.ifl[Interrupt_Source.GAMEPAK] = 0;
+        // WAITCNT
         case 0x204;
             cpu.waitcnt_lo = val;
+            cpu.waitcnt_sram = int.[4, 3, 2, 8][val & 0b11];
+            cpu.waitcnt_0 = 2 - ((val >> 4) & 0b1);
+            cpu.waitcnt_1 = 4 - ((val >> 7) & 0b1) * 3;
         case 0x205;
             cpu.waitcnt_hi = val;
+            cpu.waitcnt_1 = 8 - ((val >> 2) & 0b1) * 7;
         case 0x206;
         case 0x207;
-        // WAITCNT
-        // not really all that important
         case 0x208;
             cpu.interrupt_master_enable = (val & 1) != 0;
         case 0x209;

@@ -937,6 +937,12 @@ disassemble_thumb_instruction :: (ins: u16) -> string  {
             if ((ins >> 8) & 0b11) == {
                 case 0b00;
                 // add (4)
+                rd_idx : u8 = xx ((ins & 0b111) | ((ins >> 4) & 0b1000));
+                rm_idx : u8 = xx ((ins >> 3) & 0xf);
+                opcode = "add";
+                append(*suffix, disassemble_register(rd_idx));
+                append(*suffix, ", ");
+                append(*suffix, disassemble_register(rm_idx));
                 case 0b01;
                 // cmp (3)
                 rd_idx : u8 = xx ((ins & 0b111) | ((ins >> 4) & 0b1000));

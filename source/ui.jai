@@ -817,6 +817,6 @@ ui :: () {
         }
         end_time := seconds_since_init();
         // TODO: should probably make this refresh rate dependent
-        sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
+        // sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
 }

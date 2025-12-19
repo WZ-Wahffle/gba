@@ -43,6 +43,10 @@ Cpu :: struct {
     // WAITCNT
     waitcnt_lo : u8 = 0;
     waitcnt_hi : u8 = 0;
+    waitcnt_sram := 0;
+    waitcnt_0 := 0;
+    waitcnt_1 := 0;
+    waitcnt_2 := 0;
 
     Cpu_Mmu :: struct {
         Bios_Union :: union {

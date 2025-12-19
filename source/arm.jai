@@ -8,6 +8,7 @@ arm_bx :: inline (ins: u32) {
         set_status_bit(.T, true);
         cpu.reg[15] = rm & 0xfffffffe;
     }
+    cpu.remaining_cycles -= 2;
 }
 
 arm_mul_mla :: inline (ins: u32) {
@@ -19,6 +20,7 @@ arm_mul_mla :: inline (ins: u32) {
     if (ins & 0x200000) != 0 {
         rn := reg_src(xx (ins >> 12) & 0xf);
         result = rm * rs + rn;
+        cpu.remaining_cycles -= 1;
     } else {
         assert(((ins >> 12) & 0xf) == 0);
         result = rm * rs;
@@ -28,6 +30,10 @@ arm_mul_mla :: inline (ins: u32) {
         set_status_bit(.N, (result & 0x80000000) != 0);
         set_status_bit(.Z, result == 0);
     }
+    if rs & 0xffffff00 == 0xffffff00 || rs & 0xffffff00 == 0x0 cpu.remaining_cycles -= 1;
+    else if rs & 0xffff0000 == 0xffff0000 || rs & 0xffff0000 == 0x0 cpu.remaining_cycles -= 2;
+    else if rs & 0xff000000 == 0xff000000 || rs & 0xff000000 == 0x0 cpu.remaining_cycles -= 3;
+    else cpu.remaining_cycles -= 4;
 }
 
 arm_umull_umlal_smull_smlal :: inline (ins: u32) {
@@ -43,6 +49,7 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
         rm : u64 = reg_src(xx ins & 0xf);
         if (ins & 0x200000) != 0 {
             // umlal
+            cpu.remaining_cycles -= 1;
             assert(false);
         } else {
             // umull
@@ -54,6 +61,10 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
                 set_status_bit(.Z, result == 0);
             }
         }
+        if rs & 0xffffff00 == 0x0 cpu.remaining_cycles -= 2;
+        else if rs & 0xffff0000 == 0x0 cpu.remaining_cycles -= 3;
+        else if rs & 0xff000000 == 0x0 cpu.remaining_cycles -= 4;
+        else cpu.remaining_cycles -= 5;
     }
 }
 
