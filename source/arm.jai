@@ -446,6 +446,22 @@ arm_cmp :: inline (ins: u32) {
     set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
 }
 
+arm_cmn :: inline (ins: u32) {
+    operand: u32;
+    if (ins & 0x2000000) {
+        operand = immediate_operand(xx ins & 0xfff);
+    } else {
+        operand = shifter_operand(xx ins & 0xfff);
+        cpu.remaining_cycles -= 1;
+    }
+    rn := reg_src(xx (ins >> 16) & 0xf);
+    result := rn + operand;
+    set_status_bit(.N, (result & 0x80000000) != 0);
+    set_status_bit(.Z, result == 0);
+    set_status_bit(.C, cast(u64)(rn) + cast(u64)(operand) > 0xffffffff);
+    set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+}
+
 arm_orr :: inline (ins: u32) {
     operand: u32;
     should_carry: bool;

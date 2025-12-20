@@ -28,6 +28,9 @@ Cpu :: struct {
     flash_state := Flash_State.NONE;
     flash_op_mode := Flash_Operation_Mode.READ;
 
+    // sram/fram
+    sram: [0x8000]u8;
+
     privileged := true;
     dma: [4]Dma;
     timer: [4]Timer;
@@ -37,9 +40,9 @@ Cpu :: struct {
     // IME
     interrupt_master_enable := false;
     // IE
-    ie: [#run enum_highest_value(Interrupt_Source)+1]u8;
+    ie: u16;
     // IF
-    ifl: [#run enum_highest_value(Interrupt_Source)+1]u8;
+    ifl: u16;
     // WAITCNT
     waitcnt_lo : u8 = 0;
     waitcnt_hi : u8 = 0;
@@ -106,6 +109,8 @@ Cpu :: struct {
     pc_history: [64]u32;
     pc_history_idx : u32 = 0;
     logging := false;
+    schedule_irq := false; // used by parallel irqs
+    scheduled_irq : Interrupt_Source = 0;
 }
 
 Ppu :: struct {

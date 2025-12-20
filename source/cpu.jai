@@ -389,9 +389,11 @@ timer_overflow :: (idx: int) {
     cpu.timer[idx].counter -= 0xffff;
     cpu.timer[idx].counter += cpu.timer[idx].reload;
     interrupts := Interrupt_Source.[.TIM0OVERFLOW, .TIM1OVERFLOW, .TIM2OVERFLOW, .TIM3OVERFLOW];
-    if cpu.timer[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
-        cpu.ifl[interrupts[idx]] = xx 1 << interrupts[idx];
-        interrupt(.IRQ);
+    if cpu.timer[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && (cpu.ie & (1 << interrupts[idx])) {
+        if cpu.logging print("Timer IRQ\n");
+        cpu.scheduled_irq = interrupts[idx];
+        cpu.schedule_irq = true;
+        // interrupt(.IRQ);
     }
     if idx < 3 && cpu.timer[idx+1].ignore_prescaler {
         cpu.timer[idx+1].counter += 1;
@@ -495,9 +497,11 @@ transfer :: (idx: int) {
         cpu.dma[idx].count_int -= 1;
         if cpu.dma[idx].count_int == 0 {
             interrupts := Interrupt_Source.[.DMA0, .DMA1, .DMA2, .DMA3];
-            if cpu.dma[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && cpu.ie[interrupts[idx]] {
-                cpu.ifl[interrupts[idx]] = xx 1 << interrupts[idx];
-                interrupt(.IRQ);
+            if cpu.dma[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && (cpu.ie & (1 << interrupts[idx])) {
+                if cpu.logging print("DMA IRQ\n");
+                cpu.scheduled_irq = interrupts[idx];
+                cpu.schedule_irq = true;
+                // interrupt(.IRQ);
             }
             if cpu.dma[idx].repeat {
                 cpu.dma[idx].count_int = ifx cpu.dma[idx].count == 0 then 0x4000 else cpu.dma[idx].count;
@@ -713,6 +717,7 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xdf0f000, 0x1100000, arm_tst},
     .{0xdf0f000, 0x1300000, arm_teq},
     .{0xdf0f000, 0x1500000, arm_cmp},
+    .{0xdf0f000, 0x1700000, arm_cmn},
 
     .{0xdb000f0, 0x1200000, arm_msr},
     .{0xfb00000, 0x1000000, arm_mrs},

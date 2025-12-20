@@ -172,7 +172,7 @@ cpu_window :: () {
     ImGui.NewLine();
     ImGui.Text("Interrupts %abled", ifx cpu.interrupt_master_enable then "en" else "dis");
     for enum_names(Interrupt_Source) {
-        ImGui.Text("%: %abled, %triggered", it, ifx cpu.ie[it_index] != 0 then "en" else "dis", ifx cpu.ifl[it_index] != 0 then "" else "not ");
+        ImGui.Text("%: %abled, %triggered", it, ifx (cpu.ie & (1 << it_index)) != 0 then "en" else "dis", ifx (cpu.ie & (1 << it_index)) != 0 then "" else "not ");
     }
     ImGui.End();
 }
@@ -186,7 +186,9 @@ Bg_Control_Lut_Entry :: struct {
 mode_lut := Bg_Control_Lut_Entry.[
     .{0, 3, .[false, false, false, false]},
     .{0, 2, .[false, false, true, false]},
-    .{2, 3, .[false, false, true, true]}
+    .{2, 3, .[false, false, true, true]},
+    .{2, 2, .[false, false, true, false]},
+    .{2, 2, .[false, false, true, false]}
 ];
 background_selected : s32 = 0;
 ppu_window :: () {
@@ -555,14 +557,14 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             append(*suffix, ", ");
                         case 0b1010;
                             // cmp
-                            // technically has a flags and a destination field,
-                            // but this is never relevant so who cares
                             opcode = "CMP";
                             append(*suffix, disassemble_register((inst >> 16) & 0xf));
                             append(*suffix, ", ");
                         case 0b1011;
-                        // would be msr, but handled outside
-                        // assert(false);
+                            // cmn
+                            opcode = "CMN";
+                            append(*suffix, disassemble_register((inst >> 16) & 0xf));
+                            append(*suffix, ", ");
                         case 0b1100;
                         // orr
                             opcode = ifx flags then "ORRS" else "ORR";
@@ -1401,6 +1403,8 @@ save_window :: () {
             f := file_open(file_name, true, false);
             file_write(*f, *cpu.backup_type, size_of(Backup_Type));
             if cpu.backup_type == {
+                case .SRAM;
+                file_write(*f, cpu.sram.data, cpu.sram.count);
                 case .EEPROM;
                 file_write(*f, *cpu.eeprom_size, size_of(Eeprom_Size));
                 file_write(*f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);
@@ -1421,6 +1425,8 @@ save_window :: () {
             f := file_open(file_name, false);
             file_read(f, *cpu.backup_type, size_of(Backup_Type));
             if cpu.backup_type == {
+                case .SRAM;
+                file_read(f, cpu.sram.data, cpu.sram.count);
                 case .EEPROM;
                 file_read(f, *cpu.eeprom_size, size_of(Eeprom_Size));
                 file_read(f, cpu.ee.data, ifx cpu.eeprom_size == .EEPROM_512B then 512 else 8192);

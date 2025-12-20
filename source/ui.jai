@@ -150,6 +150,60 @@ draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
     }
 }
 
+draw_bitmap :: (y: u32) {
+    if !ppu.bg[2].enable then return;
+    line_width_px := 240;
+    line_height_px := 160;
+
+    pixel_buffer: [240]u16;
+    a := ppu.bg[2].pa;
+    b := ppu.bg[2].pb;
+    c := ppu.bg[2].pc;
+    d := ppu.bg[2].pd;
+    base_addr := ifx ppu.display_frame_select then 0xa000 else 0;
+
+    ppu.bg[2].transform_x = ppu.bg[2].anchor_x_l;
+    ppu.bg[2].transform_y = ppu.bg[2].anchor_y_l;
+    ppu.bg[2].anchor_x_l += b;
+    ppu.bg[2].anchor_y_l += d;
+
+    for x: 0..239 {
+        x_1: int = xx ppu.bg[2].transform_x;
+        y_1: int = xx ppu.bg[2].transform_y;
+        pixel_buffer[x] = BLANK_COLOR;
+
+        ppu.bg[2].transform_x += a;
+        ppu.bg[2].transform_y += c;
+
+        if ppu.bg[2].wraparound {
+            while x_1 < 0 x_1 += line_width_px;
+            while y_1 < 0 y_1 += line_height_px;
+            while x_1 >= line_width_px x_1 -= line_width_px;
+            while y_1 >= line_height_px y_1 -= line_height_px;
+        } else if x_1 < 0 || x_1 >= line_width_px || y_1 < 0 || y_1 >= line_height_px {
+            continue;
+        }
+
+        if ppu.bg[2].mosaic {
+            x_1 -= x_1 % (ppu.bg_mosaic_h + 1);
+            y_1 -= y_1 % (ppu.bg_mosaic_v + 1);
+        }
+
+        color := ppu.memory.vram._8[base_addr + 0xf0 * y_1 + x_1];
+        if color != 0 {
+            pixel_buffer[x] = ppu.memory.palette_ram._16[color] & 0x7fff;
+        } else {
+            pixel_buffer[x] = BLANK_COLOR;
+        }
+    }
+
+    for 0..239 {
+        if pixel_buffer[it] != BLANK_COLOR {
+            bg_line_buffer[2][it] = pixel_buffer[it];
+        }
+    }
+}
+
 draw_obj :: (y: u32) {
     if ppu.obj_enable {
         base_addr := 0x10000;
@@ -516,26 +570,31 @@ step_ppu :: () {
         }
 
         if cpu.interrupt_master_enable && !get_status_bit(.I) {
-            if ppu.vblank_irq_enable && cpu.ie[Interrupt_Source.LCD_VBLANK] != 0 && ppu.draw_y >= 160 && !vblank_happened {
+            if ppu.vblank_irq_enable && (cpu.ie & (1 << Interrupt_Source.LCD_VBLANK)) != 0 && ppu.draw_y >= 160 && !vblank_happened {
                 vblank_happened = true;
-                cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0x01;
+                cpu.ifl |= 1 << Interrupt_Source.LCD_VBLANK;
                 interrupt(.IRQ);
-            } else if ppu.hblank_irq_enable && cpu.ie[Interrupt_Source.LCD_HBLANK] != 0 && ppu.draw_x >= 240 && !hblank_happened {
+            } else if ppu.hblank_irq_enable && (cpu.ie & (1 << Interrupt_Source.LCD_HBLANK)) != 0 && ppu.draw_x >= 240 && !hblank_happened {
                 hblank_happened = true;
-                cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0x02;
+                cpu.ifl |= 1 << Interrupt_Source.LCD_HBLANK;
                 interrupt(.IRQ);
-            } else if ppu.vcounter_irq_enable && cpu.ie[Interrupt_Source.LCD_VCOUNTER] != 0 && ppu.draw_y == ppu.vcounter {
-                cpu.ifl[Interrupt_Source.LCD_VCOUNTER] = 0x04;
+            } else if ppu.vcounter_irq_enable && (cpu.ie & (1 << Interrupt_Source.LCD_VCOUNTER)) != 0 && ppu.draw_y == ppu.vcounter {
+                cpu.ifl |= 1 << Interrupt_Source.LCD_VCOUNTER;
+                interrupt(.IRQ);
+            } else if cpu.schedule_irq {
+                cpu.ifl |= xx (1 << cpu.scheduled_irq);
+                cpu.scheduled_irq = 0;
+                cpu.schedule_irq = false;
                 interrupt(.IRQ);
             }
         }
 
         if ppu.draw_x == 0 {
-            cpu.ifl[Interrupt_Source.LCD_HBLANK] = 0;
+            cpu.ifl &= ~(1 << Interrupt_Source.LCD_HBLANK) & 0xffff;
         }
 
         if ppu.draw_y == 0 {
-            cpu.ifl[Interrupt_Source.LCD_VBLANK] = 0;
+            cpu.ifl &= ~(1 << Interrupt_Source.LCD_VBLANK) & 0xffff;
         }
 
         if ppu.draw_x == 240 && ppu.draw_y < 160 {
@@ -574,6 +633,9 @@ step_ppu :: () {
                     merge_and_blend();
                 case 3;
                 case 4;
+                    draw_obj(ppu.draw_y);
+                    draw_bitmap(ppu.draw_y);
+                    merge_and_blend();
                 case 5;
             }
         }
@@ -817,6 +879,6 @@ ui :: () {
         }
         end_time := seconds_since_init();
         // TODO: should probably make this refresh rate dependent
-        // sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
+        sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
 }
