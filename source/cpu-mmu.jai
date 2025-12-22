@@ -126,6 +126,22 @@ mmio_read :: (addr: u32) -> u8 {
             return xx (cpu.dma[2].control_int >> 0) & 0xff;
         case 0x0d3;
             return xx (cpu.dma[2].control_int >> 8) & 0xff;
+        case 0x0d4;
+            return xx (cpu.dma[3].src >> 0) & 0xff;
+        case 0x0d5;
+            return xx (cpu.dma[3].src >> 8) & 0xff;
+        case 0x0d6;
+            return xx (cpu.dma[3].src >> 16) & 0xff;
+        case 0x0d7;
+            return xx (cpu.dma[3].src >> 24) & 0xff;
+        case 0x0d8;
+            return xx (cpu.dma[3].dst >> 0) & 0xff;
+        case 0x0d9;
+            return xx (cpu.dma[3].dst >> 8) & 0xff;
+        case 0x0da;
+            return xx (cpu.dma[3].dst >> 16) & 0xff;
+        case 0x0db;
+            return xx (cpu.dma[3].dst >> 24) & 0xff;
         case 0x0dc;
             return xx (cpu.dma[3].count_int >> 0) & 0xff;
         case 0x0dd;
@@ -684,7 +700,6 @@ mmio_write :: (addr: u32, val: u8) {
             apu.fifo_a.buffer[apu.fifo_a.w & 0x1f] = val;
             apu.fifo_a.w += 1;
             apu.fifo_a.w %= 32;
-            // print("Writing to %\n", apu.fifo_a.w);
             if apu.fifo_a.cnt < 32 {
                 apu.fifo_a.cnt += 1;
             }
@@ -1075,22 +1090,22 @@ oam_update :: (addr: u32) {
             case 6;
             #through;
             case 7;
-            ppu.oam_param[offset / 32].pa = xx cast,force(s8)upper;
+            ppu.oam_param[offset / 32].pa = xx cast,no_check(s8)upper;
             ppu.oam_param[offset / 32].pa += xx lower / 256.0;
             case 14;
             #through;
             case 15;
-            ppu.oam_param[offset / 32].pb = xx cast,force(s8)upper;
+            ppu.oam_param[offset / 32].pb = xx cast,no_check(s8)upper;
             ppu.oam_param[offset / 32].pb += xx lower / 256.0;
             case 22;
             #through;
             case 23;
-            ppu.oam_param[offset / 32].pc = xx cast,force(s8)upper;
+            ppu.oam_param[offset / 32].pc = xx cast,no_check(s8)upper;
             ppu.oam_param[offset / 32].pc += xx lower / 256.0;
             case 30;
             #through;
             case 31;
-            ppu.oam_param[offset / 32].pd = xx cast,force(s8)upper;
+            ppu.oam_param[offset / 32].pd = xx cast,no_check(s8)upper;
             ppu.oam_param[offset / 32].pd += xx lower / 256.0;
             case;
             assert(false);

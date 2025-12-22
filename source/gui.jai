@@ -232,6 +232,7 @@ apu_window :: () {
     ImGui.Begin("apu");
     ImGui.Text_CFormat("Bias: %d", apu.bias);
     ImGui.Text_CFormat("Sampling Frequency: %d", apu.sampling_frequency);
+    ImGui.Text_CFormat("Played Samples: %d", apu.played_samples);
     ImGui.InputInt("Channel", *channel_selected, 1, 1, .CharsDecimal);
     if channel_selected < 1 then channel_selected = 1;
     if channel_selected > 6 then channel_selected = 6;
@@ -1702,8 +1703,8 @@ dma_window :: () {
     if dma_selected < 0 then dma_selected = 0;
     if dma_selected > 3 then dma_selected = 3;
     ImGui.Text("%abled", ifx cpu.dma[dma_selected].enable then "en" else "dis");
-    ImGui.Text("Source: 0x%", formatInt(cpu.dma[dma_selected].src, 16, 1));
-    ImGui.Text("Destination: 0x%", formatInt(cpu.dma[dma_selected].dst, 16, 1));
+    ImGui.Text("Source: 0x% (0x%)", formatInt(cpu.dma[dma_selected].src, 16, 1), formatInt(cpu.dma[dma_selected].src_int, 16, 1));
+    ImGui.Text("Destination: 0x% (0x%)", formatInt(cpu.dma[dma_selected].dst, 16, 1), formatInt(cpu.dma[dma_selected].dst_int, 16, 1));
     ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count_int, 16, 1));
     ImGui.Text("Enable: %", cpu.dma[dma_selected].enable);
     ImGui.Text("IRQ on complete: %", cpu.dma[dma_selected].irq);

@@ -4,7 +4,7 @@ FONT_SIZE :: 26;
 BLANK_COLOR :: 0x8000;
 
 SAMPLE_RATE :: 32768;
-CALLBACK_SIZE :: 1;
+CALLBACK_SIZE :: 512;
 window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
 framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
@@ -105,7 +105,7 @@ draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
         pixel_buffer: [512]u16;
         if ppu.bg[bg].single_palette {
             for tile_idx: 0..line_size_tiles-1 {
-                tile_base_addr := ppu.bg[bg].char_base_block * 16384 + ((tile_idx / 32) * 2048) + tile_address_buffer[tile_idx].idx * 64;
+                tile_base_addr := ppu.bg[bg].char_base_block * 16384 + tile_address_buffer[tile_idx].idx * 64;
                 y_pos_src := ifx tile_address_buffer[tile_idx].flip_v then (7 - (y_pos % 8)) else y_pos % 8;
                 tile_base_addr += 8 * y_pos_src;
                 for pixel_idx: 0..7 {
@@ -671,7 +671,6 @@ ui :: () {
     spec: SDL_AudioSpec;
     spec.channels = 1;
     spec.format = AUDIO_S16;
-    spec.callback = apu_callback;
     spec.freq = SAMPLE_RATE;
     spec.samples = CALLBACK_SIZE;
     apu.dev = SDL_OpenAudioDevice(null, 0, *spec, null, 0);
@@ -820,7 +819,9 @@ ui :: () {
                     if cpu.emu_state == .STOPPED break;
                     cpu.remaining_cycles += 4;
                     ppu.remaining_cycles += 4;
+                    apu.remaining_cycles += 1;
                     step_ppu();
+                    step_apu();
                     while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
                 }
                 if cpu.emu_state == .STOPPED break;

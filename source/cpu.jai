@@ -407,11 +407,9 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].dst_addr_control = .FIXED;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
-                // print("Advancing read to %\n", apu.fifo_a.r & 0x1f);
+                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
                 apu.fifo_a.cnt -= 1;
                 if apu.fifo_a.cnt < 16 {
-                    // print("Overflow, re-reading\n");
                     transfer(1);
                     transfer(1);
                     transfer(1);

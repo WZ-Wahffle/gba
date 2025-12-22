@@ -343,6 +343,12 @@ Apu :: struct {
         cnt := 0;
         out : s8 = 0;
     }
+
+    remaining_cycles := 0.0;
+    played_samples := 0;
+    prev : s16 = 0;
+    prev_2 : s16 = 0;
+    prev_3 : s16 = 0;
 }
 
 Backup_Type :: enum {
