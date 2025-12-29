@@ -32,11 +32,11 @@ read_8 :: (addr: u32, bios_bypass := false) -> u8 {
         return rom_read(addr);
     }
 
-    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    log_error("Unmapped read: 0x%", formatInt(addr, 16));
     return 0;
 }
 
-read_16 :: (addr: u32, bios_bypass := false) -> u16 {
+read_16 :: (addr: u32, bios_bypass := false, no_check := false) -> u16 {
     if addr < 0x4000 {
         if bios_bypass return cpu.memory.bios._16[addr >> 1];
         return 0;
@@ -71,11 +71,15 @@ read_16 :: (addr: u32, bios_bypass := false) -> u16 {
         return first | (second << 8);
     }
 
-    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    if no_check {
+        log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    } else {
+        log_error("Unmapped read: 0x%", formatInt(addr, 16));
+    }
     return 0;
 }
 
-read_32 :: (addr: u32, bios_bypass := false) -> u32 {
+read_32 :: (addr: u32, bios_bypass := false, no_check := false) -> u32 {
     if addr < 0x4000 {
         if bios_bypass return cpu.memory.bios._32[addr >> 2];
         return 0;
@@ -114,7 +118,11 @@ read_32 :: (addr: u32, bios_bypass := false) -> u32 {
         return first | (second << 8) | (third << 16) | (fourth << 24);
     }
 
-    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    if no_check {
+        log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    } else {
+        log_error("Unmapped read: 0x%", formatInt(addr, 16));
+    }
     return 0;
 }
 
@@ -405,6 +413,8 @@ timer_overflow :: (idx: int) {
         if apu.chan_a.timer_select == idx {
             if cpu.dma[1].dst == 0x40000a0 && cpu.dma[1].repeat {
                 cpu.dma[1].dst_addr_control = .FIXED;
+                cpu.dma[1].control_int &= 0xffc0;
+                cpu.dma[1].control_int |= 0x40;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
                 apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
@@ -418,6 +428,8 @@ timer_overflow :: (idx: int) {
             }
             if cpu.dma[2].dst == 0x40000a0 && cpu.dma[2].repeat {
                 cpu.dma[2].dst_addr_control = .FIXED;
+                cpu.dma[2].control_int &= 0xffc0;
+                cpu.dma[2].control_int |= 0x40;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
                 apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
@@ -433,6 +445,8 @@ timer_overflow :: (idx: int) {
         if apu.chan_b.timer_select == idx {
             if cpu.dma[1].dst == 0x40000a4 && cpu.dma[1].repeat {
                 cpu.dma[1].dst_addr_control = .FIXED;
+                cpu.dma[1].control_int &= 0xffc0;
+                cpu.dma[1].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
                 apu.fifo_b.cnt -= 1;
@@ -445,6 +459,8 @@ timer_overflow :: (idx: int) {
             }
             if cpu.dma[2].dst == 0x40000a4 && cpu.dma[2].repeat {
                 cpu.dma[2].dst_addr_control = .FIXED;
+                cpu.dma[2].control_int &= 0xffc0;
+                cpu.dma[2].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
                 apu.fifo_b.cnt -= 1;
@@ -461,6 +477,9 @@ timer_overflow :: (idx: int) {
 
 transfer :: (idx: int) {
     if cpu.dma[idx].enable {
+        // if idx != 1 && idx != 2 {
+        //     print("% from % to %\n", idx, formatInt(cpu.dma[idx].src_int, 16, 1), formatInt(cpu.dma[idx].dst_int, 16, 1));
+        // }
         if cpu.dma[idx].large_transfer {
             write_32(cpu.dma[idx].dst_int & 0xfffffffc, read_32(cpu.dma[idx].src_int & 0xfffffffc));
             if cpu.dma[idx].src_addr_control == {

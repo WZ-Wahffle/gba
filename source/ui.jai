@@ -792,73 +792,60 @@ ui :: () {
             ppu.keypad_state |= 0x80;
         }
         SDL_PumpEvents();
-        ppu.keypad_state |=
-            (keystate[SDL_SCANCODE_A] << 0) |
-            (keystate[SDL_SCANCODE_B] << 1) |
-            (keystate[SDL_SCANCODE_TAB] << 2) |
-            (keystate[SDL_SCANCODE_RETURN] << 3) |
-            (keystate[SDL_SCANCODE_RIGHT] << 4) |
-            (keystate[SDL_SCANCODE_LEFT] << 5) |
-            (keystate[SDL_SCANCODE_UP] << 6) |
-            (keystate[SDL_SCANCODE_DOWN] << 7) |
-            (keystate[SDL_SCANCODE_R] << 8) |
-            (keystate[SDL_SCANCODE_L] << 9);
+        if !keystate[SDL_SCANCODE_LSHIFT] && !keystate[SDL_SCANCODE_RSHIFT] then
+            ppu.keypad_state |=
+                (cast(u16, keystate[SDL_SCANCODE_A]) << 0) |
+                (cast(u16, keystate[SDL_SCANCODE_B]) << 1) |
+                (cast(u16, keystate[SDL_SCANCODE_TAB]) << 2) |
+                (cast(u16, keystate[SDL_SCANCODE_RETURN]) << 3) |
+                (cast(u16, keystate[SDL_SCANCODE_RIGHT]) << 4) |
+                (cast(u16, keystate[SDL_SCANCODE_LEFT]) << 5) |
+                (cast(u16, keystate[SDL_SCANCODE_UP]) << 6) |
+                (cast(u16, keystate[SDL_SCANCODE_DOWN]) << 7) |
+                (cast(u16, keystate[SDL_SCANCODE_R]) << 8) |
+                (cast(u16, keystate[SDL_SCANCODE_L]) << 9);
+
+        step_all :: (cycle_count: int) {
+            cpu.remaining_cycles += cycle_count;
+            ppu.remaining_cycles += cycle_count;
+            apu.remaining_cycles += cycle_count;
+            while cpu.emu_state != .STOPPED &&
+            (cpu.remaining_cycles > 0 || ppu.remaining_cycles > 0 || apu.remaining_cycles > 0.0) {
+                step_cpu();
+                step_ppu();
+                step_apu();
+            }
+        }
 
         // processing
         if cpu.emu_state == {
             case .STARTED;
-            ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            cpu.remaining_cycles = 1;
-            step_cpu();
-            cpu.emu_state = .RUNNING;
-            while ppu.remaining_cycles > 0 step_ppu();
-            #through;
+                step_all(-cpu.remaining_cycles + 1);
+                cpu.emu_state = .RUNNING;
+                #through;
             case .RUNNING;
-            for 0..228-1 {
-                for 0..308-1 {
+                for 0..228-1 {
                     if cpu.emu_state == .STOPPED break;
-                    cpu.remaining_cycles += 4;
-                    ppu.remaining_cycles += 4;
-                    apu.remaining_cycles += 1;
-                    step_ppu();
-                    step_apu();
-                    while cpu.remaining_cycles > 0 && cpu.emu_state != .STOPPED step_cpu();
+                    for 0..308-1 {
+                        if cpu.emu_state == .STOPPED break;
+                        step_all(4);
+                    }
                 }
-                if cpu.emu_state == .STOPPED break;
-            }
-            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
-            disasm_mode = get_status_bit(.T);
             case .STOPPED;
-            // this page intentionally left blank
+                // this page intentionally left blank
             case .STEPPED;
-            cpu.emu_state = .STOPPED;
-            ppu.remaining_cycles += -cpu.remaining_cycles + 1;
-            cpu.remaining_cycles += -cpu.remaining_cycles + 1;
-            while ppu.remaining_cycles > 0 step_ppu();
-            while cpu.remaining_cycles > 0 step_cpu();
-            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
-            disasm_mode = get_status_bit(.T);
+                step_all(-cpu.remaining_cycles + 1);
+                cpu.emu_state = .STOPPED;
             case .STEPPED_SCANLINE;
-            cpu.emu_state = .STOPPED;
-            ppu.remaining_cycles += 308 * 4;
-            cpu.remaining_cycles += 308 * 4;
-            while ppu.remaining_cycles > 0 || cpu.remaining_cycles > 0 {
-                step_ppu();
-                step_cpu();
-            }
-            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
-            disasm_mode = get_status_bit(.T);
+                step_all(308 * 4);
+                cpu.emu_state = .STOPPED;
             case .STEPPED_FRAME;
-            cpu.emu_state = .STOPPED;
-            ppu.remaining_cycles += 308 * 228 * 4;
-            cpu.remaining_cycles += 308 * 228 * 4;
-            while ppu.remaining_cycles > 0 || cpu.remaining_cycles > 0 {
-                step_ppu();
-                step_cpu();
-            }
-            disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
-            disasm_mode = get_status_bit(.T);
+                step_all(308 * 228 * 4);
+                cpu.emu_state = .STOPPED;
         }
+        disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+        disasm_mode = get_status_bit(.T);
+
         SDL_RenderClear(renderer);
         surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
         defer SDL_FreeSurface(surface);

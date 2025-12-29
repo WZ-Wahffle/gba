@@ -95,8 +95,17 @@ color_log :: (message: string, data: *void, info: Log_Info) {
         write_string(message, to_standard_error = to_standard_error);
     }
 
-    write_string("\e[0;37m");
-    if to_standard_error then exit(1);
+    if to_standard_error {
+        write_string("Stack Trace:\n");
+        for get_stack_trace_strings() {
+            print("%\n", it);
+        }
+        context.print_style.default_format_int.base = 16;
+        context.print_style.default_format_int.minimum_digits = 8;
+        print("Registers: %\n", cpu.reg);
+        write_string("\e[0;37m");
+        exit(1);
+    }
 }
 
 #load "types.jai";

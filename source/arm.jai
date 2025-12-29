@@ -748,7 +748,8 @@ arm_mcr_mrc :: inline (ins: u32) {
 }
 
 arm_swi :: inline (ins: u32) {
-    assert(false);
+    interrupt(.SVC);
+    cpu.remaining_cycles -= 2;
 }
 
 arm_bkpt :: inline (ins: u32) {

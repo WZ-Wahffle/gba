@@ -1253,9 +1253,9 @@ disasm_window :: () {
     for 0..cast(int)ImGui.GetWindowSize().y {
         addr : u32 = xx ((disasm_scroll_state + xx it) * ifx disasm_mode then 2 else 4);
         to_print := ifx !disasm_mode then
-            disassemble_arm_instruction(read_32(addr, true))
-            else disassemble_thumb_instruction(read_16(addr, true));
-        has_breakpoint := ifx !disasm_mode then ((read_32(addr, true) & 0xfff000f0) == 0xe1200070) else ((read_16(addr, true) & 0xff00) == 0xbe00);
+            disassemble_arm_instruction(read_32(addr, true, true))
+            else disassemble_thumb_instruction(read_16(addr, true, true));
+            has_breakpoint := ifx !disasm_mode then ((read_32(addr, true, true) & 0xfff000f0) == 0xe1200070) else ((read_16(addr, true, true) & 0xff00) == 0xbe00);
         in_history, history_idx := array_find(cpu.pc_history, addr);
         if addr == cpu.reg[15] {
             ImGui.TextColored(.{0, 1, 0, 1}, "%\t%", addr, to_print);
@@ -1270,11 +1270,11 @@ disasm_window :: () {
             ImGui.Text("%\t%", addr, to_print);
         }
         if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("0x%", ifx !disasm_mode then read_32(addr, true) else read_16(addr, true));
+            ImGui.SetTooltip("0x%", ifx !disasm_mode then read_32(addr, true, true) else read_16(addr, true, true));
         }
         if ImGui.IsItemClicked() {
             if !disasm_mode {
-                ins := read_32(addr, true);
+                ins := read_32(addr, true, true);
                 if has_breakpoint {
                     idx := (ins & 0xf) | ((ins >> 8) & 0xfff);
                     write_32(addr, cpu.breakpoints_arm[idx], true);
@@ -1289,7 +1289,7 @@ disasm_window :: () {
                     write_32(addr, 0xe1200070 | (idx & 0xf) | ((idx & 0xfff0) << 4), true);
                 }
             } else {
-                ins := read_16(addr, true);
+                ins := read_16(addr, true, true);
                 if has_breakpoint {
                     idx := ins & 0xff;
                     write_16(addr, cpu.breakpoints_thumb[idx], true);
