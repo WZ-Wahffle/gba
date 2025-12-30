@@ -42,7 +42,22 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
     flags := (ins & 0x100000) != 0;
     if (ins & 0x400000) != 0 {
         // smull, smlal
-        assert(false);
+        rs : s64 = cast,no_check(s32)reg_src(xx (ins >> 8) & 0xf);
+        rm : s64 = cast,no_check(s32)reg_src(xx ins & 0xf);
+        if (ins & 0x200000) != 0 {
+            // smlal
+            cpu.remaining_cycles -= 1;
+            assert(false);
+        } else {
+            // smull
+            result : u64 = cast,no_check(u64, rs * rm);
+            reg_dst(rdlo_idx, xx result & 0xffffffff);
+            reg_dst(rdhi_idx, xx (result >> 32) & 0xffffffff);
+            if flags {
+                set_status_bit(.N, result & 0x8000000000000000 != 0);
+                set_status_bit(.Z, result == 0);
+            }
+        }
     } else {
         // umull, umlal
         rs : u64 = reg_src(xx (ins >> 8) & 0xf);
@@ -50,7 +65,14 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
         if (ins & 0x200000) != 0 {
             // umlal
             cpu.remaining_cycles -= 1;
-            assert(false);
+            rd := cast(u64, reg_src(rdlo_idx)) | (cast(u64, reg_src(rdhi_idx)) << 32);
+            result : u64 = rs * rm + rd;
+            reg_dst(rdlo_idx, xx result & 0xffffffff);
+            reg_dst(rdhi_idx, xx (result >> 32) & 0xffffffff);
+            if flags {
+                set_status_bit(.N, result & 0x8000000000000000 != 0);
+                set_status_bit(.Z, result == 0);
+            }
         } else {
             // umull
             result : u64 = rs * rm;

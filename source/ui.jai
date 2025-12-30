@@ -248,7 +248,7 @@ draw_obj :: (y: u32) {
                         if x < it.bounding_box_min_x || x >= it.bounding_box_max_x || y < it.bounding_box_min_y || y >= it.bounding_box_max_y then continue;
 
                         if it.single_palette {
-                            tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (32 * (w / 8)) else (32 * 32);
+                            tile_line_base := obj_base + ((y_1 - it.min_y) / 8) * ifx packed then (64 * (w / 8)) else (32 * 32);
                             tile_base := tile_line_base + ((x_1 - it.min_x) / 8) * 64;
                             line_base := tile_base + ((y_1 - it.min_y) % 8) * 8;
                             color_idx := ppu.memory.vram._8[line_base + ((x_1 - it.min_x) % 8)];
@@ -366,11 +366,11 @@ draw_obj :: (y: u32) {
 }
 
 merge_and_blend :: () {
-    win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y >= ppu.draw_y;
-    win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y >= ppu.draw_y;
+    win_1_in_y := ppu.win[0].min_y <= ppu.draw_y && ppu.win[0].max_y > ppu.draw_y;
+    win_2_in_y := ppu.win[1].min_y <= ppu.draw_y && ppu.win[1].max_y > ppu.draw_y;
     for x: 0..239 {
-        win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x >= x;
-        win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x >= x;
+        win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x > x;
+        win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x > x;
         win_obj_in := obj_win_buffer[x];
         out_pixels := u16.[BLANK_COLOR, BLANK_COLOR];
         out_pixel_prios := int.[9, 9];
@@ -831,20 +831,26 @@ ui :: () {
                         step_all(4);
                     }
                 }
+                disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+                disasm_mode = get_status_bit(.T);
             case .STOPPED;
                 // this page intentionally left blank
             case .STEPPED;
                 step_all(-cpu.remaining_cycles + 1);
                 cpu.emu_state = .STOPPED;
+                disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+                disasm_mode = get_status_bit(.T);
             case .STEPPED_SCANLINE;
                 step_all(308 * 4);
                 cpu.emu_state = .STOPPED;
+                disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+                disasm_mode = get_status_bit(.T);
             case .STEPPED_FRAME;
                 step_all(308 * 228 * 4);
                 cpu.emu_state = .STOPPED;
+                disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
+                disasm_mode = get_status_bit(.T);
         }
-        disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
-        disasm_mode = get_status_bit(.T);
 
         SDL_RenderClear(renderer);
         surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);

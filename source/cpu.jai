@@ -477,9 +477,6 @@ timer_overflow :: (idx: int) {
 
 transfer :: (idx: int) {
     if cpu.dma[idx].enable {
-        // if idx != 1 && idx != 2 {
-        //     print("% from % to %\n", idx, formatInt(cpu.dma[idx].src_int, 16, 1), formatInt(cpu.dma[idx].dst_int, 16, 1));
-        // }
         if cpu.dma[idx].large_transfer {
             write_32(cpu.dma[idx].dst_int & 0xfffffffc, read_32(cpu.dma[idx].src_int & 0xfffffffc));
             if cpu.dma[idx].src_addr_control == {
@@ -665,9 +662,10 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
             ret : u32 = reg_src(xx (val & 0xf));
             rotate_cnt : u32 = val >> 7;
             if rotate_cnt == 0 {
-                msb := get_status_bit(.C);
+                msb : u32 = xx ifx get_status_bit(.C) then 0x80000000 else 0;
                 carry := (ret & 1) != 0;
                 ret >>= 1;
+                ret |= msb;
                 return ret, true, carry;
             } else {
                 carry := (ret & (1 << (rotate_cnt-1))) != 0;
