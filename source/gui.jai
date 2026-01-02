@@ -257,10 +257,19 @@ apu_window :: () {
         ImGui.Text_CFormat("Sound Length: %d", apu.chan_2.sound_length);
         ImGui.Text_CFormat("Frequency: %d", apu.chan_2.frequency);
         case 5;
+        ImGui.Text("Enable: %%", ifx apu.chan_a.enable_l then "L" else "-", ifx apu.chan_a.enable_r then "R" else "-");
+        ImGui.Text("Volume: %", ifx apu.chan_a.volume then "100%" else "50%");
         ImGui.Text_CFormat("Timer Select: %d", apu.chan_a.timer_select);
         ImGui.Text_CFormat("FIFO R: %d", apu.fifo_a.r);
         ImGui.Text_CFormat("FIFO W: %d", apu.fifo_a.w);
         ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_a.cnt);
+        case 6;
+        ImGui.Text("Enable: %%", ifx apu.chan_b.enable_l then "L" else "-", ifx apu.chan_b.enable_r then "R" else "-");
+        ImGui.Text("Volume: %\%", ifx apu.chan_b.volume then "100%" else "50%");
+        ImGui.Text_CFormat("Timer Select: %d", apu.chan_b.timer_select);
+        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_b.r);
+        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_b.w);
+        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_b.cnt);
     }
     ImGui.End();
 }

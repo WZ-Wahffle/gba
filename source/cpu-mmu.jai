@@ -95,12 +95,20 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x07f;
             return 0;
         case 0x080;
-            return apu.cgb_enable_int;
-        case 0x081;
             return apu.cgb_vol_int;
+        case 0x081;
+            return apu.cgb_enable_int;
         case 0x082;
-            return 0;
+            return apu.soundcnt_h_int[0];
         case 0x083;
+            return apu.soundcnt_h_int[1];
+        case 0x084;
+            return xx ifx apu.master_enable then 0x80 else 0;
+        case 0x085;
+            return 0;
+        case 0x086;
+            return 0;
+        case 0x087;
             return 0;
         case 0x0b8;
             return xx (cpu.dma[0].count_int >> 0) & 0xff;
@@ -673,6 +681,10 @@ mmio_write :: (addr: u32, val: u8) {
             apu.chan_3.use_length = (val >> 6) & 1;
             apu.chan_3.trigger = (val >> 7) & 1;
         case 0x080;
+            apu.cgb_vol_r = val & 0b111;
+            apu.cgb_vol_l = (val >> 4) & 0b111;
+            apu.cgb_vol_int = val;
+        case 0x081;
             apu.cgb_enable_r[0] = (val & 0x1) != 0;
             apu.cgb_enable_r[1] = (val & 0x2) != 0;
             apu.cgb_enable_r[2] = (val & 0x4) != 0;
@@ -682,10 +694,38 @@ mmio_write :: (addr: u32, val: u8) {
             apu.cgb_enable_l[2] = (val & 0x40) != 0;
             apu.cgb_enable_l[3] = (val & 0x80) != 0;
             apu.cgb_enable_int = val;
-        case 0x081;
-            apu.cgb_vol_r = val & 0b111;
-            apu.cgb_vol_l = (val >> 4) & 0b111;
-            apu.cgb_vol_int = val;
+        case 0x082;
+            apu.agb_cgb_volume = val & 0b11;
+            apu.chan_a.volume = val & 0x4 != 0;
+            apu.chan_b.volume = val & 0x8 != 0;
+            apu.soundcnt_h_int[0] = val;
+        case 0x083;
+            apu.chan_a.enable_r = val & 0x1 != 0;
+            apu.chan_a.enable_l = val & 0x2 != 0;
+            apu.chan_a.timer_select = (val & 0x4) >> 2;
+            if val & 0x8 != 0 {
+                apu.fifo_a.r = 0;
+                apu.fifo_a.w = 0;
+                apu.fifo_a.cnt = 0;
+                apu.fifo_a.out = 0;
+                for 0..31 apu.fifo_a.buffer[it] = 0;
+            }
+            apu.chan_b.enable_r = val & 0x10 != 0;
+            apu.chan_b.enable_l = val & 0x20 != 0;
+            apu.chan_b.timer_select = (val & 0x40) >> 2;
+            if val & 0x80 != 0 {
+                apu.fifo_b.r = 0;
+                apu.fifo_b.w = 0;
+                apu.fifo_b.cnt = 0;
+                apu.fifo_b.out = 0;
+                for 0..31 apu.fifo_b.buffer[it] = 0;
+            }
+            apu.soundcnt_h_int[1] = val & 0x77;
+        case 0x084;
+            apu.master_enable = val & 0x80 != 0;
+        case 0x085;
+        case 0x086;
+        case 0x087;
         case 0x088;
             apu.bias &= 0x300;
             apu.bias |= val;

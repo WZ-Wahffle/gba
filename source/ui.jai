@@ -2,9 +2,10 @@ SCREEN_WIDTH :: 240;
 SCREEN_HEIGHT :: 160;
 FONT_SIZE :: 26;
 BLANK_COLOR :: 0x8000;
+PRIO_LOWEST :: 9;
 
 SAMPLE_RATE :: 32768;
-CALLBACK_SIZE :: 512;
+CALLBACK_SIZE :: 1024;
 window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
 framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
@@ -373,7 +374,7 @@ merge_and_blend :: () {
         win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x > x;
         win_obj_in := obj_win_buffer[x];
         out_pixels := u16.[BLANK_COLOR, BLANK_COLOR];
-        out_pixel_prios := int.[9, 9];
+        out_pixel_prios := int.[PRIO_LOWEST, PRIO_LOWEST];
         out_indices := int.[-1, -1];
         out_use_special := bool.[false, false];
         backdrop := ppu.memory.palette_ram._16[0];
@@ -467,6 +468,8 @@ merge_and_blend :: () {
                     out_use_special[out_pixel_idx] = ppu.obj_win.special_effect;
                 } else if ppu.win[0].enable || ppu.win[1].enable || ppu.obj_win.enable {
                     out_use_special[out_pixel_idx] = ppu.outside_win_special_effect;
+                } else {
+                    out_use_special[out_pixel_idx] = ppu.special_effect != 0;
                 }
             }
 
@@ -669,7 +672,7 @@ ui :: () {
     SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
 
     spec: SDL_AudioSpec;
-    spec.channels = 1;
+    spec.channels = 2;
     spec.format = AUDIO_S16;
     spec.freq = SAMPLE_RATE;
     spec.samples = CALLBACK_SIZE;

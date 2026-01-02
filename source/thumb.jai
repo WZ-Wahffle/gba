@@ -643,7 +643,7 @@ thumb_ldmia_stmia :: inline (ins: u16) {
                 pointer += 4;
             }
         }
-        reg_dst(rn_idx, pointer);
+        if (regs & (1 << rn_idx)) == 0 then reg_dst(rn_idx, pointer);
     } else {
         // stm
         for 0..7 {
@@ -653,7 +653,7 @@ thumb_ldmia_stmia :: inline (ins: u16) {
                 pointer += 4;
             }
         }
-        reg_dst(rn_idx, pointer);
+        if (regs & (1 << rn_idx)) == 0 then reg_dst(rn_idx, pointer);
     }
 }
 

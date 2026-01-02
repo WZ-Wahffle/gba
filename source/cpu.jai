@@ -4,7 +4,7 @@
 read_8 :: (addr: u32, bios_bypass := false) -> u8 {
     if addr < 0x4000 {
         if bios_bypass return cpu.memory.bios._8[addr];
-        return 0;
+        return xx (cpu.open_bus_bios_instruction >> ((addr & 0b11) << 3)) & 0xff;
     }
     if addr >= 0x02000000 && addr < 0x02040000 {
         return cpu.memory.ewram._8[addr % 0x40000];
@@ -286,6 +286,7 @@ next_32 :: () -> u32 {
     }
     else if idx < 0x4000 {
         ret = cpu.memory.bios._32[idx >> 2];
+        cpu.open_bus_bios_instruction = cpu.memory.bios._32[(idx >> 2) + 2];
     }
     else if idx >= 0x02000000 && idx < 0x02040000 {
         ret = cpu.memory.ewram._32[(idx >> 2) % 0x10000];
@@ -449,6 +450,7 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
+                apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r];
                 apu.fifo_b.cnt -= 1;
                 if apu.fifo_b.cnt < 16 {
                     transfer(1);
@@ -463,6 +465,7 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
+                apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r];
                 apu.fifo_b.cnt -= 1;
                 if apu.fifo_b.cnt < 16 {
                     transfer(2);
@@ -604,7 +607,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
         case 0b001;
             // register operand + logical shift left reg
             ret := reg_src(xx (val & 0xf));
-            reg_shift := reg_src(xx ((val >> 8) & 0xf));
+            reg_shift := reg_src(xx ((val >> 8) & 0xf)) & 0xff;
             if reg_shift != 0 {
                 carry: bool;
                 if reg_shift > 32 then carry = false;
@@ -622,7 +625,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
         case 0b011;
             // register operand + logical shift right reg
             ret := reg_src(xx (val & 0xf));
-            reg_shift := reg_src(xx ((val >> 8) & 0xf));
+            reg_shift := reg_src(xx ((val >> 8) & 0xf)) & 0xff;
             if reg_shift != 0 {
                 carry: bool;
                 if reg_shift > 32 then carry = false;
@@ -644,7 +647,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
         case 0b101;
             // register operand + arithmetic shift right reg
             ret := reg_src(xx (val & 0xf));
-            reg_shift := reg_src(xx ((val >> 8) & 0xf));
+            reg_shift := reg_src(xx ((val >> 8) & 0xf)) & 0xff;
             carry := false;
             should_carry := false;
             if reg_shift != 0 {
@@ -678,7 +681,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
         case 0b111;
             // register operand + rotate right reg
             ret : u32 = reg_src(xx (val & 0xf));
-            reg_rotate : u32 = reg_src(xx ((val >> 8) & 0xf));
+            reg_rotate : u32 = reg_src(xx ((val >> 8) & 0xf)) & 0xff;
             carry := false;
             should_carry := false;
             if reg_rotate != 0 {

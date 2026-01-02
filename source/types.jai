@@ -111,6 +111,7 @@ Cpu :: struct {
     logging := false;
     schedule_irq := false; // used by parallel irqs
     scheduled_irq : Interrupt_Source = 0;
+    open_bus_bios_instruction : u32 = 0;
 }
 
 Ppu :: struct {
@@ -276,12 +277,15 @@ Apu :: struct {
     fifo_a: Fifo;
     fifo_b: Fifo;
 
+    master_enable := false;
     cgb_enable_l: [4]bool;
     cgb_enable_r: [4]bool;
     cgb_enable_int: u8;
     cgb_vol_l := 0;
     cgb_vol_r := 0;
     cgb_vol_int: u8;
+    agb_cgb_volume := 0;
+    soundcnt_h_int: [2]u8;
     bias := 0x200;
     sampling_frequency := 0;
 
@@ -332,7 +336,9 @@ Apu :: struct {
     }
 
     Direct_Channel :: struct {
-        reset := false;
+        volume := false;
+        enable_l := false;
+        enable_r := false;
         timer_select := 0;
     }
 
