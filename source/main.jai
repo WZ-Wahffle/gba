@@ -41,7 +41,7 @@ main :: () {
     if contains(rom_str, "EEPROM_V") {
         log("Identified EEPROM");
         cpu.backup_type = .EEPROM;
-    } else if contains(rom_str, "SRAM_V") {
+    } else if contains(rom_str, "SRAM_V") || contains(rom_str, "SRAM_F") {
         log("Identified SRAM/FRAM");
         cpu.backup_type = .SRAM;
     } else if contains(rom_str, "FLASH_V") || contains(rom_str, "FLASH512_V") {
@@ -52,6 +52,7 @@ main :: () {
         cpu.backup_type = .FLASH_128K;
     } else {
         log("None identified\n");
+        cpu.backup_type = .NONE;
     }
     bios, success := read_entire_file("in/gba_bios.bin");
     if !success || bios.count != cpu.memory.bios._8.count {

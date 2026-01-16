@@ -6,7 +6,7 @@ read_8 :: (addr: u32, bios_bypass := false) -> u8 {
         if bios_bypass return cpu.memory.bios._8[addr];
         return xx (cpu.open_bus_bios_instruction >> ((addr & 0b11) << 3)) & 0xff;
     }
-    if addr >= 0x02000000 && addr < 0x02040000 {
+    if addr >= 0x02000000 && addr < 0x03000000 {
         return cpu.memory.ewram._8[addr % 0x40000];
     }
     if addr >= 0x03000000 && addr < 0x04000000 {
@@ -39,9 +39,9 @@ read_8 :: (addr: u32, bios_bypass := false) -> u8 {
 read_16 :: (addr: u32, bios_bypass := false, no_check := false) -> u16 {
     if addr < 0x4000 {
         if bios_bypass return cpu.memory.bios._16[addr >> 1];
-        return 0;
+        return xx (cpu.open_bus_bios_instruction >> ((addr & 0b10) << 3)) & 0xffff;
     }
-    if addr >= 0x02000000 && addr < 0x02040000 {
+    if addr >= 0x02000000 && addr < 0x03000000 {
         return cpu.memory.ewram._16[(addr >> 1) % 0x20000];
     }
     if addr >= 0x03000000 && addr < 0x04000000 {
@@ -82,9 +82,9 @@ read_16 :: (addr: u32, bios_bypass := false, no_check := false) -> u16 {
 read_32 :: (addr: u32, bios_bypass := false, no_check := false) -> u32 {
     if addr < 0x4000 {
         if bios_bypass return cpu.memory.bios._32[addr >> 2];
-        return 0;
+        return cpu.open_bus_bios_instruction;
     }
-    if addr >= 0x02000000 && addr < 0x02040000 {
+    if addr >= 0x02000000 && addr < 0x03000000 {
         return cpu.memory.ewram._32[(addr >> 2) % 0x10000];
     }
     if addr >= 0x03000000 && addr < 0x04000000 {
@@ -110,7 +110,7 @@ read_32 :: (addr: u32, bios_bypass := false, no_check := false) -> u32 {
     if addr >= 0x07000000 && addr < 0x08000000 {
         return ppu.memory.oam._32[(addr >> 2) % 0x100];
     }
-    if addr >= 0x08000000 && addr < 0x0e000000 {
+    if addr >= 0x08000000 {
         first : u32 = rom_read((addr & 0xfffffffc));
         second : u32 = rom_read((addr & 0xfffffffc) + 1);
         third : u32 = rom_read((addr & 0xfffffffc) + 2);
@@ -127,7 +127,7 @@ read_32 :: (addr: u32, bios_bypass := false, no_check := false) -> u32 {
 }
 
 write_8 :: (addr: u32, val: u8) {
-    if addr >= 0x02000000 && addr < 0x02040000 {
+    if addr >= 0x02000000 && addr < 0x03000000 {
         cpu.memory.ewram._8[addr % 0x40000] = val;
     }
     else if addr >= 0x03000000 && addr < 0x04000000 {
@@ -155,7 +155,7 @@ write_8 :: (addr: u32, val: u8) {
 }
 
 write_16 :: (addr: u32, val: u16, write_override := false) {
-    if addr >= 0x02000000 && addr < 0x02040000 {
+    if addr >= 0x02000000 && addr < 0x03000000 {
         cpu.memory.ewram._16[(addr >> 1) % 0x20000] = val;
     }
     else if addr >= 0x03000000 && addr < 0x04000000 {
@@ -182,8 +182,8 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._16[addr >> 1] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
-        cpu.memory.rom[(addr & 0xfffffffe) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
-        cpu.memory.rom[((addr & 0xfffffffe) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[(addr & 0x1fffffe) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[((addr & 0x1fffffe) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
     } else if addr >= 0x08000000 {
         rom_write((addr & 0xfffffffe), xx val & 0xff);
         rom_write((addr & 0xfffffffe) + 1, xx val >> 8);
@@ -191,7 +191,7 @@ write_16 :: (addr: u32, val: u16, write_override := false) {
 }
 
 write_32 :: (addr: u32, val: u32, write_override := false) {
-    if addr >= 0x02000000 && addr < 0x02040000 {
+    if addr >= 0x02000000 && addr < 0x03000000 {
         cpu.memory.ewram._32[(addr >> 2) % 0x10000] = val;
     }
     else if addr >= 0x03000000 && addr < 0x04000000 {
@@ -222,15 +222,15 @@ write_32 :: (addr: u32, val: u32, write_override := false) {
     } else if write_override && addr < 0x4000 {
         cpu.memory.bios._32[addr >> 2] = val;
     } else if write_override && addr >= 0x08000000 && addr < 0x0e000000 {
-        cpu.memory.rom[(addr & 0xfffffffc) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
-        cpu.memory.rom[((addr & 0xfffffffc) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
-        cpu.memory.rom[((addr & 0xfffffffc) + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
-        cpu.memory.rom[((addr & 0xfffffffc) + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
+        cpu.memory.rom[(addr & 0x1fffffc) % cpu.memory.rom.count] = xx (val >> 0) & 0xff;
+        cpu.memory.rom[((addr & 0x1fffffc) + 1) % cpu.memory.rom.count] = xx (val >> 8) & 0xff;
+        cpu.memory.rom[((addr & 0x1fffffc) + 2) % cpu.memory.rom.count] = xx (val >> 16) & 0xff;
+        cpu.memory.rom[((addr & 0x1fffffc) + 3) % cpu.memory.rom.count] = xx (val >> 24) & 0xff;
     } else if addr >= 0x08000000 {
-        rom_write((addr & 0xfffffffc), xx (val >> 0) & 0xff);
-        rom_write((addr & 0xfffffffc) + 1, xx (val >> 8) & 0xff);
-        rom_write((addr & 0xfffffffc) + 2, xx (val >> 16) & 0xff);
-        rom_write((addr & 0xfffffffc) + 3, xx (val >> 24) & 0xff);
+        rom_write((addr & 0x1fffffc), xx (val >> 0) & 0xff);
+        rom_write((addr & 0x1fffffc) + 1, xx (val >> 8) & 0xff);
+        rom_write((addr & 0x1fffffc) + 2, xx (val >> 16) & 0xff);
+        rom_write((addr & 0x1fffffc) + 3, xx (val >> 24) & 0xff);
     }
 }
 
@@ -241,8 +241,8 @@ next_16 :: () -> u16 {
     ret: u16;
     idx := cpu.reg[15] & 0xfffffffe;
     if idx >= 0x08000000 && idx < 0x0e000000 {
-        first : u16 = cpu.memory.rom[idx % cpu.memory.rom.count];
-        second : u16 = cpu.memory.rom[(idx + 1) % cpu.memory.rom.count];
+        first : u16 = cpu.memory.rom[(idx & 0x1ffffff) % cpu.memory.rom.count];
+        second : u16 = cpu.memory.rom[((idx & 0x1ffffff) + 1) % cpu.memory.rom.count];
         ret = first | (second << 8);
         if idx < 0xa000000 {
             cpu.remaining_cycles -= cpu.waitcnt_0;
@@ -255,7 +255,7 @@ next_16 :: () -> u16 {
     else if idx < 0x4000 {
         ret = cpu.memory.bios._16[idx >> 1];
     }
-    else if idx >= 0x02000000 && idx < 0x02040000 {
+    else if idx >= 0x02000000 && idx < 0x03000000 {
         ret = cpu.memory.ewram._16[(idx >> 1) % 0x20000];
     }
     else if idx >= 0x03000000 && idx < 0x04000000 {
@@ -271,10 +271,10 @@ next_32 :: () -> u32 {
     ret: u32;
     idx := cpu.reg[15] & 0xfffffffc;
     if idx >= 0x08000000 && idx < 0x0e000000 {
-        first : u32 = cpu.memory.rom[idx % cpu.memory.rom.count];
-        second : u32 = cpu.memory.rom[(idx + 1) % cpu.memory.rom.count];
-        third : u32 = cpu.memory.rom[(idx + 2) % cpu.memory.rom.count];
-        fourth : u32 = cpu.memory.rom[(idx + 3) % cpu.memory.rom.count];
+        first : u32 = cpu.memory.rom[(idx & 0x1ffffff) % cpu.memory.rom.count];
+        second : u32 = cpu.memory.rom[((idx & 0x1ffffff) + 1) % cpu.memory.rom.count];
+        third : u32 = cpu.memory.rom[((idx & 0x1ffffff) + 2) % cpu.memory.rom.count];
+        fourth : u32 = cpu.memory.rom[((idx & 0x1ffffff) + 3) % cpu.memory.rom.count];
         ret = first | (second << 8) | (third << 16) | (fourth << 24);
         if idx < 0xa000000 {
             cpu.remaining_cycles -= cpu.waitcnt_0;
@@ -288,7 +288,7 @@ next_32 :: () -> u32 {
         ret = cpu.memory.bios._32[idx >> 2];
         cpu.open_bus_bios_instruction = cpu.memory.bios._32[(idx >> 2) + 2];
     }
-    else if idx >= 0x02000000 && idx < 0x02040000 {
+    else if idx >= 0x02000000 && idx < 0x03000000 {
         ret = cpu.memory.ewram._32[(idx >> 2) % 0x10000];
     }
     else if idx >= 0x03000000 && idx < 0x04000000 {
@@ -656,7 +656,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
                 else carry = (ret & (1 << (reg_shift-1))) != 0;
             }
             if ret & 0x80000000 {
-                sign_bit_fill := cast(u32)0xffffffff << (32 - min(32, reg_shift));
+                sign_bit_fill := cast,no_check(u32)0xffffffff << (32 - min(32, reg_shift));
                 return (ret >> reg_shift) | sign_bit_fill, should_carry, carry;
             }
             return ret >> reg_shift, should_carry, carry;
@@ -737,7 +737,7 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xdf0f000, 0x1500000, arm_cmp},
     .{0xdf0f000, 0x1700000, arm_cmn},
 
-    .{0xdb000f0, 0x1200000, arm_msr},
+    .{0xdb00000, 0x1200000, arm_msr_bkpt},
     .{0xfb00000, 0x1000000, arm_mrs},
     .{0xfb00ff0, 0x1000090, arm_swp_swpb},
     .{0xffffff0, 0x12fff10, arm_bx},
@@ -746,7 +746,6 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xf000010, 0xe000000, arm_cdp},
     .{0xf000010, 0xe000010, arm_mcr_mrc},
     .{0xf000000, 0xf000000, arm_swi},
-    .{0xff000f0, 0x1200070, arm_bkpt},
     .{0x0000000, 0x0000000, null}
 ];
 

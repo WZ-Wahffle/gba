@@ -15,6 +15,10 @@ mmio_read :: (addr: u32) -> u8 {
             (ifx ppu.win[0].enable then 32 else 0) |
             (ifx ppu.win[1].enable then 64 else 0) |
             (ifx ppu.obj_win.enable then 128 else 0);
+        case 0x002;
+            return 0;
+        case 0x003;
+            return 0;
         case 0x004;
             return xx (ifx ppu.draw_y >= 160 && ppu.draw_y <= 226 then 1 else 0) |
             (ifx ppu.draw_x < 228 then 2 else 0) |
@@ -44,10 +48,65 @@ mmio_read :: (addr: u32) -> u8 {
             return ppu.bg[3].config_int[0];
         case 0x00f;
             return ppu.bg[3].config_int[1];
+        case 0x048;
+            return xx (
+                (ifx ppu.win[0].bg_enable[0] then 0x1 else 0) |
+                (ifx ppu.win[0].bg_enable[1] then 0x2 else 0) |
+                (ifx ppu.win[0].bg_enable[2] then 0x4 else 0) |
+                (ifx ppu.win[0].bg_enable[3] then 0x8 else 0) |
+                (ifx ppu.win[0].obj_enable then 0x10 else 0) |
+                (ifx ppu.win[0].special_effect then 0x20 else 0)
+            );
+        case 0x049;
+            return xx (
+                (ifx ppu.win[1].bg_enable[0] then 0x1 else 0) |
+                (ifx ppu.win[1].bg_enable[1] then 0x2 else 0) |
+                (ifx ppu.win[1].bg_enable[2] then 0x4 else 0) |
+                (ifx ppu.win[1].bg_enable[3] then 0x8 else 0) |
+                (ifx ppu.win[1].obj_enable then 0x10 else 0) |
+                (ifx ppu.win[1].special_effect then 0x20 else 0)
+            );
+        case 0x04a;
+            return xx (
+                (ifx ppu.outside_win_bg_enable[0] then 0x1 else 0) |
+                (ifx ppu.outside_win_bg_enable[1] then 0x2 else 0) |
+                (ifx ppu.outside_win_bg_enable[2] then 0x4 else 0) |
+                (ifx ppu.outside_win_bg_enable[3] then 0x8 else 0) |
+                (ifx ppu.outside_win_obj_enable then 0x10 else 0) |
+                (ifx ppu.outside_win_special_effect then 0x20 else 0)
+            );
+        case 0x04b;
+            return xx (
+                (ifx ppu.obj_win.bg_enable[0] then 0x1 else 0) |
+                (ifx ppu.obj_win.bg_enable[1] then 0x2 else 0) |
+                (ifx ppu.obj_win.bg_enable[2] then 0x4 else 0) |
+                (ifx ppu.obj_win.bg_enable[3] then 0x8 else 0) |
+                (ifx ppu.obj_win.obj_enable then 0x10 else 0) |
+                (ifx ppu.obj_win.special_effect then 0x20 else 0)
+            );
         case 0x04c;
             return xx ppu.bg_mosaic_h | (ppu.bg_mosaic_v << 4);
         case 0x04d;
             return xx ppu.obj_mosaic_h | (ppu.obj_mosaic_v << 4);
+        case 0x050;
+            return xx (
+                (ifx ppu.bg_first_target_pixel[0] then 1 else 0) |
+                (ifx ppu.bg_first_target_pixel[1] then 2 else 0) |
+                (ifx ppu.bg_first_target_pixel[2] then 4 else 0) |
+                (ifx ppu.bg_first_target_pixel[3] then 8 else 0) |
+                (ifx ppu.obj_first_target_pixel then 16 else 0) |
+                (ifx ppu.bd_first_target_pixel then 32 else 0) |
+                (ppu.special_effect << 6)
+                );
+        case 0x051;
+            return xx (
+                (ifx ppu.bg_second_target_pixel[0] then 1 else 0) |
+                (ifx ppu.bg_second_target_pixel[1] then 2 else 0) |
+                (ifx ppu.bg_second_target_pixel[2] then 4 else 0) |
+                (ifx ppu.bg_second_target_pixel[3] then 8 else 0) |
+                (ifx ppu.obj_second_target_pixel then 16 else 0) |
+                (ifx ppu.bd_second_target_pixel then 32 else 0)
+            );
         case 0x060;
             return xx apu.chan_1.sweep_shift_cnt |
             (ifx apu.chan_1.sweep_freq_decrease then 0x8 else 0) |
@@ -764,7 +823,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[0].src |= (cast(u32)val) << 16;
         case 0x0b3;
             cpu.dma[0].src &= 0x00ffffff;
-            cpu.dma[0].src |= (cast(u32)val) << 24;
+            cpu.dma[0].src |= (cast(u32)val & 0xf) << 24;
         case 0x0b4;
             cpu.dma[0].dst &= 0x0fffff00;
             cpu.dma[0].dst |= val;
@@ -776,7 +835,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[0].dst |= (cast(u32)val) << 16;
         case 0x0b7;
             cpu.dma[0].dst &= 0x00ffffff;
-            cpu.dma[0].dst |= (cast(u32)val) << 24;
+            cpu.dma[0].dst |= (cast(u32)val & 0xf) << 24;
         case 0x0b8;
             cpu.dma[0].count &= 0xff00;
             cpu.dma[0].count |= val;
@@ -825,7 +884,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[1].src_int = cpu.dma[1].src;
         case 0x0bf;
             cpu.dma[1].src &= 0x00ffffff;
-            cpu.dma[1].src |= (cast(u32)val) << 24;
+            cpu.dma[1].src |= (cast(u32)val & 0xf) << 24;
             cpu.dma[1].src_int = cpu.dma[1].src;
         case 0x0c0;
             cpu.dma[1].dst &= 0x0fffff00;
@@ -841,7 +900,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[1].dst_int = cpu.dma[1].dst;
         case 0x0c3;
             cpu.dma[1].dst &= 0x00ffffff;
-            cpu.dma[1].dst |= (cast(u32)val) << 24;
+            cpu.dma[1].dst |= (cast(u32)val & 0xf) << 24;
             cpu.dma[1].dst_int = cpu.dma[1].dst;
         case 0x0c4;
             cpu.dma[1].count &= 0xff00;
@@ -893,7 +952,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[2].src_int = cpu.dma[2].src;
         case 0x0cb;
             cpu.dma[2].src &= 0x00ffffff;
-            cpu.dma[2].src |= (cast(u32)val) << 24;
+            cpu.dma[2].src |= (cast(u32)val & 0xf) << 24;
             cpu.dma[2].src_int = cpu.dma[2].src;
         case 0x0cc;
             cpu.dma[2].dst &= 0x0fffff00;
@@ -909,7 +968,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[2].dst_int = cpu.dma[2].dst;
         case 0x0cf;
             cpu.dma[2].dst &= 0x00ffffff;
-            cpu.dma[2].dst |= (cast(u32)val) << 24;
+            cpu.dma[2].dst |= (cast(u32)val & 0xf) << 24;
             cpu.dma[2].dst_int = cpu.dma[2].dst;
         case 0x0d0;
             cpu.dma[2].count &= 0xff00;
@@ -961,7 +1020,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[3].src_int = cpu.dma[3].src;
         case 0x0d7;
             cpu.dma[3].src &= 0x00ffffff;
-            cpu.dma[3].src |= (cast(u32)val) << 24;
+            cpu.dma[3].src |= (cast(u32)val & 0xf) << 24;
             cpu.dma[3].src_int = cpu.dma[3].src;
         case 0x0d8;
             cpu.dma[3].dst &= 0x0fffff00;
@@ -977,7 +1036,7 @@ mmio_write :: (addr: u32, val: u8) {
             cpu.dma[3].dst_int = cpu.dma[3].dst;
         case 0x0db;
             cpu.dma[3].dst &= 0x00ffffff;
-            cpu.dma[3].dst |= (cast(u32)val) << 24;
+            cpu.dma[3].dst |= (cast(u32)val & 0xf) << 24;
             cpu.dma[3].dst_int = cpu.dma[3].dst;
         case 0x0dc;
             cpu.dma[3].count &= 0xff00;
@@ -1211,11 +1270,11 @@ oam_update_bounding_box :: (idx: u32) {
     ppu.oam[idx].max_x = ppu.oam[idx].x + ppu.oam[idx].width;
     ppu.oam[idx].min_y = ppu.oam[idx].y;
     ppu.oam[idx].max_y = ppu.oam[idx].y + ppu.oam[idx].height;
-    while ppu.oam[idx].max_y >= 256 {
+    while ppu.oam[idx].max_y >= 160 {
         ppu.oam[idx].min_y -= 256;
         ppu.oam[idx].max_y -= 256;
     }
-    while ppu.oam[idx].max_x >= 512 {
+    while ppu.oam[idx].max_x >= 240 {
         ppu.oam[idx].min_x -= 512;
         ppu.oam[idx].max_x -= 512;
     }

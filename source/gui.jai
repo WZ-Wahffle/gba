@@ -493,7 +493,14 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     append(*suffix, ifx (inst & 0x400000) != 0 then "SPSR" else "CPSR");
                 } else if (inst & 0xfb00000) == 0x3200000 {
                     // msr immediate
-                    // assert(false);
+                    opcode = "MSR";
+                    c := (inst & 0x10000) != 0;
+                    f := (inst & 0x80000) != 0;
+                    append(*suffix, ifx (inst & 0x400000) != 0 then "SPSR_" else "CPSR_");
+                    if f append(*suffix, #char "f");
+                    if c append(*suffix, #char "c");
+                    append(*suffix, ", ");
+                    append(*suffix, tprint("#0x%", formatInt(inst & 0xfff, 16)));
                 } else if (inst & 0xfb000f0) == 0x1200000 {
                     // msr reg
                     opcode = "MSR";

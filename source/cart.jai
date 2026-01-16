@@ -2,14 +2,14 @@ rom_read :: (addr: u32) -> u8 {
     if cpu.backup_type == {
         case .SRAM;
             if addr < 0x0e000000 {
-                return cpu.memory.rom[addr % cpu.memory.rom.count];
+                return cpu.memory.rom[addr & 0x1ffffff];
             } else if addr < 0x0e008000 {
                 return cpu.sram[addr % cpu.sram.count];
             }
         case .FLASH_64K; #through;
         case .FLASH_128K;
             if addr < 0x0e000000 {
-                return cpu.memory.rom[addr % cpu.memory.rom.count];
+                return cpu.memory.rom[addr & 0x1ffffff];
             } else {
                 if cpu.flash_op_mode == .ID {
                     if addr == 0x0e000000 return 0x62;
@@ -19,7 +19,7 @@ rom_read :: (addr: u32) -> u8 {
             }
         case .NONE;
             if addr < 0x0e000000 {
-                return cpu.memory.rom[addr % cpu.memory.rom.count];
+                return cpu.memory.rom[addr & 0x1ffffff];
             }
         case .EEPROM;
             if addr >= 0x0d000000 && addr < 0x0e000000 {
@@ -33,12 +33,16 @@ rom_read :: (addr: u32) -> u8 {
                     return 1;
                 }
             } else if addr < 0x0e000000 {
-                return cpu.memory.rom[addr % cpu.memory.rom.count];
+                return cpu.memory.rom[addr & 0x1ffffff];
             }
     }
 
-    log_warn("Unmapped ROM read: 0x%", formatInt(addr, 16));
-    return 0;
+    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
+    if get_status_bit(.T) {
+        return xx (read_16(cpu.reg[15] + 2) >> ((addr & 0b1) * 8)) & 0xff;
+    } else {
+        return xx (read_32(cpu.reg[15] + 4) >> ((addr & 0b11) * 8)) & 0xff;
+    }
 }
 
 rom_write :: (addr: u32, val: u8) {

@@ -17,11 +17,6 @@ obj_prio_buffer: [SCREEN_WIDTH]u8;
 obj_win_buffer: [SCREEN_WIDTH]bool;
 obj_use_alpha_buffer: [SCREEN_WIDTH]bool;
 
-// priorities: (the lower, the higher)
-// backdrop: 8
-// OBJ: priority * 2
-// BG: priority * 2 + 1
-
 draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
     if !ppu.bg[bg].enable then return;
     if rotation_mode {
@@ -221,6 +216,8 @@ draw_obj :: (y: u32) {
                     h := it.max_y - it.min_y;
                     x_0 := (it.min_x + it.max_x) / 2;
                     y_0 := (it.min_y + it.max_y) / 2;
+                    if x_0 > 240 then x_0 -= 512;
+                    if y_0 > 160 then y_0 -= 256;
                     sprite_x : float = xx x_0;
                     sprite_y : float = xx y_0;
                     sprite_x -= x_0 * a;
@@ -372,10 +369,19 @@ merge_and_blend :: () {
     for x: 0..239 {
         win_1_in := win_1_in_y && ppu.win[0].min_x <= x && ppu.win[0].max_x > x;
         win_2_in := win_2_in_y && ppu.win[1].min_x <= x && ppu.win[1].max_x > x;
+        // whether a potential object pixel is part of the object window
         win_obj_in := obj_win_buffer[x];
+        // color outputs from the two uppermost sources
         out_pixels := u16.[BLANK_COLOR, BLANK_COLOR];
+        // priorities from the two uppermost sources
+        // priorities: (the lower, the higher)
+        // backdrop: 8
+        // OBJ: priority * 2
+        // BG: priority * 2 + 1
         out_pixel_prios := int.[PRIO_LOWEST, PRIO_LOWEST];
+        // "indices" of the two uppermost sources, bg0-3 = 0-3, obj = 4, backdrop = 5
         out_indices := int.[-1, -1];
+        // whether the two uppermost sources use color special effects
         out_use_special := bool.[false, false];
         backdrop := ppu.memory.palette_ram._16[0];
         for out_pixel_idx: 0..1 {
@@ -455,7 +461,7 @@ merge_and_blend :: () {
                 }
             }
 
-            if out_pixel_prios[out_pixel_idx] > 8 {
+            if out_pixel_prios[out_pixel_idx] == PRIO_LOWEST {
                 out_pixels[out_pixel_idx] = backdrop;
                 out_pixel_prios[out_pixel_idx] = 8;
                 out_indices[out_pixel_idx] = 5;

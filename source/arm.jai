@@ -215,11 +215,26 @@ arm_mrs :: inline (ins: u32) {
     }
 }
 
-arm_msr :: inline (ins: u32) {
+arm_msr_bkpt :: inline (ins: u32) {
     to_write : u32;
     if (ins & 0x2000000) != 0 {
         to_write = immediate_operand(xx ins & 0xfff);
     } else {
+        if (ins & 0xf0) == 0x70 {
+            // bkpt
+            if cpu.emu_state != .RUNNING {
+                idx := (ins & 0xf) | ((ins >> 4) & 0xfff0);
+                cpu.reg[15] -= 4;
+                addr := cpu.reg[15];
+                write_32(addr, cpu.breakpoints_arm[idx], true);
+                execute_next();
+                write_32(addr, ins, true);
+            } else {
+                cpu.emu_state = .STOPPED;
+                cpu.reg[15] -= 4;
+            }
+            return;
+        }
         if (ins & 0xff00) != 0xf000 assert(false);
         to_write = reg_src(xx (ins & 0xf));
     }
@@ -409,11 +424,57 @@ arm_adc :: inline (ins: u32) {
 }
 
 arm_sbc :: inline (ins: u32) {
-    assert(false);
+    operand: u32;
+    if (ins & 0x2000000) {
+        operand = immediate_operand(xx ins & 0xfff);
+    } else {
+        operand = shifter_operand(xx ins & 0xfff);
+        cpu.remaining_cycles -= 1;
+    }
+    rn := reg_src(xx (ins >> 16) & 0xf);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    flags := (ins & 0x100000) != 0;
+    operand += xx ifx !get_status_bit(.C) then 1 else 0;
+    result := rn - operand;
+    if flags {
+        if rd_idx == 15 {
+            cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
+        } else {
+            set_status_bit(.N, (result & 0x80000000) != 0);
+            set_status_bit(.Z, result == 0);
+            set_status_bit(.C, rn >= operand);
+            set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+        }
+    }
+    reg_dst(rd_idx, result);
 }
 
 arm_rsc :: inline (ins: u32) {
-    assert(false);
+    operand: u32;
+    if (ins & 0x2000000) {
+        operand = immediate_operand(xx ins & 0xfff);
+    } else {
+        operand = shifter_operand(xx ins & 0xfff);
+        cpu.remaining_cycles -= 1;
+    }
+    rn := reg_src(xx (ins >> 16) & 0xf);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    flags := (ins & 0x100000) != 0;
+    rn += xx ifx !get_status_bit(.C) then 1 else 0;
+    result := operand - rn;
+    if flags {
+        if rd_idx == 15 {
+            cpu.psr = cpu.spsr[cpu.mode];
+            set_mode(cpu.psr);
+        } else {
+            set_status_bit(.N, (result & 0x80000000) != 0);
+            set_status_bit(.Z, result == 0);
+            set_status_bit(.C, operand >= rn);
+            set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+        }
+    }
+    reg_dst(rd_idx, result);
 }
 
 arm_tst :: inline (ins: u32) {
@@ -772,18 +833,4 @@ arm_mcr_mrc :: inline (ins: u32) {
 arm_swi :: inline (ins: u32) {
     interrupt(.SVC);
     cpu.remaining_cycles -= 2;
-}
-
-arm_bkpt :: inline (ins: u32) {
-    if cpu.emu_state != .RUNNING {
-        idx := (ins & 0xf) | ((ins >> 4) & 0xfff0);
-        cpu.reg[15] -= 4;
-        addr := cpu.reg[15];
-        write_32(addr, cpu.breakpoints_arm[idx], true);
-        execute_next();
-        write_32(addr, ins, true);
-    } else {
-        cpu.emu_state = .STOPPED;
-        cpu.reg[15] -= 4;
-    }
 }

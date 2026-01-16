@@ -408,8 +408,7 @@ thumb_neg :: inline (ins: u16) {
     reg_dst(rd_idx, result);
     set_status_bit(.N, (result & 0x80000000) != 0);
     set_status_bit(.Z, result == 0);
-    // technically would be set if 0 were greater, but... yeah
-    set_status_bit(.C, false);
+    set_status_bit(.C, result == 0);
     // I suspect this can only happen if result == 0x80000000?
     set_status_bit(.V, (rm & 0x80000000) != 0 && (result & 0x80000000) != 0);
 }
