@@ -28,8 +28,11 @@ main :: () {
     context.logger = color_log;
     context.assertion_failed = dump_processor_state;
     rom := read_entire_file(args[1]);
-    array_resize(*cpu.memory.rom, rom.count);
-    memcpy(cpu.memory.rom.data, rom.data, cpu.memory.rom.count);
+    assert(rom.count <= cpu.memory.rom.count);
+    for 0..(cpu.memory.rom.count)/2-1 {
+        cast,force([]u16, cpu.memory.rom)[it] = xx it & 0xffff;
+    }
+    memcpy(cpu.memory.rom.data, rom.data, rom.count);
     game_title := string.{12, cpu.memory.rom.data + 0xa0};
     game_code := string.{4, cpu.memory.rom.data + 0xac};
     maker_code := string.{2, cpu.memory.rom.data + 0xb0};

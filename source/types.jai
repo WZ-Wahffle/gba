@@ -70,7 +70,7 @@ Cpu :: struct {
             _32: [0x2000]u32;
         }
         iwram: Iwram_Union;
-        rom: [..]u8;
+        rom: [0x2000000]u8;
     }
 
     Dma :: struct {

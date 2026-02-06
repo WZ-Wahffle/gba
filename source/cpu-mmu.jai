@@ -1270,11 +1270,11 @@ oam_update_bounding_box :: (idx: u32) {
     ppu.oam[idx].max_x = ppu.oam[idx].x + ppu.oam[idx].width;
     ppu.oam[idx].min_y = ppu.oam[idx].y;
     ppu.oam[idx].max_y = ppu.oam[idx].y + ppu.oam[idx].height;
-    while ppu.oam[idx].max_y >= 160 {
+    while ppu.oam[idx].min_y >= 160 {
         ppu.oam[idx].min_y -= 256;
         ppu.oam[idx].max_y -= 256;
     }
-    while ppu.oam[idx].max_x >= 240 {
+    while ppu.oam[idx].min_x >= 240 {
         ppu.oam[idx].min_x -= 512;
         ppu.oam[idx].max_x -= 512;
     }
