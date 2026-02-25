@@ -5,7 +5,7 @@ BLANK_COLOR :: 0x8000;
 PRIO_LOWEST :: 9;
 
 SAMPLE_RATE :: 32768;
-CALLBACK_SIZE :: 1024;
+CALLBACK_SIZE :: 128;
 window_width : s32 = SCREEN_WIDTH * 6;
 window_height : s32 = SCREEN_HEIGHT * 6;
 framebuffer: [SCREEN_WIDTH * SCREEN_HEIGHT]u16;
@@ -818,6 +818,7 @@ ui :: () {
             cpu.remaining_cycles += cycle_count;
             ppu.remaining_cycles += cycle_count;
             apu.remaining_cycles += cycle_count;
+            apu.total_cycles += cycle_count;
             while cpu.emu_state != .STOPPED &&
             (cpu.remaining_cycles > 0 || ppu.remaining_cycles > 0 || apu.remaining_cycles > 0.0) {
                 step_cpu();

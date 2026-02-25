@@ -767,6 +767,9 @@ mmio_write :: (addr: u32, val: u8) {
                 apu.fifo_a.w = 0;
                 apu.fifo_a.cnt = 0;
                 apu.fifo_a.out = 0;
+                apu.fifo_a.time_out = 0;
+                apu.fifo_a.prev_out = 0;
+                apu.fifo_a.time_prev_out = 0;
                 for 0..31 apu.fifo_a.buffer[it] = 0;
             }
             apu.chan_b.enable_r = val & 0x10 != 0;
@@ -777,6 +780,9 @@ mmio_write :: (addr: u32, val: u8) {
                 apu.fifo_b.w = 0;
                 apu.fifo_b.cnt = 0;
                 apu.fifo_b.out = 0;
+                apu.fifo_b.time_out = 0;
+                apu.fifo_b.prev_out = 0;
+                apu.fifo_b.time_prev_out = 0;
                 for 0..31 apu.fifo_b.buffer[it] = 0;
             }
             apu.soundcnt_h_int[1] = val & 0x77;

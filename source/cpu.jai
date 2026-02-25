@@ -416,9 +416,12 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].dst_addr_control = .FIXED;
                 cpu.dma[1].control_int &= 0xffc0;
                 cpu.dma[1].control_int |= 0x40;
+                apu.fifo_a.prev_out = apu.fifo_a.out;
+                apu.fifo_a.time_prev_out = apu.fifo_a.time_out;
+                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
+                apu.fifo_a.time_out = apu.total_cycles - xx apu.remaining_cycles;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
                 apu.fifo_a.cnt -= 1;
                 if apu.fifo_a.cnt < 16 {
                     transfer(1);
@@ -431,9 +434,12 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].dst_addr_control = .FIXED;
                 cpu.dma[2].control_int &= 0xffc0;
                 cpu.dma[2].control_int |= 0x40;
+                apu.fifo_a.prev_out = apu.fifo_a.out;
+                apu.fifo_a.time_prev_out = apu.fifo_a.time_out;
+                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
+                apu.fifo_a.time_out = apu.total_cycles - xx apu.remaining_cycles;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
                 apu.fifo_a.cnt -= 1;
                 if apu.fifo_a.cnt < 16 {
                     transfer(2);
@@ -450,7 +456,10 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
+                apu.fifo_b.prev_out = apu.fifo_b.out;
+                apu.fifo_b.time_prev_out = apu.fifo_b.time_out;
                 apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r];
+                apu.fifo_b.time_out = apu.total_cycles - xx apu.remaining_cycles;
                 apu.fifo_b.cnt -= 1;
                 if apu.fifo_b.cnt < 16 {
                     transfer(1);
@@ -465,7 +474,10 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
+                apu.fifo_b.prev_out = apu.fifo_b.out;
+                apu.fifo_b.time_prev_out = apu.fifo_b.time_out;
                 apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r];
+                apu.fifo_b.time_out = apu.total_cycles - xx apu.remaining_cycles;
                 apu.fifo_b.cnt -= 1;
                 if apu.fifo_b.cnt < 16 {
                     transfer(2);

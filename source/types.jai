@@ -348,13 +348,14 @@ Apu :: struct {
         w : u8 = 0;
         cnt := 0;
         out : s8 = 0;
+        time_out := 0;
+        prev_out : s8 = 0;
+        time_prev_out := 0;
     }
 
     remaining_cycles := 0.0;
+    total_cycles := 0;
     played_samples := 0;
-    prev : s16 = 0;
-    prev_2 : s16 = 0;
-    prev_3 : s16 = 0;
 }
 
 Backup_Type :: enum {
