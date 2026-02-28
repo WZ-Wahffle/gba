@@ -346,9 +346,7 @@ Apu :: struct {
         buffer: [32]u8;
         r : u8 = 0;
         w : u8 = 0;
-        cnt := 0;
-        out: [4]s8;
-        time_out: [4]int;
+        out: s8;
     }
 
     remaining_cycles := 0.0;

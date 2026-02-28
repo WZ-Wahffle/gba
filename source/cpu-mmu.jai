@@ -765,7 +765,6 @@ mmio_write :: (addr: u32, val: u8) {
             if val & 0x8 != 0 {
                 apu.fifo_a.r = 0;
                 apu.fifo_a.w = 0;
-                apu.fifo_a.cnt = 0;
                 for 0..31 apu.fifo_a.buffer[it] = 0;
             }
             apu.chan_b.enable_r = val & 0x10 != 0;
@@ -774,7 +773,6 @@ mmio_write :: (addr: u32, val: u8) {
             if val & 0x80 != 0 {
                 apu.fifo_b.r = 0;
                 apu.fifo_b.w = 0;
-                apu.fifo_b.cnt = 0;
                 for 0..31 apu.fifo_b.buffer[it] = 0;
             }
             apu.soundcnt_h_int[1] = val & 0x77;
@@ -796,20 +794,12 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x0a3;
             apu.fifo_a.buffer[apu.fifo_a.w & 0x1f] = val;
             apu.fifo_a.w += 1;
-            apu.fifo_a.w %= 32;
-            if apu.fifo_a.cnt < 32 {
-                apu.fifo_a.cnt += 1;
-            }
         case 0x0a4; #through;
         case 0x0a5; #through;
         case 0x0a6; #through;
         case 0x0a7;
             apu.fifo_b.buffer[apu.fifo_b.w & 0x1f] = val;
             apu.fifo_b.w += 1;
-            apu.fifo_b.w %= 32;
-            if apu.fifo_b.cnt < 32 {
-                apu.fifo_b.cnt += 1;
-            }
         case 0x0b0;
             cpu.dma[0].src &= 0x0fffff00;
             cpu.dma[0].src |= val;

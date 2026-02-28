@@ -679,7 +679,7 @@ ui :: () {
 
     spec: SDL_AudioSpec;
     spec.channels = 2;
-    spec.format = AUDIO_S16;
+    spec.format = AUDIO_F32;
     spec.freq = SAMPLE_RATE;
     spec.samples = CALLBACK_SIZE;
     apu.dev = SDL_OpenAudioDevice(null, 0, *spec, null, 0);
