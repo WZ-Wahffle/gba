@@ -818,7 +818,7 @@ ui :: () {
             cpu.remaining_cycles += cycle_count;
             ppu.remaining_cycles += cycle_count;
             apu.remaining_cycles += cycle_count;
-            apu.total_cycles += cycle_count;
+            advance_timers(cycle_count);
             while cpu.emu_state != .STOPPED &&
             (cpu.remaining_cycles > 0 || ppu.remaining_cycles > 0 || apu.remaining_cycles > 0.0) {
                 step_cpu();

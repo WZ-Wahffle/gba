@@ -233,6 +233,10 @@ apu_window :: () {
     ImGui.Text_CFormat("Bias: %d", apu.bias);
     ImGui.Text_CFormat("Sampling Frequency: %d", apu.sampling_frequency);
     ImGui.Text_CFormat("Played Samples: %d", apu.played_samples);
+    ImGui.Text_CFormat("Samples in SDL: %d", SDL_GetQueuedAudioSize(apu.dev));
+    if ImGui.Button("Dump SDL Samples") {
+        SDL_ClearQueuedAudio(apu.dev);
+    }
     ImGui.InputInt("Channel", *channel_selected, 1, 1, .CharsDecimal);
     if channel_selected < 1 then channel_selected = 1;
     if channel_selected > 6 then channel_selected = 6;
@@ -265,7 +269,7 @@ apu_window :: () {
         ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_a.cnt);
         case 6;
         ImGui.Text("Enable: %%", ifx apu.chan_b.enable_l then "L" else "-", ifx apu.chan_b.enable_r then "R" else "-");
-        ImGui.Text("Volume: %\%", ifx apu.chan_b.volume then "100%" else "50%");
+        ImGui.Text("Volume: %", ifx apu.chan_b.volume then "100%" else "50%");
         ImGui.Text_CFormat("Timer Select: %d", apu.chan_b.timer_select);
         ImGui.Text_CFormat("FIFO R: %d", apu.fifo_b.r);
         ImGui.Text_CFormat("FIFO W: %d", apu.fifo_b.w);
@@ -360,9 +364,17 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                 // multiply long
                 flags := (inst & 0x100000) != 0;
                 if (inst & 0x400000) != 0 {
-                    opcode = ifx flags then "SMULLS" else "SMULL";
+                    if (inst & 0x200000) != 0 {
+                        opcode = ifx flags then "SMLALS" else "SMLAL";
+                    } else {
+                        opcode = ifx flags then "SMULLS" else "SMULL";
+                    }
                 } else {
-                    opcode = ifx flags then "UMULLS" else "UMULL";
+                    if (inst & 0x200000) != 0 {
+                        opcode = ifx flags then "UMLALS" else "UMLAL";
+                    } else {
+                        opcode = ifx flags then "UMULLS" else "UMULL";
+                    }
                 }
                 append(*suffix, disassemble_register((inst >> 12) & 0xf));
                 append(*suffix, ", ");
@@ -583,7 +595,7 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             append(*suffix, disassemble_register((inst >> 16) & 0xf));
                             append(*suffix, ", ");
                         case 0b1100;
-                        // orr
+                            // orr
                             opcode = ifx flags then "ORRS" else "ORR";
                             append(*suffix, disassemble_register((inst >> 12) & 0xf));
                             append(*suffix, ", ");
@@ -600,8 +612,10 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                             append(*suffix, disassemble_register((inst >> 12) & 0xf));
                             append(*suffix, ", ");
                         case 0b1111;
-                        // mvn
-                        // assert(false);
+                            // mvn
+                            opcode = ifx flags then "MVNS" else "MVN";
+                            append(*suffix, disassemble_register((inst >> 12) & 0xf));
+                            append(*suffix, ", ");
                     }
                     if (inst & 0x2000000) {
                         append(*suffix, disassemble_immediate(inst & 0xfff));
@@ -711,6 +725,7 @@ disassemble_arm_instruction :: (inst: u32) -> string {
                     append(*suffix, ifx any then ",pc" else "pc");
                 }
                 append(*suffix, "}");
+                if s append(*suffix, "^");
             } else {
                 // branch
                 if (inst & 0x1000000) == 0 {

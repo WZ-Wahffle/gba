@@ -347,10 +347,8 @@ Apu :: struct {
         r : u8 = 0;
         w : u8 = 0;
         cnt := 0;
-        out : s8 = 0;
-        time_out := 0;
-        prev_out : s8 = 0;
-        time_prev_out := 0;
+        out: [4]s8;
+        time_out: [4]int;
     }
 
     remaining_cycles := 0.0;

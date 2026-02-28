@@ -347,6 +347,13 @@ set_mode :: (mode: u32) {
     cpu.lr[cpu.mode] = cpu.reg[14];
     cpu.reg[13] = cpu.sp[new_mode];
     cpu.reg[14] = cpu.lr[new_mode];
+    if (cpu.mode == .FIQ) ^ (new_mode == .FIQ) {
+        for i: 0..4 {
+            tmp := cpu.reg_hi_fiq[i];
+            cpu.reg_hi_fiq[i] = cpu.reg[8 + i];
+            cpu.reg[8 + i] = tmp;
+        }
+    }
     cpu.mode = new_mode;
     cpu.psr &= ~cast(u32)0x1f;
     cpu.psr |= mode & 0x1f;
@@ -385,18 +392,20 @@ advance_timers :: (cycles: int) {
         if !it.ignore_prescaler {
             it.prescaler_counter += cycles;
             inc_count : int = it.prescaler_counter / prescaler_values[it.prescaler_selection];
-            it.counter += inc_count;
-            it.prescaler_counter -= inc_count * prescaler_values[it.prescaler_selection];
-            if it.counter > 0xffff {
-                timer_overflow(it_index);
+            for it2: 0..inc_count-1 {
+                it.counter += 1;
+                apu.total_cycles += 1;
+                it.prescaler_counter -= prescaler_values[it.prescaler_selection];
+                if it.counter > 0xffff {
+                    timer_overflow(it_index);
+                }
             }
         }
     }
 }
 
 timer_overflow :: (idx: int) {
-    cpu.timer[idx].counter -= 0xffff;
-    cpu.timer[idx].counter += cpu.timer[idx].reload;
+    cpu.timer[idx].counter = cpu.timer[idx].reload;
     interrupts := Interrupt_Source.[.TIM0OVERFLOW, .TIM1OVERFLOW, .TIM2OVERFLOW, .TIM3OVERFLOW];
     if cpu.timer[idx].irq && !get_status_bit(.I) && cpu.interrupt_master_enable && (cpu.ie & (1 << interrupts[idx])) {
         if cpu.logging print("Timer IRQ\n");
@@ -416,10 +425,12 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].dst_addr_control = .FIXED;
                 cpu.dma[1].control_int &= 0xffc0;
                 cpu.dma[1].control_int |= 0x40;
-                apu.fifo_a.prev_out = apu.fifo_a.out;
-                apu.fifo_a.time_prev_out = apu.fifo_a.time_out;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
-                apu.fifo_a.time_out = apu.total_cycles - xx apu.remaining_cycles;
+                for 0..2 {
+                    apu.fifo_a.out[it] = apu.fifo_a.out[it+1];
+                    apu.fifo_a.time_out[it] = apu.fifo_a.time_out[it+1];
+                }
+                apu.fifo_a.out[3] = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
+                apu.fifo_a.time_out[3] = apu.total_cycles;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
                 apu.fifo_a.cnt -= 1;
@@ -434,10 +445,12 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].dst_addr_control = .FIXED;
                 cpu.dma[2].control_int &= 0xffc0;
                 cpu.dma[2].control_int |= 0x40;
-                apu.fifo_a.prev_out = apu.fifo_a.out;
-                apu.fifo_a.time_prev_out = apu.fifo_a.time_out;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r];
-                apu.fifo_a.time_out = apu.total_cycles - xx apu.remaining_cycles;
+                for 0..2 {
+                    apu.fifo_a.out[it] = apu.fifo_a.out[it+1];
+                    apu.fifo_a.time_out[it] = apu.fifo_a.time_out[it+1];
+                }
+                apu.fifo_a.out[3] = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
+                apu.fifo_a.time_out[3] = apu.total_cycles;
                 apu.fifo_a.r += 1;
                 apu.fifo_a.r %= 32;
                 apu.fifo_a.cnt -= 1;
@@ -456,10 +469,12 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
-                apu.fifo_b.prev_out = apu.fifo_b.out;
-                apu.fifo_b.time_prev_out = apu.fifo_b.time_out;
-                apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r];
-                apu.fifo_b.time_out = apu.total_cycles - xx apu.remaining_cycles;
+                for 0..2 {
+                    apu.fifo_b.out[it] = apu.fifo_b.out[it+1];
+                    apu.fifo_b.time_out[it] = apu.fifo_b.time_out[it+1];
+                }
+                apu.fifo_b.out[3] = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r & 0x1f];
+                apu.fifo_b.time_out[3] = apu.total_cycles;
                 apu.fifo_b.cnt -= 1;
                 if apu.fifo_b.cnt < 16 {
                     transfer(1);
@@ -474,10 +489,12 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].control_int |= 0x40;
                 apu.fifo_b.r += 1;
                 apu.fifo_b.r %= 32;
-                apu.fifo_b.prev_out = apu.fifo_b.out;
-                apu.fifo_b.time_prev_out = apu.fifo_b.time_out;
-                apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r];
-                apu.fifo_b.time_out = apu.total_cycles - xx apu.remaining_cycles;
+                for 0..2 {
+                    apu.fifo_b.out[it] = apu.fifo_b.out[it+1];
+                    apu.fifo_b.time_out[it] = apu.fifo_b.time_out[it+1];
+                }
+                apu.fifo_b.out[3] = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r & 0x1f];
+                apu.fifo_b.time_out[3] = apu.total_cycles;
                 apu.fifo_b.cnt -= 1;
                 if apu.fifo_b.cnt < 16 {
                     transfer(2);
@@ -744,14 +761,14 @@ arm_decoder_table :: Decoder_Unit_Arm.[
     .{0xde00000, 0x1c00000, arm_bic},
     .{0xdef0000, 0x1e00000, arm_mvn},
 
-    .{0xdf0f000, 0x1100000, arm_tst},
-    .{0xdf0f000, 0x1300000, arm_teq},
-    .{0xdf0f000, 0x1500000, arm_cmp},
-    .{0xdf0f000, 0x1700000, arm_cmn},
+    .{0xdf00000, 0x1100000, arm_tst},
+    .{0xdf00000, 0x1300000, arm_teq},
+    .{0xdf00000, 0x1500000, arm_cmp},
+    .{0xdf00000, 0x1700000, arm_cmn},
 
     .{0xdb00000, 0x1200000, arm_msr_bkpt},
-    .{0xfb00000, 0x1000000, arm_mrs},
-    .{0xfb00ff0, 0x1000090, arm_swp_swpb},
+    .{0xfb000f0, 0x1000000, arm_mrs},
+    .{0xfb000f0, 0x1000090, arm_swp_swpb},
     .{0xffffff0, 0x12fff10, arm_bx},
     .{0xf000000, 0xa000000, arm_b},
     .{0xf000000, 0xb000000, arm_bl},

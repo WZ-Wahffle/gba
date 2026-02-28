@@ -46,8 +46,13 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
         rm : s64 = cast,no_check(s32)reg_src(xx ins & 0xf);
         if (ins & 0x200000) != 0 {
             // smlal
+            rdlo := cast,no_check(u64, reg_src(rdlo_idx));
+            rdhi := cast,no_check(u64, reg_src(rdhi_idx));
+            result : s64 = cast,no_check(s64, rdlo | (rdhi << 32));
+            result += rs * rm;
+            reg_dst(rdlo_idx, xx cast,no_check(u64, result) & 0xffffffff);
+            reg_dst(rdhi_idx, xx (cast,no_check(u64, result) >> 32) & 0xffffffff);
             cpu.remaining_cycles -= 1;
-            assert(false);
         } else {
             // smull
             result : u64 = cast,no_check(u64, rs * rm);
@@ -91,9 +96,31 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
 }
 
 arm_swp_swpb :: inline (ins: u32) {
-    // verify that bits 8..11 are actually zero
-    // rotate on % 4 != 0 !!!!!!
-    assert(false);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    rn := reg_src(xx (ins >> 16) & 0xf);
+    rm_idx : u8 = xx ins & 0xf;
+
+    if (ins & 0x400000) != 0 {
+        temp := read_8(rn, cpu.reg[15] < 0x4000);
+        write_8(rn, xx reg_src(rm_idx) & 0xff);
+        reg_dst(rd_idx, temp);
+    } else {
+        temp : u32;
+        if rn & 0b11 != 0 {
+            val := read_32(rn, cpu.reg[15] < 0x4000);
+            rotate_cnt := (rn & 0b11) * 8;
+            #asm {
+                rotate_cnt === c;
+                ror.32 val, rotate_cnt;
+            }
+            temp = val;
+        } else {
+            temp = read_32(rn, cpu.reg[15] < 0x4000);
+        }
+
+        write_32(rn, reg_src(rm_idx));
+        reg_dst(rd_idx, temp);
+    }
 }
 
 arm_ldrh_strh :: inline (ins: u32) {
@@ -112,14 +139,17 @@ arm_ldrh_strh :: inline (ins: u32) {
         offset = reg_src(xx ins & 0xf);
     }
 
+    write_back : u32 = 0;
+    do_write_back := false;
     if !p {
         // post indexed
         if u {
-            rn += offset;
+            write_back = rn + offset;
         } else {
-            rn -= offset;
+            write_back = rn - offset;
         }
-        reg_dst(rn_idx, rn);
+        do_write_back = true;
+        // reg_dst(rn_idx, rn);
     } else if !w {
         // offset addressing
         if u {
@@ -134,17 +164,35 @@ arm_ldrh_strh :: inline (ins: u32) {
         } else {
             address -= offset;
         }
-        reg_dst(rn_idx, address);
+        write_back = address;
+        do_write_back = true;
+        // reg_dst(rn_idx, address);
     }
 
     if l {
         // load
         cpu.remaining_cycles -= 2;
-        reg_dst(rd_idx, read_16(address, cpu.reg[15] < 0x4000));
+        if address & 0b1 != 0 {
+            val : u32 = read_16(address, cpu.reg[15] < 0x4000);
+            rotate_cnt := (address & 0b1) * 8;
+            #asm {
+                rotate_cnt === c;
+                ror.32 val, rotate_cnt;
+            }
+            reg_dst(rd_idx, val);
+        } else {
+            reg_dst(rd_idx, read_16(address, cpu.reg[15] < 0x4000));
+        }
+        if do_write_back && rn_idx != rd_idx {
+            reg_dst(rn_idx, write_back);
+        }
     } else {
         // store
         cpu.remaining_cycles -= 1;
         write_16(address, xx (reg_src(rd_idx) & 0xffff));
+        if do_write_back {
+            reg_dst(rn_idx, write_back);
+        }
     }
 }
 
@@ -190,7 +238,7 @@ arm_ldrsb_ldrsh :: inline (ins: u32) {
     }
 
     cpu.remaining_cycles -= 2;
-    if (ins & 0x20) != 0 {
+    if (ins & 0x20) != 0 && (address & 0b1) == 0 {
         // ldrsh
         to_write : u32 = xx read_16(address, cpu.reg[15] < 0x4000);
         if (to_write & 0x8000) != 0 then to_write |= 0xffff0000;
@@ -489,9 +537,15 @@ arm_tst :: inline (ins: u32) {
     }
     rn := reg_src(xx (ins >> 16) & 0xf);
     result := rn & operand;
-    set_status_bit(.N, (result & 0x80000000) != 0);
-    set_status_bit(.Z, result == 0);
-    if should_carry set_status_bit(.C, carry_out);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    if rd_idx == 15 {
+        cpu.psr = cpu.spsr[cpu.mode];
+        set_mode(cpu.psr);
+    } else {
+        set_status_bit(.N, (result & 0x80000000) != 0);
+        set_status_bit(.Z, result == 0);
+        if should_carry set_status_bit(.C, carry_out);
+    }
 }
 
 arm_teq :: inline (ins: u32) {
@@ -506,9 +560,15 @@ arm_teq :: inline (ins: u32) {
     }
     rn := reg_src(xx (ins >> 16) & 0xf);
     result := rn ^ operand;
-    set_status_bit(.N, (result & 0x80000000) != 0);
-    set_status_bit(.Z, result == 0);
-    if should_carry set_status_bit(.C, carry_out);
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    if rd_idx == 15 {
+        cpu.psr = cpu.spsr[cpu.mode];
+        set_mode(cpu.psr);
+    } else {
+        set_status_bit(.N, (result & 0x80000000) != 0);
+        set_status_bit(.Z, result == 0);
+        if should_carry set_status_bit(.C, carry_out);
+    }
 }
 
 arm_cmp :: inline (ins: u32) {
@@ -523,10 +583,16 @@ arm_cmp :: inline (ins: u32) {
     }
     rn := reg_src(xx (ins >> 16) & 0xf);
     result := rn - operand;
-    set_status_bit(.N, (result & 0x80000000) != 0);
-    set_status_bit(.Z, result == 0);
-    set_status_bit(.C, rn >= operand);
-    set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    if rd_idx == 15 {
+        cpu.psr = cpu.spsr[cpu.mode];
+        set_mode(cpu.psr);
+    } else {
+        set_status_bit(.N, (result & 0x80000000) != 0);
+        set_status_bit(.Z, result == 0);
+        set_status_bit(.C, rn >= operand);
+        set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+    }
 }
 
 arm_cmn :: inline (ins: u32) {
@@ -539,10 +605,16 @@ arm_cmn :: inline (ins: u32) {
     }
     rn := reg_src(xx (ins >> 16) & 0xf);
     result := rn + operand;
-    set_status_bit(.N, (result & 0x80000000) != 0);
-    set_status_bit(.Z, result == 0);
-    set_status_bit(.C, cast(u64)(rn) + cast(u64)(operand) > 0xffffffff);
-    set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+    rd_idx : u8 = xx (ins >> 12) & 0xf;
+    if rd_idx == 15 {
+        cpu.psr = cpu.spsr[cpu.mode];
+        set_mode(cpu.psr);
+    } else {
+        set_status_bit(.N, (result & 0x80000000) != 0);
+        set_status_bit(.Z, result == 0);
+        set_status_bit(.C, cast(u64)(rn) + cast(u64)(operand) > 0xffffffff);
+        set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+    }
 }
 
 arm_orr :: inline (ins: u32) {
@@ -667,14 +739,16 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
         offset = shifter_operand(xx offset);
     }
     address := rn;
+    write_back : u32 = 0;
+    do_write_back := false;
     if !p {
         // post indexed
         if u {
-            rn += offset;
+            write_back = rn + offset;
         } else {
-            rn -= offset;
+            write_back = rn - offset;
         }
-        reg_dst(rn_idx, rn);
+        do_write_back = true;
     } else if !w {
         // offset addressing
         if u {
@@ -689,7 +763,8 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
         } else {
             address -= offset;
         }
-        reg_dst(rn_idx, address);
+        write_back = address;
+        do_write_back = true;
     }
 
     if l {
@@ -712,6 +787,10 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
                 reg_dst(rd_idx, read_32(address, cpu.reg[15] < 0x4000));
             }
         }
+
+        if do_write_back && rn_idx != rd_idx {
+            reg_dst(rn_idx, write_back);
+        }
     } else {
         // store
         cpu.remaining_cycles -= 1;
@@ -720,7 +799,12 @@ arm_ldr_str_ldrb_strb :: inline (ins: u32) {
         } else {
             write_32(address, reg_src(rd_idx));
         }
+
+        if do_write_back {
+            reg_dst(rn_idx, write_back);
+        }
     }
+
 }
 
 arm_ldm_stm :: inline (ins: u32) {
@@ -751,7 +835,11 @@ arm_ldm_stm :: inline (ins: u32) {
                 to_store := read_32(pointer, cpu.reg[15] < 0x4000);
                 if s && cpu.mode != .USER {
                     if it < 13 {
-                        cpu.reg[it] = to_store;
+                        if it > 7 && cpu.mode == .FIQ {
+                             cpu.reg_hi_fiq[it - 8] = to_store;
+                        } else {
+                             cpu.reg[it] = to_store;
+                        }
                     } else if it == 13 {
                         cpu.sp[0] = to_store;
                     } else if it == 14 {
@@ -778,7 +866,11 @@ arm_ldm_stm :: inline (ins: u32) {
                 to_store : u32;
                 if s {
                     if it < 13 {
-                        to_store = cpu.reg[it];
+                        if it > 7 && cpu.mode == .FIQ {
+                            to_store = cpu.reg_hi_fiq[it - 8];
+                        } else {
+                            to_store = cpu.reg[it];
+                        }
                     } else if it == 13 {
                         to_store = cpu.sp[0];
                     } else if it == 14 {

@@ -280,7 +280,7 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x130;
             return xx (~ppu.keypad_state) & 0xff;
         case 0x131;
-            return xx (~(ppu.keypad_state >> 8)) & 0xff;
+            return xx (~(ppu.keypad_state >> 8)) & 0x3;
         case 0x132;
             return xx ppu.keypad_irq_mask & 0xff;
         case 0x133;
@@ -766,23 +766,15 @@ mmio_write :: (addr: u32, val: u8) {
                 apu.fifo_a.r = 0;
                 apu.fifo_a.w = 0;
                 apu.fifo_a.cnt = 0;
-                apu.fifo_a.out = 0;
-                apu.fifo_a.time_out = 0;
-                apu.fifo_a.prev_out = 0;
-                apu.fifo_a.time_prev_out = 0;
                 for 0..31 apu.fifo_a.buffer[it] = 0;
             }
             apu.chan_b.enable_r = val & 0x10 != 0;
             apu.chan_b.enable_l = val & 0x20 != 0;
-            apu.chan_b.timer_select = (val & 0x40) >> 2;
+            apu.chan_b.timer_select = (val & 0x40) >> 6;
             if val & 0x80 != 0 {
                 apu.fifo_b.r = 0;
                 apu.fifo_b.w = 0;
                 apu.fifo_b.cnt = 0;
-                apu.fifo_b.out = 0;
-                apu.fifo_b.time_out = 0;
-                apu.fifo_b.prev_out = 0;
-                apu.fifo_b.time_prev_out = 0;
                 for 0..31 apu.fifo_b.buffer[it] = 0;
             }
             apu.soundcnt_h_int[1] = val & 0x77;
