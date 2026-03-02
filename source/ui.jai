@@ -602,7 +602,7 @@ step_ppu :: () {
             cpu.ifl &= ~(1 << Interrupt_Source.LCD_HBLANK) & 0xffff;
         }
 
-        if ppu.draw_y == 0 {
+        if ppu.draw_y == 227 {
             cpu.ifl &= ~(1 << Interrupt_Source.LCD_VBLANK) & 0xffff;
         }
 

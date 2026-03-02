@@ -52,6 +52,10 @@ arm_umull_umlal_smull_smlal :: inline (ins: u32) {
             result += rs * rm;
             reg_dst(rdlo_idx, xx cast,no_check(u64, result) & 0xffffffff);
             reg_dst(rdhi_idx, xx (cast,no_check(u64, result) >> 32) & 0xffffffff);
+            if flags {
+                set_status_bit(.N, result & 0x8000000000000000 != 0);
+                set_status_bit(.Z, result == 0);
+            }
             cpu.remaining_cycles -= 1;
         } else {
             // smull
@@ -455,8 +459,8 @@ arm_adc :: inline (ins: u32) {
     rn := reg_src(xx (ins >> 16) & 0xf);
     rd_idx : u8 = xx (ins >> 12) & 0xf;
     flags := (ins & 0x100000) != 0;
-    operand += xx ifx get_status_bit(.C) then 1 else 0;
-    result := rn + operand;
+    c : u32 = xx ifx get_status_bit(.C) then 1 else 0;
+    result := rn + operand + c;
     reg_dst(rd_idx, result);
     if flags {
         if rd_idx == 15 {
@@ -465,7 +469,7 @@ arm_adc :: inline (ins: u32) {
         } else {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
-            set_status_bit(.C, cast(u64)(rn) + cast(u64)(operand) > 0xffffffff);
+            set_status_bit(.C, cast(u64,rn) + cast(u64,operand) + cast(u64,c) > 0xffffffff);
             set_status_bit(.V, (rn & 0x80000000) == (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
         }
     }
@@ -482,8 +486,8 @@ arm_sbc :: inline (ins: u32) {
     rn := reg_src(xx (ins >> 16) & 0xf);
     rd_idx : u8 = xx (ins >> 12) & 0xf;
     flags := (ins & 0x100000) != 0;
-    operand += xx ifx !get_status_bit(.C) then 1 else 0;
-    result := rn - operand;
+    c : u32 = xx ifx !get_status_bit(.C) then 1 else 0;
+    result := rn - operand - c;
     if flags {
         if rd_idx == 15 {
             cpu.psr = cpu.spsr[cpu.mode];
@@ -519,7 +523,7 @@ arm_rsc :: inline (ins: u32) {
             set_status_bit(.N, (result & 0x80000000) != 0);
             set_status_bit(.Z, result == 0);
             set_status_bit(.C, operand >= rn);
-            set_status_bit(.V, (rn & 0x80000000) != (operand & 0x80000000) && (result & 0x80000000) != (rn & 0x80000000));
+            set_status_bit(.V, (operand & 0x80000000) != (rn & 0x80000000) && (result & 0x80000000) != (operand & 0x80000000));
         }
     }
     reg_dst(rd_idx, result);

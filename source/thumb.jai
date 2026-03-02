@@ -367,22 +367,24 @@ thumb_asr_2 :: inline (ins: u16) {
 }
 
 thumb_adc :: inline (ins: u16) {
-    rm : u32 = reg_src(xx ((ins >> 3) & 0b111)) + xx ifx get_status_bit(.C) then 1 else 0;
+    rm : u32 = reg_src(xx ((ins >> 3) & 0b111));
+    c : u32 = xx ifx get_status_bit(.C) then 1 else 0;
     rd_idx : u8 = xx ins & 0b111;
     rd := reg_src(rd_idx);
-    result := rd + rm;
+    result := xx rd + rm + c;
     set_status_bit(.N, (result & 0x80000000) != 0);
     set_status_bit(.Z, result == 0);
-    set_status_bit(.C, cast(u64)(rd) + cast(u64)(rm) > 0xffffffff);
+    set_status_bit(.C, cast(u64,rd) + cast(u64,rm) + cast(u64,c) > 0xffffffff);
     set_status_bit(.V, (rd & 0x80000000) == (rm & 0x80000000) && (rd & 0x80000000) != (result & 0x80000000));
     reg_dst(rd_idx, result);
 }
 
 thumb_sbc :: inline (ins: u16) {
-    rm : u32 = reg_src(xx ((ins >> 3) & 0b111)) + xx ifx !get_status_bit(.C) then 1 else 0;
+    rm : u32 = reg_src(xx ((ins >> 3) & 0b111));
+    c : u32 = xx ifx !get_status_bit(.C) then 1 else 0;
     rd_idx : u8 = xx ins & 0b111;
     rd := reg_src(rd_idx);
-    result := rd - rm;
+    result := rd - rm - c;
     set_status_bit(.N, (result & 0x80000000) != 0);
     set_status_bit(.Z, result == 0);
     set_status_bit(.C, rd >= rm);

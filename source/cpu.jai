@@ -653,7 +653,7 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
             should_carry := false;
             if reg_shift != 0 {
                 should_carry = true;
-                if reg_shift > 32 then carry = false;
+                if reg_shift > 32 then carry = ret & 0x80000000 != 0;
                 else carry = (ret & (1 << (reg_shift-1))) != 0;
             }
             if ret & 0x80000000 {
@@ -687,8 +687,11 @@ shifter_operand :: (val: u16) -> (u32, bool, bool) {
             should_carry := false;
             if reg_rotate != 0 {
                 should_carry = true;
-                if reg_rotate > 32 then carry = false;
-                else carry = (ret & (1 << (reg_rotate-1))) != 0;
+                if reg_rotate & 0x1f == 0 {
+                    carry = (ret & (1 << 31)) != 0;
+                } else {
+                    carry = (ret & (1 << ((reg_rotate & 0x1f)-1))) != 0;
+                }
             }
             #asm {
                 reg_rotate === c;
