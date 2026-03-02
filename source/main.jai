@@ -3,6 +3,7 @@
 #import "Thread";
 #import "String";
 #import "Math";
+#import "Compiler";
 
 ImGui :: #import "ImGui";
 #import "SDL";
@@ -12,6 +13,17 @@ ImGui :: #import "ImGui";
 cpu: Cpu;
 ppu: Ppu;
 apu: Apu;
+
+#no_reset comptime_bios: [0x4000]u8;
+
+#run {
+    ret, success := read_entire_file("in/gba_bios.bin");
+    if !success || ret.count != comptime_bios.count {
+        compiler_report("BIOS file not found, expected under ./in/gba_bios.bin\n");
+        exit(1);
+    }
+    memcpy(comptime_bios.data, ret.data, ret.count);
+}
 
 main :: () {
     args := get_command_line_arguments();
@@ -57,13 +69,8 @@ main :: () {
         log("None identified\n");
         cpu.backup_type = .NONE;
     }
-    bios, success := read_entire_file("in/gba_bios.bin");
-    if !success || bios.count != cpu.memory.bios._8.count {
-        log_error("BIOS file not found");
-        exit(1);
-    }
 
-    memcpy(cpu.memory.bios._8.data, bios.data, cpu.memory.bios._8.count);
+    memcpy(cpu.memory.bios._8.data, comptime_bios.data, comptime_bios.count);
 
     ui();
 }
