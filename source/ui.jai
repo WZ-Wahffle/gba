@@ -146,10 +146,10 @@ draw_bg :: (y: int, bg: u32, rotation_mode: bool) {
     }
 }
 
-draw_bitmap :: (y: u32) {
+draw_bitmap :: (y: u32, double_color_depth: bool, widescreen: bool) {
     if !ppu.bg[2].enable then return;
-    line_width_px := 240;
-    line_height_px := 160;
+    line_width_px := ifx widescreen 240 else 160;
+    line_height_px := ifx widescreen 160 else 128;
 
     pixel_buffer: [240]u16;
     a := ppu.bg[2].pa;
@@ -185,11 +185,20 @@ draw_bitmap :: (y: u32) {
             y_1 -= y_1 % (ppu.bg_mosaic_v + 1);
         }
 
-        color := ppu.memory.vram._8[base_addr + 0xf0 * y_1 + x_1];
-        if color != 0 {
-            pixel_buffer[x] = ppu.memory.palette_ram._16[color] & 0x7fff;
+        if double_color_depth {
+            color := ppu.memory.vram._16[(base_addr >> 1) + line_width_px * y_1 + x_1];
+            if color != 0 {
+                pixel_buffer[x] = color;
+            } else {
+                pixel_buffer[x] = BLANK_COLOR;
+            }
         } else {
-            pixel_buffer[x] = BLANK_COLOR;
+            color := ppu.memory.vram._8[base_addr + line_width_px * y_1 + x_1];
+            if color != 0 {
+                pixel_buffer[x] = ppu.memory.palette_ram._16[color] & 0x7fff;
+            } else {
+                pixel_buffer[x] = BLANK_COLOR;
+            }
         }
     }
 
@@ -641,11 +650,17 @@ step_ppu :: () {
                     draw_bg(ppu.draw_y, 3, true);
                     merge_and_blend();
                 case 3;
+                    draw_obj(ppu.draw_y);
+                    draw_bitmap(ppu.draw_y, true, true);
+                    merge_and_blend();
                 case 4;
                     draw_obj(ppu.draw_y);
-                    draw_bitmap(ppu.draw_y);
+                    draw_bitmap(ppu.draw_y, false, true);
                     merge_and_blend();
                 case 5;
+                    draw_obj(ppu.draw_y);
+                    draw_bitmap(ppu.draw_y, true, false);
+                    merge_and_blend();
             }
         }
 
