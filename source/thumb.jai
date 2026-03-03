@@ -661,6 +661,13 @@ thumb_ldmia_stmia :: inline (ins: u16) {
     rn_idx : u8 = xx (ins >> 8) & 0b111;
     pointer := reg_src(rn_idx);
     init_pointer := pointer;
+    final_pointer := init_pointer;
+    bit_count : u32;
+    #asm {
+        popcnt.32 bit_count, regs;
+    }
+    final_pointer += bit_count * 4;
+
     if (ins & 0x800) != 0 {
         // ldm
         cpu.remaining_cycles -= 1;
@@ -675,18 +682,23 @@ thumb_ldmia_stmia :: inline (ins: u16) {
     } else {
         // stm
         for 0..7 {
+            first := true;
             if regs & (1 << it) != 0 {
                 cpu.remaining_cycles -= 1;
-                write_32(pointer, reg_src(xx it));
+                if it == rn_idx {
+                    if first {
+                        write_32(pointer, init_pointer);
+                    } else {
+                        write_32(pointer, final_pointer);
+                    }
+                } else {
+                    write_32(pointer, reg_src(xx it));
+                }
                 pointer += 4;
+                first = false;
             }
         }
-        if (regs & ~((1 << rn_idx) - 1)) == (1 << rn_idx) {
-            reg_dst(rn_idx, init_pointer);
-        } else {
-            reg_dst(rn_idx, pointer);
-        }
-        if (regs & (1 << rn_idx)) == 0 then reg_dst(rn_idx, pointer);
+        reg_dst(rn_idx, pointer);
     }
 }
 

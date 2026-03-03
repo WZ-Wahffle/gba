@@ -819,15 +819,21 @@ arm_ldm_stm :: inline (ins: u32) {
     l := (ins & 0x100000) != 0; // load? (store)
     rn_idx : u8 = xx (ins >> 16) & 0xf;
     pointer := reg_src(rn_idx);
+    init_pointer := pointer;
+    final_pointer := init_pointer;
     regs := ins & 0xffff;
-    if !u {
-        bit_count : u32;
-        #asm {
-            popcnt.32 bit_count, regs;
-        }
-        pointer -= bit_count * 4;
-        if w then reg_dst(rn_idx, pointer);
+    bit_count : u32;
+    #asm {
+        popcnt.32 bit_count, regs;
     }
+    if u {
+        final_pointer += bit_count * 4;
+    } else {
+        final_pointer -= bit_count * 4;
+        pointer = final_pointer;
+    }
+    if !u && w then reg_dst(rn_idx, final_pointer);
+
     if l {
         cpu.remaining_cycles -= 1;
         for 0..15 {
@@ -859,8 +865,8 @@ arm_ldm_stm :: inline (ins: u32) {
                 }
             }
         }
-        if w && u then reg_dst(rn_idx, pointer);
     } else {
+        first := true;
         for 0..15 {
             if (regs & (1 << it)) != 0 {
                 cpu.remaining_cycles -= 1;
@@ -883,16 +889,25 @@ arm_ldm_stm :: inline (ins: u32) {
                         to_store = cpu.reg[15];
                     }
                 } else {
-                    to_store = reg_src(xx it);
+                    if it == rn_idx {
+                        if first {
+                            to_store = init_pointer;
+                        } else {
+                            to_store = final_pointer;
+                        }
+                    } else {
+                        to_store = reg_src(xx it);
+                    }
                 }
                 write_32(pointer, to_store);
                 if (!p) ^ (!u) {
                     pointer += 4;
                 }
+                first = false;
             }
         }
-        if w && u then reg_dst(rn_idx, pointer);
     }
+    if w && u then reg_dst(rn_idx, final_pointer);
 }
 
 arm_b :: inline (ins: u32) {
