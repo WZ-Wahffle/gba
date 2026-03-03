@@ -156,7 +156,7 @@ draw_bitmap :: (y: u32, double_color_depth: bool, widescreen: bool) {
     b := ppu.bg[2].pb;
     c := ppu.bg[2].pc;
     d := ppu.bg[2].pd;
-    base_addr := ifx ppu.display_frame_select then 0xa000 else 0;
+    base_addr := ifx ppu.display_frame_select && !(double_color_depth && widescreen) then 0xa000 else 0;
 
     ppu.bg[2].transform_x = ppu.bg[2].anchor_x_l;
     ppu.bg[2].transform_y = ppu.bg[2].anchor_y_l;
