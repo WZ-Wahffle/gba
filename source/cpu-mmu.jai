@@ -290,7 +290,7 @@ mmio_read :: (addr: u32) -> u8 {
         case 0x134;
             return 0;
         case 0x135;
-            return 0;
+            return 0x80;
         // communication with gamecube not implemented
         case 0x140;
             return 0;
