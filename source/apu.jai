@@ -1,3 +1,13 @@
+audio_cb :: (_: *void, data: *u8, len: s32) #c_call {
+    out : *float32 = xx data;
+    cnt := len / 4;
+    push_context {
+        for 0..cnt/2-1  {
+            out[it * 2] = ring_buffer_read(*apu.out_buffer_l);
+            out[it * 2 + 1] = ring_buffer_read(*apu.out_buffer_r);
+        }
+    }
+}
 
 voltbl := float.[0.5, 1.0];
 
@@ -15,8 +25,8 @@ step_apu :: () {
         channel_b_r := xx (b_out * (xx apu.chan_b.enable_r * voltbl[xx apu.chan_b.volume])) / 127.0;
         result_r := xx apu.master_enable * (channel_a_r / 2.0 + channel_b_r / 2.0);
 
-        SDL_QueueAudio(apu.dev, *result_l, 4);
-        SDL_QueueAudio(apu.dev, *result_r, 4);
+        ring_buffer_write(*apu.out_buffer_l, result_l);
+        ring_buffer_write(*apu.out_buffer_r, result_r);
         apu.played_samples += 1;
     }
 }

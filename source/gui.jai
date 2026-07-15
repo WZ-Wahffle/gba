@@ -227,13 +227,15 @@ ppu_window :: () {
     ImGui.End();
 }
 
+overflows : s32 = 0;
 channel_selected : s32 = 1;
 apu_window :: () {
     ImGui.Begin("apu");
+    ImGui.Text_CFormat("Overflows: %d", overflows);
     ImGui.Text_CFormat("Bias: %d", apu.bias);
     ImGui.Text_CFormat("Sampling Frequency: %d", apu.sampling_frequency);
     ImGui.Text_CFormat("Played Samples: %d", apu.played_samples);
-    ImGui.Text_CFormat("Samples in SDL: %d", SDL_GetQueuedAudioSize(apu.dev));
+    ImGui.Text_CFormat("Samples in SDL: %d", SDL_GetQueuedAudioSize(apu.dev) / 4);
     if ImGui.Button("Dump SDL Samples") {
         SDL_ClearQueuedAudio(apu.dev);
     }
@@ -264,16 +266,16 @@ apu_window :: () {
         ImGui.Text("Enable: %%", ifx apu.chan_a.enable_l then "L" else "-", ifx apu.chan_a.enable_r then "R" else "-");
         ImGui.Text("Volume: %", ifx apu.chan_a.volume then "100%" else "50%");
         ImGui.Text_CFormat("Timer Select: %d", apu.chan_a.timer_select);
-        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_a.r & 0x1f);
-        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_a.w & 0x1f);
-        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_a.w - apu.fifo_a.r);
+        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_a.rb.r & 0x1f);
+        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_a.rb.w & 0x1f);
+        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_a.rb.w - apu.fifo_a.rb.r);
         case 6;
         ImGui.Text("Enable: %%", ifx apu.chan_b.enable_l then "L" else "-", ifx apu.chan_b.enable_r then "R" else "-");
         ImGui.Text("Volume: %", ifx apu.chan_b.volume then "100%" else "50%");
         ImGui.Text_CFormat("Timer Select: %d", apu.chan_b.timer_select);
-        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_b.r & 0x1f);
-        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_b.w & 0x1f);
-        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_b.w - apu.fifo_b.r);
+        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_b.rb.r & 0x1f);
+        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_b.rb.w & 0x1f);
+        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_b.rb.w - apu.fifo_b.rb.r);
     }
     ImGui.End();
 }

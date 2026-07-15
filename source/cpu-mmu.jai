@@ -763,17 +763,17 @@ mmio_write :: (addr: u32, val: u8) {
             apu.chan_a.enable_l = val & 0x2 != 0;
             apu.chan_a.timer_select = (val & 0x4) >> 2;
             if val & 0x8 != 0 {
-                apu.fifo_a.r = 0;
-                apu.fifo_a.w = 0;
-                for 0..31 apu.fifo_a.buffer[it] = 0;
+                apu.fifo_a.rb.r = 0;
+                apu.fifo_a.rb.w = 0;
+                for 0..apu.fifo_a.rb.size-1 apu.fifo_a.rb.data[it] = 0;
             }
             apu.chan_b.enable_r = val & 0x10 != 0;
             apu.chan_b.enable_l = val & 0x20 != 0;
             apu.chan_b.timer_select = (val & 0x40) >> 6;
             if val & 0x80 != 0 {
-                apu.fifo_b.r = 0;
-                apu.fifo_b.w = 0;
-                for 0..31 apu.fifo_b.buffer[it] = 0;
+                apu.fifo_b.rb.r = 0;
+                apu.fifo_b.rb.w = 0;
+                for 0..apu.fifo_b.rb.size-1 apu.fifo_b.rb.data[it] = 0;
             }
             apu.soundcnt_h_int[1] = val & 0x77;
         case 0x084;
@@ -792,14 +792,12 @@ mmio_write :: (addr: u32, val: u8) {
         case 0x0a1; #through;
         case 0x0a2; #through;
         case 0x0a3;
-            apu.fifo_a.buffer[apu.fifo_a.w & 0x1f] = val;
-            apu.fifo_a.w += 1;
+            ring_buffer_write(*apu.fifo_a.rb, val);
         case 0x0a4; #through;
         case 0x0a5; #through;
         case 0x0a6; #through;
         case 0x0a7;
-            apu.fifo_b.buffer[apu.fifo_b.w & 0x1f] = val;
-            apu.fifo_b.w += 1;
+            ring_buffer_write(*apu.fifo_b.rb, val);
         case 0x0b0;
             cpu.dma[0].src &= 0x0fffff00;
             cpu.dma[0].src |= val;

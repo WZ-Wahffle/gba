@@ -32,7 +32,7 @@ read_8 :: (addr: u32, bios_bypass := false) -> u8 {
         return rom_read(addr);
     }
 
-    log_error("Unmapped read: 0x%", formatInt(addr, 16));
+    log_warn("Unmapped read: 0x%", formatInt(addr, 16));
     return 0;
 }
 
@@ -425,9 +425,8 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].dst_addr_control = .FIXED;
                 cpu.dma[1].control_int &= 0xffc0;
                 cpu.dma[1].control_int |= 0x40;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
-                apu.fifo_a.r += 1;
-                if (apu.fifo_a.w - apu.fifo_a.r) < 16 {
+                apu.fifo_a.out = cast,no_check(s8)ring_buffer_read(*apu.fifo_a.rb);
+                if apu.fifo_a.rb.cnt < 16 {
                     transfer(1);
                     transfer(1);
                     transfer(1);
@@ -438,9 +437,8 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].dst_addr_control = .FIXED;
                 cpu.dma[2].control_int &= 0xffc0;
                 cpu.dma[2].control_int |= 0x40;
-                apu.fifo_a.out = cast,no_check(s8)apu.fifo_a.buffer[apu.fifo_a.r & 0x1f];
-                apu.fifo_a.r += 1;
-                if (apu.fifo_a.w - apu.fifo_a.r) < 16 {
+                apu.fifo_a.out = cast,no_check(s8)ring_buffer_read(*apu.fifo_a.rb);
+                if apu.fifo_a.rb.cnt < 16 {
                     transfer(2);
                     transfer(2);
                     transfer(2);
@@ -453,9 +451,8 @@ timer_overflow :: (idx: int) {
                 cpu.dma[1].dst_addr_control = .FIXED;
                 cpu.dma[1].control_int &= 0xffc0;
                 cpu.dma[1].control_int |= 0x40;
-                apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r & 0x1f];
-                apu.fifo_b.r += 1;
-                if (apu.fifo_b.w - apu.fifo_b.r) < 16 {
+                apu.fifo_b.out = cast,no_check(s8)ring_buffer_read(*apu.fifo_b.rb);
+                if apu.fifo_b.rb.cnt < 16 {
                     transfer(1);
                     transfer(1);
                     transfer(1);
@@ -466,9 +463,8 @@ timer_overflow :: (idx: int) {
                 cpu.dma[2].dst_addr_control = .FIXED;
                 cpu.dma[2].control_int &= 0xffc0;
                 cpu.dma[2].control_int |= 0x40;
-                apu.fifo_b.out = cast,no_check(s8)apu.fifo_b.buffer[apu.fifo_b.r & 0x1f];
-                apu.fifo_b.r += 1;
-                if (apu.fifo_b.w - apu.fifo_b.r) < 16 {
+                apu.fifo_b.out = cast,no_check(s8)ring_buffer_read(*apu.fifo_b.rb);
+                if apu.fifo_b.rb.cnt < 16 {
                     transfer(2);
                     transfer(2);
                     transfer(2);

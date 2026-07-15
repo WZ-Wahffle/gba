@@ -267,6 +267,8 @@ Ppu :: struct {
 
 Apu :: struct {
     dev: SDL_AudioDeviceID;
+    out_buffer_l: Ring_Buffer(float32, 2048);
+    out_buffer_r: Ring_Buffer(float32, 2048);
 
     chan_1: Pulse_Channel;
     chan_2: Pulse_Channel;
@@ -343,15 +345,32 @@ Apu :: struct {
     }
 
     Fifo :: struct {
-        buffer: [32]u8;
-        r : u8 = 0;
-        w : u8 = 0;
+        rb: Ring_Buffer(u8, 32);
         out: s8;
     }
 
     remaining_cycles := 0.0;
     total_cycles := 0;
     played_samples := 0;
+}
+
+Decoder_Unit_Arm :: struct {
+    mask: u32;
+    result: u32;
+    function: (ins: u32);
+}
+
+Decoder_Unit_Thumb :: struct {
+    mask: u16;
+    result: u16;
+    function: (ins: u16);
+}
+
+Ring_Buffer :: struct (type: Type, size: int) {
+    r := 0;
+    w := 0;
+    cnt := 0;
+    data: [size]type;
 }
 
 Backup_Type :: enum {
@@ -450,16 +469,4 @@ Emulation_State :: enum {
     STEPPED;
     STEPPED_SCANLINE;
     STEPPED_FRAME;
-}
-
-Decoder_Unit_Arm :: struct {
-    mask: u32;
-    result: u32;
-    function: (ins: u32);
-}
-
-Decoder_Unit_Thumb :: struct {
-    mask: u16;
-    result: u16;
-    function: (ins: u16);
 }

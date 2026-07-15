@@ -120,6 +120,7 @@ color_log :: (message: string, data: *void, info: Log_Info) {
 }
 
 #load "types.jai";
+#load "ring_buffer.jai";
 #load "cpu.jai";
 #load "cpu-mmu.jai";
 #load "cart.jai";

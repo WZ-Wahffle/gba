@@ -697,6 +697,7 @@ ui :: () {
     spec.format = AUDIO_F32;
     spec.freq = SAMPLE_RATE;
     spec.samples = CALLBACK_SIZE;
+    spec.callback = audio_cb;
     apu.dev = SDL_OpenAudioDevice(null, 0, *spec, null, 0);
     if apu.dev == 0 {
         str: string;
@@ -898,6 +899,6 @@ ui :: () {
         }
         end_time := seconds_since_init();
         // TODO: should probably make this refresh rate dependent
-        sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
+        if end_time - time < 16.6 then sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
 }
