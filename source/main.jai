@@ -5,10 +5,10 @@
 #import "Math";
 #import "Compiler";
 
-ImGui :: #import "ImGui";
-#import "SDL";
-#import "Math";
-#import "GL";
+rg :: #import "RlImGui";
+im :: #import "ImGui";
+rl :: #import "Raylib";
+_ :: #library,system,link_always "libSDL3";
 
 cpu: Cpu;
 ppu: Ppu;
@@ -127,7 +127,6 @@ color_log :: (message: string, data: *void, info: Log_Info) {
 #load "arm.jai";
 #load "thumb.jai";
 
-#load "imgui_sdl_gl.jai";
 #load "ui.jai";
 #load "gui.jai";
 

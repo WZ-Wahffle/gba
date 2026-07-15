@@ -266,7 +266,7 @@ Ppu :: struct {
 }
 
 Apu :: struct {
-    dev: SDL_AudioDeviceID;
+    dev: rl.AudioStream;
     out_buffer_l: Ring_Buffer(float32, 2048);
     out_buffer_r: Ring_Buffer(float32, 2048);
 

@@ -20,65 +20,65 @@ draw_gui :: () {
     context.print_style.default_format_int.base = 16;
     context.print_style.default_format_int.minimum_digits = 8;
     if show_header
-        if ImGui.BeginMainMenuBar() {
-            if ImGui.BeginMenu("General") {
-                if ImGui.MenuItem("cpu", "shift+c") {
+        if im.BeginMainMenuBar() {
+            if im.BeginMenu("General") {
+                if im.MenuItem("cpu", "shift+c") {
                     show_cpu = !show_cpu;
                 }
-                if ImGui.MenuItem("ppu", "shift+g") {
+                if im.MenuItem("ppu", "shift+g") {
                     show_ppu = !show_ppu;
                 }
-                if ImGui.MenuItem("apu", "shift+a") {
+                if im.MenuItem("apu", "shift+a") {
                     show_apu = !show_apu;
                 }
-                if ImGui.MenuItem("keypad", "shift+k") {
+                if im.MenuItem("keypad", "shift+k") {
                     show_keypad = !show_keypad;
                 }
-                if ImGui.MenuItem("dma", "shift+m") {
+                if im.MenuItem("dma", "shift+m") {
                     show_dma = !show_dma;
                 }
-                if ImGui.MenuItem("window", "shift+w") {
+                if im.MenuItem("window", "shift+w") {
                     show_window = !show_window;
                 }
-                if ImGui.MenuItem("blend", "shift+b") {
+                if im.MenuItem("blend", "shift+b") {
                     show_blend = !show_blend;
                 }
-                if ImGui.MenuItem("timer", "shift+t") {
+                if im.MenuItem("timer", "shift+t") {
                     show_timer = !show_timer;
                 }
-                ImGui.EndMenu();
+                im.EndMenu();
             }
-            if ImGui.BeginMenu("Memory") {
-                if ImGui.MenuItem("rom", "shift+r") {
+            if im.BeginMenu("Memory") {
+                if im.MenuItem("rom", "shift+r") {
                     show_rom = !show_rom;
                 }
-                if ImGui.MenuItem("iwram", "shift+i") {
+                if im.MenuItem("iwram", "shift+i") {
                     show_iwram = !show_iwram;
                 }
-                if ImGui.MenuItem("ewram", "shift+e") {
+                if im.MenuItem("ewram", "shift+e") {
                     show_ewram = !show_ewram;
                 }
-                if ImGui.MenuItem("vram", "shift+v") {
+                if im.MenuItem("vram", "shift+v") {
                     show_vram = !show_vram;
                 }
-                if ImGui.MenuItem("palette ram", "shift+p") {
+                if im.MenuItem("palette ram", "shift+p") {
                     show_palette_ram = !show_palette_ram;
                 }
-                if ImGui.MenuItem("oam", "shift+o") {
+                if im.MenuItem("oam", "shift+o") {
                     show_oam = !show_oam;
                 }
-                if ImGui.MenuItem("save data", "shift+s") {
+                if im.MenuItem("save data", "shift+s") {
                     show_save = !show_save;
                 }
-                ImGui.EndMenu();
+                im.EndMenu();
             }
-            if ImGui.BeginMenu("Disassembly") {
-                if ImGui.MenuItem("show", "shift+d") {
+            if im.BeginMenu("Disassembly") {
+                if im.MenuItem("show", "shift+d") {
                     show_disasm = !show_disasm;
                 }
-                ImGui.EndMenu();
+                im.EndMenu();
             }
-            ImGui.EndMainMenuBar();
+            im.EndMainMenuBar();
         }
 
     if show_iwram iwram_window();
@@ -109,39 +109,39 @@ draw_gui :: () {
 }
 
 cpu_window :: () {
-    ImGui.Begin("cpu");
-    ImGui.Text("Frame time: %ms", dt * 1000);
-    if ImGui.Button("Start") {
+    im.Begin("cpu");
+    im.Text("Frame time: %ms", dt * 1000);
+    if im.Button("Start") {
         cpu.emu_state = .STARTED;
     }
-    ImGui.SameLine();
-    if ImGui.Button("Stop") {
+    im.SameLine();
+    if im.Button("Stop") {
         cpu.emu_state = .STOPPED;
     }
-    ImGui.SameLine();
-    if ImGui.Button("Step") {
+    im.SameLine();
+    if im.Button("Step") {
         cpu.emu_state = .STEPPED;
     }
-    ImGui.SameLine();
-    if ImGui.Button("Step Scanline") {
+    im.SameLine();
+    if im.Button("Step Scanline") {
         cpu.emu_state = .STEPPED_SCANLINE;
     }
-    ImGui.SameLine();
-    if ImGui.Button("Step Frame") {
+    im.SameLine();
+    if im.Button("Step Frame") {
         cpu.emu_state = .STEPPED_FRAME;
     }
-    ImGui.Checkbox("Logging", *cpu.logging);
+    im.Checkbox("Logging", *cpu.logging);
     if cpu.mode == .USER && cpu.privileged {
-        ImGui.Text("Mode: SYSTEM, %", ifx get_status_bit(.T) then "THUMB" else "ARM");
+        im.Text("Mode: SYSTEM, %", ifx get_status_bit(.T) then "THUMB" else "ARM");
     } else {
-        ImGui.Text("Mode: %, %", cpu.mode, ifx get_status_bit(.T) then "THUMB" else "ARM");
+        im.Text("Mode: %, %", cpu.mode, ifx get_status_bit(.T) then "THUMB" else "ARM");
     }
-    ImGui.Text("PC : 0x% ", cpu.reg[15]);
-    ImGui.SameLine();
-    ImGui.Text("LR : 0x% ", cpu.reg[14]);
-    ImGui.Text("SP : 0x% ", cpu.reg[13]);
-    ImGui.SameLine();
-    ImGui.Text("PSR:   %1%2%3%4%5%6%7",
+    im.Text("PC : 0x% ", cpu.reg[15]);
+    im.SameLine();
+    im.Text("LR : 0x% ", cpu.reg[14]);
+    im.Text("SP : 0x% ", cpu.reg[13]);
+    im.SameLine();
+    im.Text("PSR:   %1%2%3%4%5%6%7",
         ifx (cpu.psr & 0x80000000) != 0 then "N" else "-",
         ifx (cpu.psr & 0x40000000) != 0 then "Z" else "-",
         ifx (cpu.psr & 0x20000000) != 0 then "C" else "-",
@@ -150,31 +150,31 @@ cpu_window :: () {
         ifx (cpu.psr & 0x00000040) != 0 then "F" else "-",
         ifx (cpu.psr & 0x00000020) != 0 then "T" else "-",
     );
-    ImGui.Text("R00: 0x% ", cpu.reg[0]);
-    ImGui.SameLine();
-    ImGui.Text("R01: 0x% ", cpu.reg[1]);
-    ImGui.Text("R02: 0x% ", cpu.reg[2]);
-    ImGui.SameLine();
-    ImGui.Text("R03: 0x% ", cpu.reg[3]);
-    ImGui.Text("R04: 0x% ", cpu.reg[4]);
-    ImGui.SameLine();
-    ImGui.Text("R05: 0x% ", cpu.reg[5]);
-    ImGui.Text("R06: 0x% ", cpu.reg[6]);
-    ImGui.SameLine();
-    ImGui.Text("R07: 0x% ", cpu.reg[7]);
-    ImGui.Text("R08: 0x% ", cpu.reg[8]);
-    ImGui.SameLine();
-    ImGui.Text("R09: 0x% ", cpu.reg[9]);
-    ImGui.Text("R10: 0x% ", cpu.reg[10]);
-    ImGui.SameLine();
-    ImGui.Text("R11: 0x% ", cpu.reg[11]);
-    ImGui.Text("R12: 0x% ", cpu.reg[12]);
-    ImGui.NewLine();
-    ImGui.Text("Interrupts %abled", ifx cpu.interrupt_master_enable then "en" else "dis");
+    im.Text("R00: 0x% ", cpu.reg[0]);
+    im.SameLine();
+    im.Text("R01: 0x% ", cpu.reg[1]);
+    im.Text("R02: 0x% ", cpu.reg[2]);
+    im.SameLine();
+    im.Text("R03: 0x% ", cpu.reg[3]);
+    im.Text("R04: 0x% ", cpu.reg[4]);
+    im.SameLine();
+    im.Text("R05: 0x% ", cpu.reg[5]);
+    im.Text("R06: 0x% ", cpu.reg[6]);
+    im.SameLine();
+    im.Text("R07: 0x% ", cpu.reg[7]);
+    im.Text("R08: 0x% ", cpu.reg[8]);
+    im.SameLine();
+    im.Text("R09: 0x% ", cpu.reg[9]);
+    im.Text("R10: 0x% ", cpu.reg[10]);
+    im.SameLine();
+    im.Text("R11: 0x% ", cpu.reg[11]);
+    im.Text("R12: 0x% ", cpu.reg[12]);
+    im.NewLine();
+    im.Text("Interrupts %abled", ifx cpu.interrupt_master_enable then "en" else "dis");
     for enum_names(Interrupt_Source) {
-        ImGui.Text("%: %abled, %triggered", it, ifx (cpu.ie & (1 << it_index)) != 0 then "en" else "dis", ifx (cpu.ie & (1 << it_index)) != 0 then "" else "not ");
+        im.Text("%: %abled, %triggered", it, ifx (cpu.ie & (1 << it_index)) != 0 then "en" else "dis", ifx (cpu.ie & (1 << it_index)) != 0 then "" else "not ");
     }
-    ImGui.End();
+    im.End();
 }
 
 Bg_Control_Lut_Entry :: struct {
@@ -192,92 +192,88 @@ mode_lut := Bg_Control_Lut_Entry.[
 ];
 background_selected : s32 = 0;
 ppu_window :: () {
-    ImGui.Begin("ppu");
-    ImGui.Text("Force Blank: %", ppu.forced_blank);
-    ImGui.Text("X: %", formatInt(ppu.draw_x, 10, 1));
-    ImGui.Text("Y: %", formatInt(ppu.draw_y, 10, 1));
-    ImGui.Text("Character Format: %-dimensional", ifx ppu.obj_character_vram_mapping_one_dimensional then "1" else "2");
-    ImGui.Text("BG Mode: %", formatInt(ppu.bg_mode, 10, 1));
-    ImGui.InputInt("Background", *background_selected, 1, 1, .CharsDecimal);
+    im.Begin("ppu");
+    im.Text("Force Blank: %", ppu.forced_blank);
+    im.Text("X: %", formatInt(ppu.draw_x, 10, 1));
+    im.Text("Y: %", formatInt(ppu.draw_y, 10, 1));
+    im.Text("Character Format: %-dimensional", ifx ppu.obj_character_vram_mapping_one_dimensional then "1" else "2");
+    im.Text("BG Mode: %", formatInt(ppu.bg_mode, 10, 1));
+    im.InputInt("Background", *background_selected, 1, 1, .CharsDecimal);
     if background_selected < mode_lut[ppu.bg_mode].bg_min then background_selected = mode_lut[ppu.bg_mode].bg_min;
     if background_selected > mode_lut[ppu.bg_mode].bg_max then background_selected = mode_lut[ppu.bg_mode].bg_max;
 
-    ImGui.Text("%abled", ifx ppu.bg[background_selected].enable then "en" else "dis");
-    ImGui.Text("%", ifx ppu.bg[background_selected].single_palette then "256 colors, 1 palette" else "16 colors, 16 palettes");
-    ImGui.Text("Priority: %", ppu.bg[background_selected].prio);
-    ImGui.Text("Size: %1%2", ifx ppu.bg[background_selected].tall then "1" else "0", ifx ppu.bg[background_selected].wide then "1" else "0");
-    ImGui.Text("Mosaic %abled", ifx ppu.bg[background_selected].mosaic then "en" else "dis");
-    ImGui.Text("Screen Offset: 0x%", formatInt(ppu.bg[background_selected].screen_base_block * 2048, 16));
-    ImGui.Text("Char Offset: 0x%", formatInt(ppu.bg[background_selected].char_base_block * 16384, 16));
+    im.Text("%abled", ifx ppu.bg[background_selected].enable then "en" else "dis");
+    im.Text("%", ifx ppu.bg[background_selected].single_palette then "256 colors, 1 palette" else "16 colors, 16 palettes");
+    im.Text("Priority: %", ppu.bg[background_selected].prio);
+    im.Text("Size: %1%2", ifx ppu.bg[background_selected].tall then "1" else "0", ifx ppu.bg[background_selected].wide then "1" else "0");
+    im.Text("Mosaic %abled", ifx ppu.bg[background_selected].mosaic then "en" else "dis");
+    im.Text("Screen Offset: 0x%", formatInt(ppu.bg[background_selected].screen_base_block * 2048, 16));
+    im.Text("Char Offset: 0x%", formatInt(ppu.bg[background_selected].char_base_block * 16384, 16));
 
-    ImGui.NewLine();
+    im.NewLine();
     if mode_lut[ppu.bg_mode].bg_rs_mode[background_selected] {
-        ImGui.Text("Scale/Rotate Mode");
-        ImGui.Text("X: % (raw: 0x%)", ppu.bg[background_selected].anchor_x, formatInt(ppu.bg[background_selected].anchor_x_raw, 16, 1));
-        ImGui.Text("Y: % (raw: 0x%)", ppu.bg[background_selected].anchor_y, formatInt(ppu.bg[background_selected].anchor_y_raw, 16, 1));
-        ImGui.Text("Wraparound: %", ppu.bg[background_selected].wraparound);
-        ImGui.Text("Transform: % | % | % | %", ppu.bg[background_selected].pa, ppu.bg[background_selected].pb, ppu.bg[background_selected].pc, ppu.bg[background_selected].pd);
-        ImGui.Text("Transform (Raw): 0x% | 0x% | 0x% | 0x%", formatInt(ppu.bg[background_selected].dx, 16, 8), formatInt(ppu.bg[background_selected].dmx, 16, 8), formatInt(ppu.bg[background_selected].dy, 16, 8), formatInt(ppu.bg[background_selected].dmy, 16, 8));
+        im.Text("Scale/Rotate Mode");
+        im.Text("X: % (raw: 0x%)", ppu.bg[background_selected].anchor_x, formatInt(ppu.bg[background_selected].anchor_x_raw, 16, 1));
+        im.Text("Y: % (raw: 0x%)", ppu.bg[background_selected].anchor_y, formatInt(ppu.bg[background_selected].anchor_y_raw, 16, 1));
+        im.Text("Wraparound: %", ppu.bg[background_selected].wraparound);
+        im.Text("Transform: % | % | % | %", ppu.bg[background_selected].pa, ppu.bg[background_selected].pb, ppu.bg[background_selected].pc, ppu.bg[background_selected].pd);
+        im.Text("Transform (Raw): 0x% | 0x% | 0x% | 0x%", formatInt(ppu.bg[background_selected].dx, 16, 8), formatInt(ppu.bg[background_selected].dmx, 16, 8), formatInt(ppu.bg[background_selected].dy, 16, 8), formatInt(ppu.bg[background_selected].dmy, 16, 8));
     } else {
-        ImGui.Text("Text Mode");
-        ImGui.Text("X: %", formatInt(ppu.bg[background_selected].x_off, 10, 1));
-        ImGui.Text("Y: %", formatInt(ppu.bg[background_selected].y_off, 10, 1));
+        im.Text("Text Mode");
+        im.Text("X: %", formatInt(ppu.bg[background_selected].x_off, 10, 1));
+        im.Text("Y: %", formatInt(ppu.bg[background_selected].y_off, 10, 1));
     }
 
-    ImGui.End();
+    im.End();
 }
 
 overflows : s32 = 0;
 channel_selected : s32 = 1;
 apu_window :: () {
-    ImGui.Begin("apu");
-    ImGui.Text_CFormat("Overflows: %d", overflows);
-    ImGui.Text_CFormat("Bias: %d", apu.bias);
-    ImGui.Text_CFormat("Sampling Frequency: %d", apu.sampling_frequency);
-    ImGui.Text_CFormat("Played Samples: %d", apu.played_samples);
-    ImGui.Text_CFormat("Samples in SDL: %d", SDL_GetQueuedAudioSize(apu.dev) / 4);
-    if ImGui.Button("Dump SDL Samples") {
-        SDL_ClearQueuedAudio(apu.dev);
-    }
-    ImGui.InputInt("Channel", *channel_selected, 1, 1, .CharsDecimal);
+    im.Begin("apu");
+    im.Text_CFormat("Overflows: %d", overflows);
+    im.Text_CFormat("Bias: %d", apu.bias);
+    im.Text_CFormat("Sampling Frequency: %d", apu.sampling_frequency);
+    im.Text_CFormat("Played Samples: %d", apu.played_samples);
+    im.InputInt("Channel", *channel_selected, 1, 1, .CharsDecimal);
     if channel_selected < 1 then channel_selected = 1;
     if channel_selected > 6 then channel_selected = 6;
     if channel_selected == {
         case 1;
-        ImGui.Text_CFormat("Sweep Shift Count: %d", apu.chan_1.sweep_shift_cnt);
-        ImGui.Text("Sweep Direction: %crease", ifx apu.chan_1.sweep_freq_decrease then "De" else "In");
-        ImGui.Text_CFormat("Sweep Time: %d", apu.chan_1.sweep_time);
-        ImGui.Text_CFormat("Envelope Initial Volume: %d", apu.chan_1.envelope_initial_volume);
-        ImGui.Text("Envelope Direction: %crease", ifx apu.chan_1.envelope_increase then "De" else "In");
-        ImGui.Text_CFormat("Envelope Speed: %d", apu.chan_1.envelope_speed);
-        ImGui.Text_CFormat("Duty Cycle: %d", apu.chan_1.duty_cycle);
-        ImGui.Text("Use Length: %", apu.chan_1.use_length);
-        ImGui.Text_CFormat("Sound Length: %d", apu.chan_1.sound_length);
-        ImGui.Text_CFormat("Frequency: %d", apu.chan_1.frequency);
+        im.Text_CFormat("Sweep Shift Count: %d", apu.chan_1.sweep_shift_cnt);
+        im.Text("Sweep Direction: %crease", ifx apu.chan_1.sweep_freq_decrease then "De" else "In");
+        im.Text_CFormat("Sweep Time: %d", apu.chan_1.sweep_time);
+        im.Text_CFormat("Envelope Initial Volume: %d", apu.chan_1.envelope_initial_volume);
+        im.Text("Envelope Direction: %crease", ifx apu.chan_1.envelope_increase then "De" else "In");
+        im.Text_CFormat("Envelope Speed: %d", apu.chan_1.envelope_speed);
+        im.Text_CFormat("Duty Cycle: %d", apu.chan_1.duty_cycle);
+        im.Text("Use Length: %", apu.chan_1.use_length);
+        im.Text_CFormat("Sound Length: %d", apu.chan_1.sound_length);
+        im.Text_CFormat("Frequency: %d", apu.chan_1.frequency);
         case 2;
-        ImGui.Text_CFormat("Envelope Initial Volume: %d", apu.chan_2.envelope_initial_volume);
-        ImGui.Text("Envelope Direction: %crease", ifx apu.chan_2.envelope_increase then "De" else "In");
-        ImGui.Text_CFormat("Envelope Speed: %d", apu.chan_2.envelope_speed);
-        ImGui.Text_CFormat("Duty Cycle: %d", apu.chan_2.duty_cycle);
-        ImGui.Text("Use Length: %", apu.chan_2.use_length);
-        ImGui.Text_CFormat("Sound Length: %d", apu.chan_2.sound_length);
-        ImGui.Text_CFormat("Frequency: %d", apu.chan_2.frequency);
+        im.Text_CFormat("Envelope Initial Volume: %d", apu.chan_2.envelope_initial_volume);
+        im.Text("Envelope Direction: %crease", ifx apu.chan_2.envelope_increase then "De" else "In");
+        im.Text_CFormat("Envelope Speed: %d", apu.chan_2.envelope_speed);
+        im.Text_CFormat("Duty Cycle: %d", apu.chan_2.duty_cycle);
+        im.Text("Use Length: %", apu.chan_2.use_length);
+        im.Text_CFormat("Sound Length: %d", apu.chan_2.sound_length);
+        im.Text_CFormat("Frequency: %d", apu.chan_2.frequency);
         case 5;
-        ImGui.Text("Enable: %%", ifx apu.chan_a.enable_l then "L" else "-", ifx apu.chan_a.enable_r then "R" else "-");
-        ImGui.Text("Volume: %", ifx apu.chan_a.volume then "100%" else "50%");
-        ImGui.Text_CFormat("Timer Select: %d", apu.chan_a.timer_select);
-        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_a.rb.r & 0x1f);
-        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_a.rb.w & 0x1f);
-        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_a.rb.w - apu.fifo_a.rb.r);
+        im.Text("Enable: %%", ifx apu.chan_a.enable_l then "L" else "-", ifx apu.chan_a.enable_r then "R" else "-");
+        im.Text("Volume: %", ifx apu.chan_a.volume then "100%" else "50%");
+        im.Text_CFormat("Timer Select: %d", apu.chan_a.timer_select);
+        im.Text_CFormat("FIFO R: %d", apu.fifo_a.rb.r & 0x1f);
+        im.Text_CFormat("FIFO W: %d", apu.fifo_a.rb.w & 0x1f);
+        im.Text_CFormat("FIFO Count: %d", apu.fifo_a.rb.w - apu.fifo_a.rb.r);
         case 6;
-        ImGui.Text("Enable: %%", ifx apu.chan_b.enable_l then "L" else "-", ifx apu.chan_b.enable_r then "R" else "-");
-        ImGui.Text("Volume: %", ifx apu.chan_b.volume then "100%" else "50%");
-        ImGui.Text_CFormat("Timer Select: %d", apu.chan_b.timer_select);
-        ImGui.Text_CFormat("FIFO R: %d", apu.fifo_b.rb.r & 0x1f);
-        ImGui.Text_CFormat("FIFO W: %d", apu.fifo_b.rb.w & 0x1f);
-        ImGui.Text_CFormat("FIFO Count: %d", apu.fifo_b.rb.w - apu.fifo_b.rb.r);
+        im.Text("Enable: %%", ifx apu.chan_b.enable_l then "L" else "-", ifx apu.chan_b.enable_r then "R" else "-");
+        im.Text("Volume: %", ifx apu.chan_b.volume then "100%" else "50%");
+        im.Text_CFormat("Timer Select: %d", apu.chan_b.timer_select);
+        im.Text_CFormat("FIFO R: %d", apu.fifo_b.rb.r & 0x1f);
+        im.Text_CFormat("FIFO W: %d", apu.fifo_b.rb.w & 0x1f);
+        im.Text_CFormat("FIFO Count: %d", apu.fifo_b.rb.w - apu.fifo_b.rb.r);
     }
-    ImGui.End();
+    im.End();
 }
 
 disassemble_immediate :: (val: u32) -> string {
@@ -1253,20 +1249,20 @@ disasm_scroll_state := 0;
 disasm_mode := false;
 disasm_jump_buffer: [8]u8;
 disasm_window :: () {
-    ImGui.Begin("disasm", null, .NoScrollbar | .NoScrollWithMouse);
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("disasm", null, .NoScrollbar | .NoScrollWithMouse);
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             disasm_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             disasm_scroll_state -= 1;
             disasm_scroll_state = max(disasm_scroll_state, 0);
         }
     }
-    if ImGui.Button("Jump to PC") {
+    if im.Button("Jump to PC") {
         disasm_scroll_state = cpu.reg[15] / ifx get_status_bit(.T) then 2 else 4;
     }
-    ImGui.SameLine();
-    if ImGui.Button(tprint("%\0", ifx disasm_mode then "T" else "A").data) {
+    im.SameLine();
+    if im.Button(tprint("%\0", ifx disasm_mode then "T" else "A").data) {
         if disasm_mode {
             disasm_scroll_state /= 2;
             disasm_mode = false;
@@ -1275,15 +1271,15 @@ disasm_window :: () {
             disasm_mode = true;
         }
     }
-    ImGui.SameLine();
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.InputText("Jump to...", disasm_jump_buffer.data, 8) {
+    im.SameLine();
+    im.Text("0x");
+    im.SameLine();
+    if im.InputText("Jump to...", disasm_jump_buffer.data, 8) {
         str := string.{7, disasm_jump_buffer.data};
         parsed := string_to_int(str, 16);
         disasm_scroll_state = parsed / ifx disasm_mode then 2 else 4;
     }
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    for 0..cast(int)im.GetWindowSize().y {
         addr : u32 = xx ((disasm_scroll_state + xx it) * ifx disasm_mode then 2 else 4);
         to_print := ifx !disasm_mode then
             disassemble_arm_instruction(read_32(addr, true, true))
@@ -1291,21 +1287,21 @@ disasm_window :: () {
             has_breakpoint := ifx !disasm_mode then ((read_32(addr, true, true) & 0xfff000f0) == 0xe1200070) else ((read_16(addr, true, true) & 0xff00) == 0xbe00);
         in_history, history_idx := array_find(cpu.pc_history, addr);
         if addr == cpu.reg[15] {
-            ImGui.TextColored(.{0, 1, 0, 1}, "%\t%", addr, to_print);
+            im.TextColored(.{0, 1, 0, 1}, "%\t%", addr, to_print);
         } else if has_breakpoint {
-            ImGui.TextColored(.{1, 0, 0, 1}, "%\t%", addr, to_print);
+            im.TextColored(.{1, 0, 0, 1}, "%\t%", addr, to_print);
         } else if in_history {
             idx := cpu.pc_history_idx - history_idx - 1;
             if idx < 0 then idx += 64;
             if idx > 63 then idx -= 64;
-            ImGui.TextColored(.{(idx * (1.0 / 64.0)), 1, (idx * (1.0 / 64.0)), 1}, "%\t%", addr, to_print);
+            im.TextColored(.{(idx * (1.0 / 64.0)), 1, (idx * (1.0 / 64.0)), 1}, "%\t%", addr, to_print);
         } else {
-            ImGui.Text("%\t%", addr, to_print);
+            im.Text("%\t%", addr, to_print);
         }
-        if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("0x%", ifx !disasm_mode then read_32(addr, true, true) else read_16(addr, true, true));
+        if im.IsItemHovered() {
+            im.SetTooltip("0x%", ifx !disasm_mode then read_32(addr, true, true) else read_16(addr, true, true));
         }
-        if ImGui.IsItemClicked() {
+        if im.IsItemClicked() {
             if !disasm_mode {
                 ins := read_32(addr, true, true);
                 if has_breakpoint {
@@ -1339,7 +1335,7 @@ disasm_window :: () {
             }
         }
     }
-    ImGui.End();
+    im.End();
 }
 
 keypad_window :: () {
@@ -1367,71 +1363,71 @@ DONE
     "    \\___________________________/"];
     off := Vector4.{1.0, 1.0, 1.0, 1.0};
     on := Vector4.{1.0, 0.0, 0.0, 1.0};
-    ImGui.Begin("keypad");
-    ImGui.PushStyleVar(.ItemSpacing, .{0.0, 0.0});
-    ImGui.Text("%", controller_split[0]);
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x200) != 0 then on else off, "%", controller_split[1]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[2]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x100) != 0 then on else off, "%", controller_split[3]);
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x200) != 0 then on else off, "%", controller_split[4]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[5]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x100) != 0 then on else off, "%", controller_split[6]);
-    ImGui.Text("%", controller_split[7]);
-    ImGui.Text("%", controller_split[8]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x40) != 0 then on else off, "%", controller_split[9]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[10]);
-    ImGui.Text("%", controller_split[11]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x20) != 0 then on else off, "%", controller_split[12]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x10) != 0 then on else off, "%", controller_split[13]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[14]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x1) != 0 then on else off, "%", controller_split[15]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[16]);
-    ImGui.Text("%", controller_split[17]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x80) != 0 then on else off, "%", controller_split[18]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[19]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x8) != 0 then on else off, "%", controller_split[20]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[21]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x2) != 0 then on else off, "%", controller_split[22]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[23]);
-    ImGui.Text("%", controller_split[24]);
-    ImGui.SameLine();
-    ImGui.TextColored(ifx (ppu.keypad_state & 0x4) != 0 then on else off, "%", controller_split[25]);
-    ImGui.SameLine();
-    ImGui.Text("%", controller_split[26]);
-    ImGui.Text("%", controller_split[27]);
-    ImGui.Text("%", controller_split[28]);
-    ImGui.PopStyleVar();
-    ImGui.End();
+    im.Begin("keypad");
+    im.PushStyleVar(.ItemSpacing, .{0.0, 0.0});
+    im.Text("%", controller_split[0]);
+    im.TextColored(ifx (ppu.keypad_state & 0x200) != 0 then on else off, "%", controller_split[1]);
+    im.SameLine();
+    im.Text("%", controller_split[2]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x100) != 0 then on else off, "%", controller_split[3]);
+    im.TextColored(ifx (ppu.keypad_state & 0x200) != 0 then on else off, "%", controller_split[4]);
+    im.SameLine();
+    im.Text("%", controller_split[5]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x100) != 0 then on else off, "%", controller_split[6]);
+    im.Text("%", controller_split[7]);
+    im.Text("%", controller_split[8]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x40) != 0 then on else off, "%", controller_split[9]);
+    im.SameLine();
+    im.Text("%", controller_split[10]);
+    im.Text("%", controller_split[11]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x20) != 0 then on else off, "%", controller_split[12]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x10) != 0 then on else off, "%", controller_split[13]);
+    im.SameLine();
+    im.Text("%", controller_split[14]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x1) != 0 then on else off, "%", controller_split[15]);
+    im.SameLine();
+    im.Text("%", controller_split[16]);
+    im.Text("%", controller_split[17]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x80) != 0 then on else off, "%", controller_split[18]);
+    im.SameLine();
+    im.Text("%", controller_split[19]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x8) != 0 then on else off, "%", controller_split[20]);
+    im.SameLine();
+    im.Text("%", controller_split[21]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x2) != 0 then on else off, "%", controller_split[22]);
+    im.SameLine();
+    im.Text("%", controller_split[23]);
+    im.Text("%", controller_split[24]);
+    im.SameLine();
+    im.TextColored(ifx (ppu.keypad_state & 0x4) != 0 then on else off, "%", controller_split[25]);
+    im.SameLine();
+    im.Text("%", controller_split[26]);
+    im.Text("%", controller_split[27]);
+    im.Text("%", controller_split[28]);
+    im.PopStyleVar();
+    im.End();
 }
 
 confirm_save := false;
 confirm_load := false;
 save_window :: () {
-    ImGui.Begin("save data", null);
-    ImGui.Text("Save Data Type: %", cpu.backup_type);
+    im.Begin("save data", null);
+    im.Text("Save Data Type: %", cpu.backup_type);
     if cpu.backup_type == {
         case .EEPROM;
-        ImGui.Text("Size: %", cpu.eeprom_size);
+        im.Text("Size: %", cpu.eeprom_size);
     }
 
-    if ImGui.Button(ifx confirm_save then "Confirm Save##save".data else "Save##save".data) {
+    if im.Button(ifx confirm_save then "Confirm Save##save".data else "Save##save".data) {
         if confirm_save {
             file_name := tprint("%.gbasav", cpu.cart_name);
             f := file_open(file_name, true, false);
@@ -1452,8 +1448,8 @@ save_window :: () {
             confirm_save = true;
         }
     }
-    ImGui.SameLine();
-    if ImGui.Button(ifx confirm_load then "Confirm Load##load".data else "Load##load".data) {
+    im.SameLine();
+    if im.Button(ifx confirm_load then "Confirm Load##load".data else "Load##load".data) {
         if confirm_load {
             file_name := tprint("%.gbasav", cpu.cart_name);
             f := file_open(file_name, false);
@@ -1475,167 +1471,167 @@ save_window :: () {
         }
     }
 
-    ImGui.End();
+    im.End();
 }
 
 iwram_scroll_state := 0;
 iwram_jump_buffer: [5]u8;
 iwram_window :: () {
-    ImGui.Begin("iwram", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("iwram", null, .NoScrollbar | .NoScrollWithMouse);
+    im.Text("0x");
+    im.SameLine();
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             iwram_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             iwram_scroll_state -= 1;
             iwram_scroll_state = max(iwram_scroll_state, 0);
         }
     }
-    if ImGui.InputText("Jump to...", iwram_jump_buffer.data, 5) {
+    if im.InputText("Jump to...", iwram_jump_buffer.data, 5) {
         str := string.{4, iwram_jump_buffer.data};
         parsed := string_to_int(str, 16);
         iwram_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##iwram", 17, .Borders | .RowBg | .SizingFixedFit);
-    ImGui.TableNextRow();
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    im.BeginTable("##iwram", 17, .Borders | .RowBg | .SizingFixedFit);
+    im.TableNextRow();
+    for 0..cast(int)im.GetWindowSize().y {
         if (it + iwram_scroll_state + 1) * 16 > 0x8000 {
             iwram_scroll_state = (0x8000 - 16 * it) / 16;
             break;
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("0x%04x", (it + iwram_scroll_state) * 16);
+        im.TableNextColumn();
+        im.Text_CFormat("0x%04x", (it + iwram_scroll_state) * 16);
         for it2 : 0..15 {
-            ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", cpu.memory.iwram._8[(it + iwram_scroll_state) * 16 + it2]);
-            if ImGui.IsItemHovered() {
-                ImGui.SetTooltip("0x%", 0x03000000 + (it + iwram_scroll_state) * 16 + it2);
+            im.TableNextColumn();
+            im.Text_CFormat("%02x", cpu.memory.iwram._8[(it + iwram_scroll_state) * 16 + it2]);
+            if im.IsItemHovered() {
+                im.SetTooltip("0x%", 0x03000000 + (it + iwram_scroll_state) * 16 + it2);
             }
         }
     }
-    ImGui.EndTable();
-    ImGui.End();
+    im.EndTable();
+    im.End();
 }
 
 ewram_scroll_state := 0;
 ewram_jump_buffer: [6]u8;
 ewram_window :: () {
-    ImGui.Begin("ewram", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("ewram", null, .NoScrollbar | .NoScrollWithMouse);
+    im.Text("0x");
+    im.SameLine();
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             ewram_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             ewram_scroll_state -= 1;
             ewram_scroll_state = max(ewram_scroll_state, 0);
         }
     }
-    if ImGui.InputText("Jump to...", ewram_jump_buffer.data, 6) {
+    if im.InputText("Jump to...", ewram_jump_buffer.data, 6) {
         str := string.{5, ewram_jump_buffer.data};
         parsed := string_to_int(str, 16);
         ewram_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##ewram", 17, .Borders | .RowBg | .SizingFixedFit);
-    ImGui.TableNextRow();
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    im.BeginTable("##ewram", 17, .Borders | .RowBg | .SizingFixedFit);
+    im.TableNextRow();
+    for 0..cast(int)im.GetWindowSize().y {
         if (it + ewram_scroll_state + 1) * 16 > 0x40000 {
             ewram_scroll_state = (0x40000 - 16 * it) / 16;
             break;
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("0x%05x", (it + ewram_scroll_state) * 16);
+        im.TableNextColumn();
+        im.Text_CFormat("0x%05x", (it + ewram_scroll_state) * 16);
         for it2 : 0..15 {
-            ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", cpu.memory.ewram._8[(it + ewram_scroll_state) * 16 + it2]);
-            if ImGui.IsItemHovered() {
-                ImGui.SetTooltip("0x%", 0x02000000 + (it + ewram_scroll_state) * 16 + it2);
+            im.TableNextColumn();
+            im.Text_CFormat("%02x", cpu.memory.ewram._8[(it + ewram_scroll_state) * 16 + it2]);
+            if im.IsItemHovered() {
+                im.SetTooltip("0x%", 0x02000000 + (it + ewram_scroll_state) * 16 + it2);
             }
         }
     }
-    ImGui.EndTable();
-    ImGui.End();
+    im.EndTable();
+    im.End();
 }
 
 vram_scroll_state := 0;
 vram_jump_buffer: [6]u8;
 vram_window :: () {
-    ImGui.Begin("vram", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("vram", null, .NoScrollbar | .NoScrollWithMouse);
+    im.Text("0x");
+    im.SameLine();
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             vram_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             vram_scroll_state -= 1;
             vram_scroll_state = max(vram_scroll_state, 0);
         }
     }
-    if ImGui.InputText("Jump to...", vram_jump_buffer.data, 6) {
+    if im.InputText("Jump to...", vram_jump_buffer.data, 6) {
         str := string.{5, vram_jump_buffer.data};
         parsed := string_to_int(str, 16);
         vram_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##vram", 17, .Borders | .RowBg | .SizingFixedFit);
-    ImGui.TableNextRow();
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    im.BeginTable("##vram", 17, .Borders | .RowBg | .SizingFixedFit);
+    im.TableNextRow();
+    for 0..cast(int)im.GetWindowSize().y {
         if (it + vram_scroll_state + 1) * 16 > 0x18000 {
         vram_scroll_state = (0x18000 - 16 * it) / 16;
             break;
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("0x%05x", (it + vram_scroll_state) * 16);
+        im.TableNextColumn();
+        im.Text_CFormat("0x%05x", (it + vram_scroll_state) * 16);
         for it2 : 0..15 {
-            ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", ppu.memory.vram._8[(it + vram_scroll_state) * 16 + it2]);
-            if ImGui.IsItemHovered() {
-                ImGui.SetTooltip("0x%", 0x06000000 + (it + vram_scroll_state) * 16 + it2);
+            im.TableNextColumn();
+            im.Text_CFormat("%02x", ppu.memory.vram._8[(it + vram_scroll_state) * 16 + it2]);
+            if im.IsItemHovered() {
+                im.SetTooltip("0x%", 0x06000000 + (it + vram_scroll_state) * 16 + it2);
             }
         }
     }
-    ImGui.EndTable();
-    ImGui.End();
+    im.EndTable();
+    im.End();
 }
 
 palette_ram_scroll_state := 0;
 palette_ram_jump_buffer: [4]u8;
 palette_ram_window :: () {
-    ImGui.Begin("palette_ram", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("palette_ram", null, .NoScrollbar | .NoScrollWithMouse);
+    im.Text("0x");
+    im.SameLine();
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             palette_ram_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             palette_ram_scroll_state -= 1;
             palette_ram_scroll_state = max(palette_ram_scroll_state, 0);
         }
     }
-    if ImGui.InputText("Jump to...", palette_ram_jump_buffer.data, 4) {
+    if im.InputText("Jump to...", palette_ram_jump_buffer.data, 4) {
         str := string.{3, palette_ram_jump_buffer.data};
         parsed := string_to_int(str, 16);
         palette_ram_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##palette_ram", 17, .Borders | .RowBg | .SizingFixedFit);
-    ImGui.TableNextRow();
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    im.BeginTable("##palette_ram", 17, .Borders | .RowBg | .SizingFixedFit);
+    im.TableNextRow();
+    for 0..cast(int)im.GetWindowSize().y {
         if (it + palette_ram_scroll_state + 1) * 16 > 0x400 {
         palette_ram_scroll_state = (0x400 - 16 * it) / 16;
             break;
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("0x%03x", (it + palette_ram_scroll_state) * 16);
+        im.TableNextColumn();
+        im.Text_CFormat("0x%03x", (it + palette_ram_scroll_state) * 16);
         for it2 : 0..15 {
-            ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", ppu.memory.palette_ram._8[(it + palette_ram_scroll_state) * 16 + it2]);
-            if ImGui.IsItemHovered() {
-                ImGui.SetTooltip("0x%", 0x05000000 + (it + palette_ram_scroll_state) * 16 + it2);
+            im.TableNextColumn();
+            im.Text_CFormat("%02x", ppu.memory.palette_ram._8[(it + palette_ram_scroll_state) * 16 + it2]);
+            if im.IsItemHovered() {
+                im.SetTooltip("0x%", 0x05000000 + (it + palette_ram_scroll_state) * 16 + it2);
             }
         }
     }
-    ImGui.EndTable();
-    ImGui.End();
+    im.EndTable();
+    im.End();
 }
 
 oam_scroll_state := 0;
@@ -1646,167 +1642,167 @@ oam_window :: () {
         .["16x8", "32x8", "32x16", "64x32"],
         .["0x16", "8x32", "16x32", "32x64"]
     ];
-    ImGui.Begin("oam", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("oam", null, .NoScrollbar | .NoScrollWithMouse);
+    im.Text("0x");
+    im.SameLine();
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             oam_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             oam_scroll_state -= 1;
             oam_scroll_state = max(oam_scroll_state, 0);
         }
     }
-    if ImGui.InputText("Jump to...", oam_jump_buffer.data, 4) {
+    if im.InputText("Jump to...", oam_jump_buffer.data, 4) {
         str := string.{3, oam_jump_buffer.data};
         parsed := string_to_int(str, 16);
         oam_scroll_state = parsed;
     }
-    ImGui.BeginTable("##oam", 15, .Borders | .RowBg | .SizingFixedFit | .ScrollX);
-    ImGui.TableSetupColumn("Idx");
-    ImGui.TableSetupColumn("X");
-    ImGui.TableSetupColumn("Y");
-    ImGui.TableSetupColumn("TileIdx");
-    ImGui.TableSetupColumn("Size");
-    ImGui.TableSetupColumn("FlipH");
-    ImGui.TableSetupColumn("FlipV");
-    ImGui.TableSetupColumn("R&S");
-    ImGui.TableSetupColumn("R&SDoubleSize");
-    ImGui.TableSetupColumn("R&SParamIdx");
-    ImGui.TableSetupColumn("Mode");
-    ImGui.TableSetupColumn("Mosaic");
-    ImGui.TableSetupColumn("SinglePalette");
-    ImGui.TableSetupColumn("Prio");
-    ImGui.TableSetupColumn("Palette");
-    ImGui.TableHeadersRow();
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    im.BeginTable("##oam", 15, .Borders | .RowBg | .SizingFixedFit | .ScrollX);
+    im.TableSetupColumn("Idx");
+    im.TableSetupColumn("X");
+    im.TableSetupColumn("Y");
+    im.TableSetupColumn("TileIdx");
+    im.TableSetupColumn("Size");
+    im.TableSetupColumn("FlipH");
+    im.TableSetupColumn("FlipV");
+    im.TableSetupColumn("R&S");
+    im.TableSetupColumn("R&SDoubleSize");
+    im.TableSetupColumn("R&SParamIdx");
+    im.TableSetupColumn("Mode");
+    im.TableSetupColumn("Mosaic");
+    im.TableSetupColumn("SinglePalette");
+    im.TableSetupColumn("Prio");
+    im.TableSetupColumn("Palette");
+    im.TableHeadersRow();
+    for 0..cast(int)im.GetWindowSize().y {
         if (it + oam_scroll_state + 1) > 128 {
             oam_scroll_state = (128 - it);
             break;
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%03d", it + oam_scroll_state);
-        if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("% | % | % | %", ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pa, ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pb,  ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pc, ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pd);
+        im.TableNextColumn();
+        im.Text_CFormat("%03d", it + oam_scroll_state);
+        if im.IsItemHovered() {
+            im.SetTooltip("% | % | % | %", ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pa, ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pb,  ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pc, ppu.oam_param[ppu.oam[it + oam_scroll_state].rotate_scale_param_idx].pd);
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].x);
-        if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("Sprite: %-%, Bound: %-%", formatInt(ppu.oam[it + oam_scroll_state].min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_max_x, 10, 1));
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].x);
+        if im.IsItemHovered() {
+            im.SetTooltip("Sprite: %-%, Bound: %-%", formatInt(ppu.oam[it + oam_scroll_state].min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_min_x, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_max_x, 10, 1));
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].y);
-        if ImGui.IsItemHovered() {
-            ImGui.SetTooltip("Sprite: %-%, Bound: %-%", formatInt(ppu.oam[it + oam_scroll_state].min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_max_y, 10, 1));
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].y);
+        if im.IsItemHovered() {
+            im.SetTooltip("Sprite: %-%, Bound: %-%", formatInt(ppu.oam[it + oam_scroll_state].min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].max_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_min_y, 10, 1), formatInt(ppu.oam[it + oam_scroll_state].bounding_box_max_y, 10, 1));
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].tile_idx);
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%s", oam_sizing_lut[ppu.oam[it + oam_scroll_state].shape][ppu.oam[it + oam_scroll_state].size].data);
-        ImGui.TableNextColumn();
-        ImGui.Text("%", ppu.oam[it + oam_scroll_state].flip_h);
-        ImGui.TableNextColumn();
-        ImGui.Text("%", ppu.oam[it + oam_scroll_state].flip_v);
-        ImGui.TableNextColumn();
-        ImGui.Text("%", ppu.oam[it + oam_scroll_state].rotate_scale);
-        ImGui.TableNextColumn();
-        ImGui.Text("%", ppu.oam[it + oam_scroll_state].rotate_scale_double_size);
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].rotate_scale_param_idx);
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].mode);
-        ImGui.TableNextColumn();
-        ImGui.Text("%", ppu.oam[it + oam_scroll_state].mosaic);
-        ImGui.TableNextColumn();
-        ImGui.Text("%", ppu.oam[it + oam_scroll_state].single_palette);
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].prio);
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].palette);
-        ImGui.TableNextRow();
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].tile_idx);
+        im.TableNextColumn();
+        im.Text_CFormat("%s", oam_sizing_lut[ppu.oam[it + oam_scroll_state].shape][ppu.oam[it + oam_scroll_state].size].data);
+        im.TableNextColumn();
+        im.Text("%", ppu.oam[it + oam_scroll_state].flip_h);
+        im.TableNextColumn();
+        im.Text("%", ppu.oam[it + oam_scroll_state].flip_v);
+        im.TableNextColumn();
+        im.Text("%", ppu.oam[it + oam_scroll_state].rotate_scale);
+        im.TableNextColumn();
+        im.Text("%", ppu.oam[it + oam_scroll_state].rotate_scale_double_size);
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].rotate_scale_param_idx);
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].mode);
+        im.TableNextColumn();
+        im.Text("%", ppu.oam[it + oam_scroll_state].mosaic);
+        im.TableNextColumn();
+        im.Text("%", ppu.oam[it + oam_scroll_state].single_palette);
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].prio);
+        im.TableNextColumn();
+        im.Text_CFormat("%d", ppu.oam[it + oam_scroll_state].palette);
+        im.TableNextRow();
     }
-    ImGui.EndTable();
-    ImGui.End();
+    im.EndTable();
+    im.End();
 }
 
 dma_selected : s32 = 0;
 dma_window :: () {
-    ImGui.Begin("dma", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.InputInt("Channel", *dma_selected, 1, 1, .CharsDecimal);
+    im.Begin("dma", null, .NoScrollbar | .NoScrollWithMouse);
+    im.InputInt("Channel", *dma_selected, 1, 1, .CharsDecimal);
     if dma_selected < 0 then dma_selected = 0;
     if dma_selected > 3 then dma_selected = 3;
-    ImGui.Text("%abled", ifx cpu.dma[dma_selected].enable then "en" else "dis");
-    ImGui.Text("Source: 0x% (0x%)", formatInt(cpu.dma[dma_selected].src, 16, 1), formatInt(cpu.dma[dma_selected].src_int, 16, 1));
-    ImGui.Text("Destination: 0x% (0x%)", formatInt(cpu.dma[dma_selected].dst, 16, 1), formatInt(cpu.dma[dma_selected].dst_int, 16, 1));
-    ImGui.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count_int, 16, 1));
-    ImGui.Text("Enable: %", cpu.dma[dma_selected].enable);
-    ImGui.Text("IRQ on complete: %", cpu.dma[dma_selected].irq);
-    ImGui.Text("Repeat: %", cpu.dma[dma_selected].repeat);
-    ImGui.Text("Transfer Size: %-bit", ifx cpu.dma[dma_selected].large_transfer then "32" else "16");
-    ImGui.Text("Source Address Control: %", cpu.dma[dma_selected].src_addr_control);
-    ImGui.Text("Destination Address Control: %", cpu.dma[dma_selected].dst_addr_control);
-    ImGui.Text("Start Timing: %", cpu.dma[dma_selected].start_timing);
-    ImGui.End();
+    im.Text("%abled", ifx cpu.dma[dma_selected].enable then "en" else "dis");
+    im.Text("Source: 0x% (0x%)", formatInt(cpu.dma[dma_selected].src, 16, 1), formatInt(cpu.dma[dma_selected].src_int, 16, 1));
+    im.Text("Destination: 0x% (0x%)", formatInt(cpu.dma[dma_selected].dst, 16, 1), formatInt(cpu.dma[dma_selected].dst_int, 16, 1));
+    im.Text("Size: 0x%", formatInt(cpu.dma[dma_selected].count_int, 16, 1));
+    im.Text("Enable: %", cpu.dma[dma_selected].enable);
+    im.Text("IRQ on complete: %", cpu.dma[dma_selected].irq);
+    im.Text("Repeat: %", cpu.dma[dma_selected].repeat);
+    im.Text("Transfer Size: %-bit", ifx cpu.dma[dma_selected].large_transfer then "32" else "16");
+    im.Text("Source Address Control: %", cpu.dma[dma_selected].src_addr_control);
+    im.Text("Destination Address Control: %", cpu.dma[dma_selected].dst_addr_control);
+    im.Text("Start Timing: %", cpu.dma[dma_selected].start_timing);
+    im.End();
 }
 
 window_window :: ()  {
-    ImGui.Begin("window");
-    ImGui.Text("Window 1:");
-    ImGui.Text("%abled, %2%3%4%5%6", ifx ppu.win[0].enable then "En" else "Dis",
+    im.Begin("window");
+    im.Text("Window 1:");
+    im.Text("%abled, %2%3%4%5%6", ifx ppu.win[0].enable then "En" else "Dis",
         ifx ppu.win[0].bg_enable[0] then "1" else "-",
         ifx ppu.win[0].bg_enable[1] then "2" else "-",
         ifx ppu.win[0].bg_enable[2] then "3" else "-",
         ifx ppu.win[0].bg_enable[3] then "4" else "-",
         ifx ppu.win[0].obj_enable then "O" else "-",
     );
-    ImGui.Text("Special effects %abled", ifx ppu.win[0].special_effect then "en" else "dis");
-    ImGui.Text("Min X: %", formatInt(ppu.win[0].min_x, 10, 1));
-    ImGui.Text("Max X: %", formatInt(ppu.win[0].max_x, 10, 1));
-    ImGui.Text("Min Y: %", formatInt(ppu.win[0].min_y, 10, 1));
-    ImGui.Text("Max Y: %", formatInt(ppu.win[0].max_y, 10, 1));
-    ImGui.NewLine();
-    ImGui.Text("Window 2:");
-    ImGui.Text("%abled, %2%3%4%5%6", ifx ppu.win[1].enable then "En" else "Dis",
+    im.Text("Special effects %abled", ifx ppu.win[0].special_effect then "en" else "dis");
+    im.Text("Min X: %", formatInt(ppu.win[0].min_x, 10, 1));
+    im.Text("Max X: %", formatInt(ppu.win[0].max_x, 10, 1));
+    im.Text("Min Y: %", formatInt(ppu.win[0].min_y, 10, 1));
+    im.Text("Max Y: %", formatInt(ppu.win[0].max_y, 10, 1));
+    im.NewLine();
+    im.Text("Window 2:");
+    im.Text("%abled, %2%3%4%5%6", ifx ppu.win[1].enable then "En" else "Dis",
         ifx ppu.win[1].bg_enable[0] then "1" else "-",
         ifx ppu.win[1].bg_enable[1] then "2" else "-",
         ifx ppu.win[1].bg_enable[2] then "3" else "-",
         ifx ppu.win[1].bg_enable[3] then "4" else "-",
         ifx ppu.win[1].obj_enable then "O" else "-",
     );
-    ImGui.Text("Special effects %abled", ifx ppu.win[1].special_effect then "en" else "dis");
-    ImGui.Text("Min X: %", formatInt(ppu.win[1].min_x, 10, 1));
-    ImGui.Text("Max X: %", formatInt(ppu.win[1].max_x, 10, 1));
-    ImGui.Text("Min Y: %", formatInt(ppu.win[1].min_y, 10, 1));
-    ImGui.Text("Max Y: %", formatInt(ppu.win[1].max_y, 10, 1));
-    ImGui.NewLine();
-    ImGui.Text("Outside Windows:");
-    ImGui.Text("%1%2%3%4%5",
+    im.Text("Special effects %abled", ifx ppu.win[1].special_effect then "en" else "dis");
+    im.Text("Min X: %", formatInt(ppu.win[1].min_x, 10, 1));
+    im.Text("Max X: %", formatInt(ppu.win[1].max_x, 10, 1));
+    im.Text("Min Y: %", formatInt(ppu.win[1].min_y, 10, 1));
+    im.Text("Max Y: %", formatInt(ppu.win[1].max_y, 10, 1));
+    im.NewLine();
+    im.Text("Outside Windows:");
+    im.Text("%1%2%3%4%5",
         ifx ppu.outside_win_bg_enable[0] then "1" else "-",
         ifx ppu.outside_win_bg_enable[1] then "2" else "-",
         ifx ppu.outside_win_bg_enable[2] then "3" else "-",
         ifx ppu.outside_win_bg_enable[3] then "4" else "-",
         ifx ppu.outside_win_obj_enable then "O" else "-",
     );
-    ImGui.NewLine();
-    ImGui.Text("OBJ Window:");
-    ImGui.Text("%abled, %2%3%4%5%6", ifx ppu.obj_win.enable then "En" else "Dis",
+    im.NewLine();
+    im.Text("OBJ Window:");
+    im.Text("%abled, %2%3%4%5%6", ifx ppu.obj_win.enable then "En" else "Dis",
         ifx ppu.obj_win.bg_enable[0] then "1" else "-",
         ifx ppu.obj_win.bg_enable[1] then "2" else "-",
         ifx ppu.obj_win.bg_enable[2] then "3" else "-",
         ifx ppu.obj_win.bg_enable[3] then "4" else "-",
         ifx ppu.obj_win.obj_enable then "O" else "-",
     );
-    ImGui.Text("Special effects %abled", ifx ppu.obj_win.special_effect then "en" else "dis");
-    ImGui.End();
+    im.Text("Special effects %abled", ifx ppu.obj_win.special_effect then "en" else "dis");
+    im.End();
 }
 
 blend_window :: () {
-    ImGui.Begin("blend");
-    ImGui.Text("Mode: %", ppu.special_effect);
-    ImGui.Text_CFormat("Coefficient A: %d", ppu.eva);
-    ImGui.Text_CFormat("Coefficient B: %d", ppu.evb);
-    ImGui.Text_CFormat("Coefficient Y: %d", ppu.evy);
-    ImGui.Text("First: %1%2%3%4%5%6",
+    im.Begin("blend");
+    im.Text("Mode: %", ppu.special_effect);
+    im.Text_CFormat("Coefficient A: %d", ppu.eva);
+    im.Text_CFormat("Coefficient B: %d", ppu.evb);
+    im.Text_CFormat("Coefficient Y: %d", ppu.evy);
+    im.Text("First: %1%2%3%4%5%6",
         ifx ppu.bg_first_target_pixel[0] then "1" else "-",
         ifx ppu.bg_first_target_pixel[1] then "2" else "-",
         ifx ppu.bg_first_target_pixel[2] then "3" else "-",
@@ -1814,7 +1810,7 @@ blend_window :: () {
         ifx ppu.obj_first_target_pixel then "O" else "-",
         ifx ppu.bd_first_target_pixel then "B" else "-"
     );
-    ImGui.Text("Second: %1%2%3%4%5%6",
+    im.Text("Second: %1%2%3%4%5%6",
         ifx ppu.bg_second_target_pixel[0] then "1" else "-",
         ifx ppu.bg_second_target_pixel[1] then "2" else "-",
         ifx ppu.bg_second_target_pixel[2] then "3" else "-",
@@ -1822,79 +1818,79 @@ blend_window :: () {
         ifx ppu.obj_second_target_pixel then "O" else "-",
         ifx ppu.bd_second_target_pixel then "B" else "-"
     );
-    ImGui.End();
+    im.End();
 }
 
 timer_selected : s32 = 0;
 timer_window :: () {
-    ImGui.Begin("timer");
-    ImGui.InputInt("Channel", *timer_selected, 1, 1, .CharsDecimal);
+    im.Begin("timer");
+    im.InputInt("Channel", *timer_selected, 1, 1, .CharsDecimal);
     if timer_selected < 0 timer_selected = 0;
     if timer_selected > 3 timer_selected = 3;
-    ImGui.Text("Enabled: %", cpu.timer[timer_selected].enable);
-    ImGui.Text("IRQ: %", cpu.timer[timer_selected].irq);
-    ImGui.Text("Count-Up Mode: %", cpu.timer[timer_selected].ignore_prescaler);
-    ImGui.Text_CFormat("Counter: 0x%04x", cpu.timer[timer_selected].counter);
-    ImGui.Text_CFormat("Reload: 0x%04x", cpu.timer[timer_selected].reload);
-    ImGui.Text_CFormat("Prescaler: %d", int.[1, 64, 256, 1024][cpu.timer[timer_selected].prescaler_selection]);
-    ImGui.End();
+    im.Text("Enabled: %", cpu.timer[timer_selected].enable);
+    im.Text("IRQ: %", cpu.timer[timer_selected].irq);
+    im.Text("Count-Up Mode: %", cpu.timer[timer_selected].ignore_prescaler);
+    im.Text_CFormat("Counter: 0x%04x", cpu.timer[timer_selected].counter);
+    im.Text_CFormat("Reload: 0x%04x", cpu.timer[timer_selected].reload);
+    im.Text_CFormat("Prescaler: %d", int.[1, 64, 256, 1024][cpu.timer[timer_selected].prescaler_selection]);
+    im.End();
 }
 
 rom_scroll_state := 0;
 rom_jump_buffer: [8]u8;
 rom_window :: () {
-    ImGui.Begin("rom", null, .NoScrollbar | .NoScrollWithMouse);
-    ImGui.Text("0x");
-    ImGui.SameLine();
-    if ImGui.IsWindowHovered() {
-        if ImGui.GetIO().MouseWheel < 0 {
+    im.Begin("rom", null, .NoScrollbar | .NoScrollWithMouse);
+    im.Text("0x");
+    im.SameLine();
+    if im.IsWindowHovered() {
+        if im.GetIO().MouseWheel < 0 {
             rom_scroll_state += 1;
-        } else if ImGui.GetIO().MouseWheel > 0 {
+        } else if im.GetIO().MouseWheel > 0 {
             rom_scroll_state -= 1;
             rom_scroll_state = max(rom_scroll_state, 0);
         }
     }
-    if ImGui.InputText("Jump to...", rom_jump_buffer.data, 8) {
+    if im.InputText("Jump to...", rom_jump_buffer.data, 8) {
         str := string.{7, rom_jump_buffer.data};
         parsed := string_to_int(str, 16);
         rom_scroll_state = parsed / 16;
     }
-    ImGui.BeginTable("##rom", 17, .Borders | .RowBg | .SizingFixedFit);
-    ImGui.TableNextRow();
-    for 0..cast(int)ImGui.GetWindowSize().y {
+    im.BeginTable("##rom", 17, .Borders | .RowBg | .SizingFixedFit);
+    im.TableNextRow();
+    for 0..cast(int)im.GetWindowSize().y {
         if (it + rom_scroll_state + 1) * 16 > cpu.memory.rom.count {
         oam_scroll_state = (cpu.memory.rom.count - 16 * it) / 16;
             break;
         }
-        ImGui.TableNextColumn();
-        ImGui.Text_CFormat("0x%07x", (it + rom_scroll_state) * 16);
+        im.TableNextColumn();
+        im.Text_CFormat("0x%07x", (it + rom_scroll_state) * 16);
         for it2 : 0..15 {
-            ImGui.TableNextColumn();
-            ImGui.Text_CFormat("%02x", cpu.memory.rom[(it + rom_scroll_state) * 16 + it2]);
-            if ImGui.IsItemHovered() {
-                ImGui.SetTooltip("0x%", 0x08000000 + (it + rom_scroll_state) * 16 + it2);
+            im.TableNextColumn();
+            im.Text_CFormat("%02x", cpu.memory.rom[(it + rom_scroll_state) * 16 + it2]);
+            if im.IsItemHovered() {
+                im.SetTooltip("0x%", 0x08000000 + (it + rom_scroll_state) * 16 + it2);
             }
         }
     }
-    ImGui.EndTable();
-    ImGui.End();
+    im.EndTable();
+    im.End();
 }
 
 #if #exists(__Iprof) {
     profiler_filter_selected : s32 = 0;
     profiler_window :: () {
-        ImGui.Begin("profiler");
-        ImGui.RadioButton("Filter None".data, *profiler_filter_selected, 0);
-        ImGui.RadioButton("Filter ARM Instructions".data, *profiler_filter_selected, 1);
-        ImGui.RadioButton("Filter THUMB Instructions".data, *profiler_filter_selected, 2);
+        im.Begin("profiler");
+        im.RadioButton("Filter None".data, *profiler_filter_selected, 0);
+        im.RadioButton("Filter ARM Instructions".data, *profiler_filter_selected, 1);
+        im.RadioButton("Filter THUMB Instructions".data, *profiler_filter_selected, 2);
         if report {
-            if ImGui.BeginTable("##reports", 5, .Borders | .RowBg | .SizingFixedFit) {
-                ImGui.TableSetupColumn(report.header[0].data);
-                ImGui.TableSetupColumn(report.header[1].data);
-                ImGui.TableSetupColumn(report.header[2].data);
-                ImGui.TableSetupColumn(report.header[3].data);
-                ImGui.TableSetupColumn("per iteration");
-                ImGui.TableHeadersRow();
+            if im.BeginTable("##reports", 5, .Borders | .RowBg | .SizingFixedFit) {
+                im.TableSetupColumn(report.header[0].data);
+                im.TableSetupColumn(report.header[1].data);
+                im.TableSetupColumn(report.header[2].data);
+                im.TableSetupColumn(report.header[3].data);
+                im.TableSetupColumn("per iteration");
+                im.TableHeadersRow();
                 for report.*.records {
                     if profiler_filter_selected == 1 {
                         if !starts_with(it.name, "arm_") continue;
@@ -1903,21 +1899,21 @@ rom_window :: () {
                         if !starts_with(it.name, "thumb_") continue;
                     }
                     if it.self_time < 0.00001 continue;
-                    ImGui.TableNextColumn();
-                    ImGui.Text("%", it.name);
-                    ImGui.TableNextColumn();
-                    ImGui.Text("%", it.self_time);
-                    ImGui.TableNextColumn();
-                    ImGui.Text("%", it.hier_time);
-                    ImGui.TableNextColumn();
-                    ImGui.Text("%", it.calls);
-                    ImGui.TableNextColumn();
-                    ImGui.Text("%", it.self_time / it.calls);
-                    ImGui.TableNextRow();
+                    im.TableNextColumn();
+                    im.Text("%", it.name);
+                    im.TableNextColumn();
+                    im.Text("%", it.self_time);
+                    im.TableNextColumn();
+                    im.Text("%", it.hier_time);
+                    im.TableNextColumn();
+                    im.Text("%", it.calls);
+                    im.TableNextColumn();
+                    im.Text("%", it.self_time / it.calls);
+                    im.TableNextRow();
                 }
-                ImGui.EndTable();
+                im.EndTable();
             }
         }
-        ImGui.End();
+        im.End();
     }
 }

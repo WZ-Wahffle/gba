@@ -1,8 +1,8 @@
-audio_cb :: (_: *void, data: *u8, len: s32) #c_call {
+audio_cb :: (data: *void, len: u32) #c_call {
     out : *float32 = xx data;
-    cnt := len / 4;
+    if len == 0 return;
     push_context {
-        for 0..cnt/2-1  {
+        for 0..len-1 {
             out[it * 2] = ring_buffer_read(*apu.out_buffer_l);
             out[it * 2 + 1] = ring_buffer_read(*apu.out_buffer_r);
         }

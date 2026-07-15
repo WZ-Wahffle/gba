@@ -662,6 +662,12 @@ step_ppu :: () {
                     draw_bitmap(ppu.draw_y, true, false);
                     merge_and_blend();
             }
+
+            for 0..SCREEN_WIDTH-1 {
+                idx := ppu.draw_y * SCREEN_WIDTH + it;
+                col := framebuffer[idx];
+                framebuffer[idx] = (col << 1) | 1;
+            }
         }
 
         if ppu.draw_x == 240 && ppu.draw_y < 160 {
@@ -685,150 +691,76 @@ step_ppu :: () {
 }
 
 font :: #run read_entire_file("in/ProggyClean.ttf");
-controller: *SDL_GameController;
 dt : float64;
 
 ui :: () {
-    quit := false;
-    SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
+    rl.SetTraceLogLevel(rl.TraceLogLevel.LOG_ERROR);
+    rl.InitWindow(window_width, window_height, "gba");
+    rl.SetTargetFPS(60);
 
-    spec: SDL_AudioSpec;
-    spec.channels = 2;
-    spec.format = AUDIO_F32;
-    spec.freq = SAMPLE_RATE;
-    spec.samples = CALLBACK_SIZE;
-    spec.callback = audio_cb;
-    apu.dev = SDL_OpenAudioDevice(null, 0, *spec, null, 0);
-    if apu.dev == 0 {
-        str: string;
-        str.data = SDL_GetError();
-        str.count = c_style_strlen(str.data);
-        print("Failed to initialize audio context: %\n", str);
-        exit(1);
-    }
-    SDL_PauseAudioDevice(apu.dev, 0);
+    img := rl.Image.{framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 1, rl.PixelFormat.PIXELFORMAT_UNCOMPRESSED_R5G5B5A1};
+    tex := rl.LoadTextureFromImage(img);
 
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
-    win := SDL_CreateWindow("gba", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, window_width, window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    gl_context := SDL_GL_CreateContext(win);
-    gl_load(*gl, SDL_GL_GetProcAddress);
-    renderer := SDL_CreateRenderer(win, -1, .ACCELERATED | .TARGETTEXTURE);
-    ImGui.CreateContext();
-    ImGui_ImplSdl_Init(win);
-    ImGui.StyleColorsDark();
-    ImGui.GetIO().Fonts.AddFontFromMemoryTTF(ImGui.GetIO().Fonts, font.data, font.count, FONT_SIZE);
+    rl.InitAudioDevice();
+    rl.SetAudioStreamBufferSizeDefault(4096);
+    apu.dev = rl.LoadAudioStream(SAMPLE_RATE, 32, 2);
+    rl.PlayAudioStream(apu.dev);
+    rl.SetAudioStreamCallback(apu.dev, audio_cb);
 
-    time := seconds_since_init();
-    keystate := SDL_GetKeyboardState(null);
-    while !quit {
-        new_time := seconds_since_init();
-        dt = new_time - time;
-        time = new_time;
-        event: SDL_Event;
-        while SDL_PollEvent(*event) {
-            ImGui_ImplSdl_ProcessEvent(*event);
-            if event.type == SDL_QUIT quit = true;
-            if event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(win) {
-                quit = true;
-            }
-            if event.type == SDL_KEYDOWN {
-                if event.key.keysym.sym == {
-                    case .SDLK_F9;
-                        cpu.emu_state = .STOPPED;
-                    case .SDLK_F10;
-                        cpu.emu_state = .STARTED;
-                    case .SDLK_F11;
-                        cpu.emu_state = .STEPPED;
-                }
-            }
-            if event.type == SDL_KEYDOWN && event.key.repeat == 0 && (event.key.keysym.mod & .KMOD_SHIFT) != 0 {
-                if event.key.keysym.sym == {
-                    case .SDLK_ESCAPE;
-                        quit = true;
-                    case .SDLK_TAB;
-                        show_header = !show_header;
-                    case .SDLK_a;
-                        show_apu = !show_apu;
-                    case .SDLK_b;
-                        show_blend = !show_blend;
-                    case .SDLK_c;
-                        show_cpu = !show_cpu;
-                    case .SDLK_d;
-                        show_disasm = !show_disasm;
-                    case .SDLK_e;
-                        show_ewram = !show_ewram;
-                    case .SDLK_g;
-                        show_ppu = !show_ppu;
-                    case .SDLK_i;
-                        show_iwram = !show_iwram;
-                    case .SDLK_k;
-                        show_keypad = !show_keypad;
-                    case .SDLK_m;
-                        show_dma = !show_dma;
-                    case .SDLK_o;
-                        show_oam = !show_oam;
-                    case .SDLK_p;
-                        show_palette_ram = !show_palette_ram;
-                    case .SDLK_r;
-                        show_rom = !show_rom;
-                    case .SDLK_s;
-                        show_save = !show_save;
-                    case .SDLK_t;
-                        show_timer = !show_timer;
-                    case .SDLK_v;
-                        show_vram = !show_vram;
-                    case .SDLK_w;
-                        show_window = !show_window;
-                }
-            }
-            if event.type == SDL_CONTROLLERDEVICEADDED {
-                if controller == null
-                    controller = SDL_GameControllerOpen(event.cdevice.which);
-            }
-            if event.type == SDL_CONTROLLERDEVICEREMOVED {
-                if controller
-                    SDL_GameControllerClose(controller);
-            }
+    im.CreateContext();
+    im.GetIO().Fonts.AddFontFromMemoryTTF(im.GetIO().Fonts, font.data, font.count, FONT_SIZE);
+    rg.backend_setup();
+    im.StyleColorsDark();
+
+    while !rl.WindowShouldClose() {
+        if rl.IsKeyPressed(rl.KeyboardKey.KEY_F9) cpu.emu_state = .STOPPED;
+        if rl.IsKeyPressed(rl.KeyboardKey.KEY_F10) cpu.emu_state = .STARTED;
+        if rl.IsKeyPressed(rl.KeyboardKey.KEY_F11) cpu.emu_state = .STEPPED;
+        if rl.IsKeyDown(rl.KeyboardKey.KEY_LEFT_SHIFT) {
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_TAB) show_header = !show_header;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_A) show_apu = !show_apu;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_B) show_blend = !show_blend;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_C) show_cpu = !show_cpu;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_D) show_disasm = !show_disasm;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_E) show_ewram = !show_ewram;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_G) show_ppu = !show_ppu;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_I) show_iwram = !show_iwram;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_K) show_keypad = !show_keypad;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_M) show_dma = !show_dma;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_O) show_oam = !show_oam;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_P) show_palette_ram = !show_palette_ram;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_R) show_rom = !show_rom;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_S) show_save = !show_save;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_T) show_timer = !show_timer;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_V) show_vram = !show_vram;
+            if rl.IsKeyPressed(rl.KeyboardKey.KEY_W) show_window = !show_window;
         }
 
         // inputs
         ppu.keypad_state =
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B)) << 0) | // perhaps swap B and A on a less messed up controller
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A)) << 1) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK)) << 2) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START)) << 3) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) << 4) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) << 5) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP)) << 6) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN)) << 7) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) << 8) |
-            ((cast(u16)SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) << 9);
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) << 0) | // perhaps swap B and A on a less messed up controller
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) << 1) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_MIDDLE_LEFT)) << 2) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_MIDDLE_RIGHT)) << 3) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) << 4) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_LEFT_FACE_LEFT)) << 5) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_LEFT_FACE_UP)) << 6) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_LEFT_FACE_DOWN)) << 7) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_RIGHT_TRIGGER_1)) << 8) |
+            ((cast(u16)rl.IsGamepadButtonDown(0, rl.GamepadButton.GAMEPAD_BUTTON_LEFT_TRIGGER_1)) << 9);
 
-        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX) < -16384 {
+        if (rl.GetGamepadAxisMovement(0, rl.GamepadAxis.GAMEPAD_AXIS_LEFT_X) < -0.5) {
             ppu.keypad_state |= 0x20;
         }
-        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX) > 16384 {
+        if (rl.GetGamepadAxisMovement(0, rl.GamepadAxis.GAMEPAD_AXIS_LEFT_X) > 0.5) {
             ppu.keypad_state |= 0x10;
         }
-        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY) < -16384 {
+        if (rl.GetGamepadAxisMovement(0, rl.GamepadAxis.GAMEPAD_AXIS_LEFT_Y) < -0.5) {
             ppu.keypad_state |= 0x40;
         }
-        if SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY) > 16384 {
+        if (rl.GetGamepadAxisMovement(0, rl.GamepadAxis.GAMEPAD_AXIS_LEFT_Y) > 0.5) {
             ppu.keypad_state |= 0x80;
         }
-        SDL_PumpEvents();
-        if !keystate[SDL_SCANCODE_LSHIFT] && !keystate[SDL_SCANCODE_RSHIFT] then
-            ppu.keypad_state |=
-                (cast(u16, keystate[SDL_SCANCODE_A]) << 0) |
-                (cast(u16, keystate[SDL_SCANCODE_B]) << 1) |
-                (cast(u16, keystate[SDL_SCANCODE_TAB]) << 2) |
-                (cast(u16, keystate[SDL_SCANCODE_RETURN]) << 3) |
-                (cast(u16, keystate[SDL_SCANCODE_RIGHT]) << 4) |
-                (cast(u16, keystate[SDL_SCANCODE_LEFT]) << 5) |
-                (cast(u16, keystate[SDL_SCANCODE_UP]) << 6) |
-                (cast(u16, keystate[SDL_SCANCODE_DOWN]) << 7) |
-                (cast(u16, keystate[SDL_SCANCODE_R]) << 8) |
-                (cast(u16, keystate[SDL_SCANCODE_L]) << 9);
 
         step_all :: (cycle_count: int) {
             cpu.remaining_cycles += cycle_count;
@@ -878,27 +810,24 @@ ui :: () {
                 disasm_mode = get_status_bit(.T);
         }
 
-        SDL_RenderClear(renderer);
-        surface := SDL_CreateRGBSurfaceFrom(framebuffer.data, SCREEN_WIDTH, SCREEN_HEIGHT, 15, SCREEN_WIDTH * 2, 0x1f, 0x3e0, 0x7c00, 0);
-        defer SDL_FreeSurface(surface);
-        tex := SDL_CreateTextureFromSurface(renderer, surface);
-        defer SDL_DestroyTexture(tex);
-        SDL_RenderCopy(renderer, tex, null, null);
+        rl.ClearBackground(rl.BLACK);
+        rl.BeginDrawing();
+        rg.backend_frame_begin();
+        rl.DrawPixel(100, 100, rl.RED);
+
+        rl.UpdateTexture(tex, framebuffer.data);
+        rl.DrawTexturePro(tex, .{0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}, .{0, 0, xx rl.GetScreenWidth(), xx rl.GetScreenHeight()}, .{0.0, 0.0}, 0.0, rl.WHITE);
+
         // GUI
-        SDL_GL_MakeCurrent(win, gl_context);
-        ImGui_ImplSdl_NewFrame(win);
-        ImGui.NewFrame();
         draw_gui();
-        ImGui.Render();
-        ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
-        SDL_GL_SwapWindow(win);
+        rg.backend_frame_end();
+        rl.EndDrawing();
         reset_temporary_storage();
         #if #exists(__Iprof) {
             __Iprof.update(true);
             report = __Iprof.create_report();
         }
-        end_time := seconds_since_init();
-        // TODO: should probably make this refresh rate dependent
-        if end_time - time < 16.6 then sleep_milliseconds(xx (16.6 - ((end_time - time) * 1000)));
     }
+    rl.UnloadTexture(tex);
+
 }
